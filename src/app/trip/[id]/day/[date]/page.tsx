@@ -56,6 +56,9 @@ import {
   deleteActivity,
   createActivityFromPlace,
 } from "@/lib/storage"
+import { DayMap } from "@/components/maps/DayMap"
+import { PlaceSearch } from "@/components/maps/PlaceSearch"
+import { PlaceSearchResult } from "@/lib/maps"
 
 export default function DayPage() {
   const params = useParams()
@@ -67,6 +70,7 @@ export default function DayPage() {
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [activitySection, setActivitySection] = useState<ActivitySection>("morning")
+  const [showRoute, setShowRoute] = useState(true)
 
   // Activity form state
   const [activityTitle, setActivityTitle] = useState("")
@@ -77,6 +81,7 @@ export default function DayPage() {
   const [manualPlaceName, setManualPlaceName] = useState("")
   const [manualPlaceAddress, setManualPlaceAddress] = useState("")
   const [addMode, setAddMode] = useState<'saved' | 'search' | 'manual'>('saved')
+  const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
   useEffect(() => {
     const loadedTrip = getTrip(tripId)
@@ -143,6 +148,13 @@ export default function DayPage() {
         coordinates: savedPlace.coordinates,
         googlePlaceId: savedPlace.googlePlaceId
       }
+    } else if (addMode === 'search' && searchedPlace) {
+      place = {
+        name: searchedPlace.name,
+        address: searchedPlace.address,
+        coordinates: searchedPlace.coordinates,
+        googlePlaceId: searchedPlace.placeId
+      }
     } else {
       place = {
         name: manualPlaceName || activityTitle,
@@ -168,7 +180,15 @@ export default function DayPage() {
     }
 
     setIsActivityOpen(false)
+    setSearchedPlace(null)
     refreshTrip()
+  }
+
+  const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
+    setSearchedPlace(place)
+    if (!activityTitle) {
+      setActivityTitle(place.name)
+    }
   }
 
   const handleDeleteActivity = (activityId: string) => {
@@ -246,15 +266,13 @@ export default function DayPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Map Area */}
           <div className="lg:col-span-2">
-            <Card className="h-[400px] lg:h-[600px]">
+            <Card className="h-[400px] lg:h-[600px] overflow-hidden">
               <CardContent className="p-0 h-full">
-                <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Map will appear here</p>
-                    <p className="text-sm">Add activities with locations to see them on the map</p>
-                  </div>
-                </div>
+                <DayMap
+                  activities={day.activities}
+                  showRoute={showRoute}
+                  onRouteToggle={setShowRoute}
+                />
               </CardContent>
             </Card>
           </div>
@@ -377,11 +395,24 @@ export default function DayPage() {
               <label className="text-sm font-medium">Location</label>
               <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
                 <TabsList className="w-full">
+                  <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
                   {trip.savedPlaces.length > 0 && (
                     <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
                   )}
                   <TabsTrigger value="manual" className="flex-1">Manual</TabsTrigger>
                 </TabsList>
+                <TabsContent value="search" className="mt-2">
+                  <PlaceSearch
+                    onSelect={handlePlaceSearchSelect}
+                    placeholder="Search Google Maps..."
+                  />
+                  {searchedPlace && (
+                    <div className="mt-2 p-2 rounded-md bg-muted">
+                      <p className="font-medium text-sm">{searchedPlace.name}</p>
+                      <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                    </div>
+                  )}
+                </TabsContent>
                 <TabsContent value="saved" className="mt-2">
                   <Select value={selectedPlaceId} onValueChange={setSelectedPlaceId}>
                     <SelectTrigger>
