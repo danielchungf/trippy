@@ -4,6 +4,22 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
   ArrowLeft,
   Plus,
   MapPin,
@@ -14,7 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Bookmark,
-  GripVertical
+  GripVertical,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,10 +72,11 @@ import {
   updateActivity,
   deleteActivity,
   createActivityFromPlace,
+  reorderActivities,
 } from "@/lib/storage"
 import { DayMap } from "@/components/maps/DayMap"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
-import { PlaceSearchResult } from "@/lib/maps"
+import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
 
 export default function DayPage() {
   const params = useParams()
@@ -71,6 +89,19 @@ export default function DayPage() {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [activitySection, setActivitySection] = useState<ActivitySection>("morning")
   const [showRoute, setShowRoute] = useState(true)
+  const [isOptimizing, setIsOptimizing] = useState(false)
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // Activity form state
   const [activityTitle, setActivityTitle] = useState("")
@@ -201,6 +232,57 @@ export default function DayPage() {
     refreshTrip()
   }
 
+  const handleDragEnd = (event: DragEndEvent, section: ActivitySection) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const sectionActivities = activitiesBySection[section]
+      const oldIndex = sectionActivities.findIndex(a => a.id === active.id)
+      const newIndex = sectionActivities.findIndex(a => a.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Create new ordered array for this section
+        const reordered = [...sectionActivities]
+        const [removed] = reordered.splice(oldIndex, 1)
+        reordered.splice(newIndex, 0, removed)
+
+        // Get full activity order including all sections
+        const allActivityIds = [
+          ...activitiesBySection.morning.map(a => a.id),
+          ...activitiesBySection.afternoon.map(a => a.id),
+          ...activitiesBySection.evening.map(a => a.id),
+        ]
+
+        // Replace section activities with reordered ones
+        const sectionStart = section === 'morning' ? 0
+          : section === 'afternoon' ? activitiesBySection.morning.length
+          : activitiesBySection.morning.length + activitiesBySection.afternoon.length
+
+        const sectionLength = sectionActivities.length
+        allActivityIds.splice(sectionStart, sectionLength, ...reordered.map(a => a.id))
+
+        reorderActivities(tripId, date, allActivityIds)
+        refreshTrip()
+      }
+    }
+  }
+
+  const handleOptimizeRoute = async () => {
+    if (!day || day.activities.length < 3) return
+
+    setIsOptimizing(true)
+    try {
+      const optimizedOrder = await optimizeRoute(day.activities)
+      if (optimizedOrder) {
+        const reorderedIds = optimizedOrder.map(i => day.activities[i].id)
+        reorderActivities(tripId, date, reorderedIds)
+        refreshTrip()
+      }
+    } finally {
+      setIsOptimizing(false)
+    }
+  }
+
   if (!trip || !day) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
@@ -279,6 +361,19 @@ export default function DayPage() {
 
           {/* Activities Sidebar */}
           <div className="space-y-4">
+            {/* Optimize Route Button */}
+            {day.activities.length >= 3 && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleOptimizeRoute}
+                disabled={isOptimizing}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {isOptimizing ? 'Optimizing...' : 'Optimize Route'}
+              </Button>
+            )}
+
             {/* Activity Sections */}
             {sections.map(section => (
               <Card key={section.key}>
@@ -303,16 +398,27 @@ export default function DayPage() {
                       No activities yet
                     </p>
                   ) : (
-                    <div className="space-y-2">
-                      {activitiesBySection[section.key].map(activity => (
-                        <ActivityCard
-                          key={activity.id}
-                          activity={activity}
-                          onEdit={() => handleOpenActivityDialog(section.key, activity)}
-                          onDelete={() => handleDeleteActivity(activity.id)}
-                        />
-                      ))}
-                    </div>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleDragEnd(event, section.key)}
+                    >
+                      <SortableContext
+                        items={activitiesBySection[section.key].map(a => a.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {activitiesBySection[section.key].map(activity => (
+                            <SortableActivityCard
+                              key={activity.id}
+                              activity={activity}
+                              onEdit={() => handleOpenActivityDialog(section.key, activity)}
+                              onDelete={() => handleDeleteActivity(activity.id)}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
                   )}
                 </CardContent>
               </Card>
@@ -499,7 +605,7 @@ export default function DayPage() {
   )
 }
 
-function ActivityCard({
+function SortableActivityCard({
   activity,
   onEdit,
   onDelete
@@ -508,9 +614,32 @@ function ActivityCard({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: activity.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   return (
-    <div className="flex items-start gap-2 p-2 rounded-md border bg-card hover:bg-muted/50 group">
-      <div className="mt-1 cursor-grab">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-start gap-2 p-2 rounded-md border bg-card hover:bg-muted/50 group"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="mt-1 cursor-grab active:cursor-grabbing touch-none"
+      >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
