@@ -602,7 +602,7 @@ export default function DayPage() {
                   value={activityTime}
                   onChange={(e) => setActivityTime(e.target.value)}
                   disabled={!hasTime}
-                  className={!hasTime ? "text-muted-foreground" : ""}
+                  className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}
                 />
                 <Select
                   value={isCustomDuration ? 'custom' : activityDuration}
