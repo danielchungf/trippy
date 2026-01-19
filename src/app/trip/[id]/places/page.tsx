@@ -89,7 +89,6 @@ export default function SavedPlacesPage() {
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [assigningPlace, setAssigningPlace] = useState<SavedPlace | null>(null)
   const [assignDay, setAssignDay] = useState("")
-  const [assignSection, setAssignSection] = useState<'morning' | 'afternoon' | 'evening'>('morning')
 
   useEffect(() => {
     const loadedTrip = getTrip(tripId)
@@ -132,7 +131,7 @@ export default function SavedPlacesPage() {
       address: placeAddress,
       coordinates: { lat: 0, lng: 0 },
       category: placeCategory,
-      locationId: placeLocationId || undefined,
+      locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
       notes: placeNotes || undefined
     }
 
@@ -154,13 +153,12 @@ export default function SavedPlacesPage() {
   const handleOpenAssignDialog = (place: SavedPlace) => {
     setAssigningPlace(place)
     setAssignDay(trip?.days[0]?.date || "")
-    setAssignSection('morning')
     setIsAssignOpen(true)
   }
 
   const handleAssignToDay = () => {
     if (!assigningPlace || !assignDay) return
-    createActivityFromPlace(tripId, assignDay, assigningPlace.id, assignSection)
+    createActivityFromPlace(tripId, assignDay, assigningPlace.id)
     setIsAssignOpen(false)
     refreshTrip()
   }
@@ -370,7 +368,7 @@ export default function SavedPlacesPage() {
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {trip.locations.map(loc => (
                         <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                       ))}
@@ -425,19 +423,6 @@ export default function SavedPlacesPage() {
                       </SelectItem>
                     )
                   })}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Section</label>
-              <Select value={assignSection} onValueChange={(v) => setAssignSection(v as typeof assignSection)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
                 </SelectContent>
               </Select>
             </div>

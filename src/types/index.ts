@@ -28,9 +28,6 @@ export interface SavedPlace {
   locationId?: string
 }
 
-// Activity section
-export type ActivitySection = 'morning' | 'afternoon' | 'evening'
-
 // Activity (core entity - lives inside a Day)
 export interface Activity {
   id: string
@@ -40,7 +37,6 @@ export interface Activity {
   savedPlaceId?: string
   place: PlaceInfo
   notes?: string
-  section: ActivitySection
 }
 
 // Day (derived from trip dates)
@@ -59,6 +55,8 @@ export interface Accommodation {
   name: string
   type: AccommodationType
   address: string
+  coordinates?: Coordinates
+  googlePlaceId?: string
   checkIn: string // ISO date
   checkOut: string // ISO date
   checkInTime?: string
@@ -74,6 +72,8 @@ export interface Accommodation {
 export interface Location {
   id: string
   name: string // city/area (e.g., "Barcelona", "Rome")
+  coordinates?: Coordinates // center point for biasing place searches
+  googlePlaceId?: string
   startDate: string // ISO date
   endDate: string // ISO date
 }
@@ -94,12 +94,26 @@ export interface Trip {
 // Trip status (derived)
 export type TripStatus = 'upcoming' | 'ongoing' | 'past'
 
+// Parse ISO date string (YYYY-MM-DD) as local date, not UTC
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+// Format Date to ISO date string (YYYY-MM-DD) using local date
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Helper function to determine trip status
 export function getTripStatus(trip: Trip): TripStatus {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const start = new Date(trip.startDate)
-  const end = new Date(trip.endDate)
+  const start = parseLocalDate(trip.startDate)
+  const end = parseLocalDate(trip.endDate)
 
   if (today < start) return 'upcoming'
   if (today > end) return 'past'
@@ -109,17 +123,17 @@ export function getTripStatus(trip: Trip): TripStatus {
 // Helper to generate days from trip dates
 export function generateDaysFromTrip(trip: Trip): Day[] {
   const days: Day[] = []
-  const start = new Date(trip.startDate)
-  const end = new Date(trip.endDate)
+  const start = parseLocalDate(trip.startDate)
+  const end = parseLocalDate(trip.endDate)
 
   const current = new Date(start)
   while (current <= end) {
-    const dateStr = current.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(current)
 
     // Find which location this day belongs to
     const location = trip.locations.find(loc => {
-      const locStart = new Date(loc.startDate)
-      const locEnd = new Date(loc.endDate)
+      const locStart = parseLocalDate(loc.startDate)
+      const locEnd = parseLocalDate(loc.endDate)
       return current >= locStart && current <= locEnd
     })
 
@@ -140,7 +154,7 @@ export function generateDaysFromTrip(trip: Trip): Day[] {
 
 // Format date for display
 export function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
+  const date = parseLocalDate(dateStr)
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -150,8 +164,8 @@ export function formatDate(dateStr: string): string {
 
 // Format date range
 export function formatDateRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+  const start = parseLocalDate(startDate)
+  const end = parseLocalDate(endDate)
 
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
@@ -165,8 +179,8 @@ export function formatDateRange(startDate: string, endDate: string): string {
 
 // Calculate trip duration in days
 export function getTripDuration(trip: Trip): number {
-  const start = new Date(trip.startDate)
-  const end = new Date(trip.endDate)
+  const start = parseLocalDate(trip.startDate)
+  const end = parseLocalDate(trip.endDate)
   const diff = end.getTime() - start.getTime()
   return Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
 }

@@ -52,6 +52,8 @@ export async function searchPlaces(
   query: string,
   location?: Coordinates
 ): Promise<PlaceSearchResult[]> {
+  // Load both maps (for LatLng) and places libraries
+  await loadGoogleMaps()
   const places = await loadPlacesLibrary()
 
   const request: google.maps.places.TextSearchRequest = {
@@ -88,6 +90,7 @@ export async function searchPlaces(
 }
 
 export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResult | null> {
+  await loadGoogleMaps()
   const places = await loadPlacesLibrary()
 
   return new Promise((resolve) => {
@@ -121,14 +124,14 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
 }
 
 export interface DirectionsResult {
-  routes: google.maps.DirectionsRoute[]
+  directionsResult: google.maps.DirectionsResult
   totalDistance: number // meters
   totalDuration: number // seconds
 }
 
 export async function getDirections(
   activities: Activity[],
-  travelMode: google.maps.TravelMode = google.maps.TravelMode.WALKING
+  travelMode: 'WALKING' | 'DRIVING' = 'WALKING'
 ): Promise<DirectionsResult | null> {
   if (activities.length < 2) return null
 
@@ -142,6 +145,9 @@ export async function getDirections(
 
   const directionsService = new google.maps.DirectionsService()
 
+  // Convert string to TravelMode enum after loading the library
+  const mode = travelMode === 'WALKING' ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING
+
   const origin = validActivities[0].place.coordinates
   const destination = validActivities[validActivities.length - 1].place.coordinates
   const waypoints = validActivities.slice(1, -1).map(a => ({
@@ -155,7 +161,7 @@ export async function getDirections(
         origin: new google.maps.LatLng(origin.lat, origin.lng),
         destination: new google.maps.LatLng(destination.lat, destination.lng),
         waypoints,
-        travelMode,
+        travelMode: mode,
         optimizeWaypoints: false
       },
       (result, status) => {
@@ -169,7 +175,7 @@ export async function getDirections(
           })
 
           resolve({
-            routes: result.routes,
+            directionsResult: result,
             totalDistance,
             totalDuration
           })
@@ -181,50 +187,145 @@ export async function getDirections(
   })
 }
 
-export async function optimizeRoute(
-  activities: Activity[]
-): Promise<number[] | null> {
-  if (activities.length < 3) return null
+// Calculate distance between two coordinates (Haversine formula)
+function calculateDistance(a: Coordinates, b: Coordinates): number {
+  const R = 6371e3 // Earth's radius in meters
+  const lat1 = a.lat * Math.PI / 180
+  const lat2 = b.lat * Math.PI / 180
+  const deltaLat = (b.lat - a.lat) * Math.PI / 180
+  const deltaLng = (b.lng - a.lng) * Math.PI / 180
 
+  const x = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+
+  return R * c
+}
+
+export async function optimizeRoute(
+  activities: Activity[],
+  startingLocation?: Coordinates
+): Promise<number[] | null> {
   const validActivities = activities.filter(
     a => a.place.coordinates.lat !== 0 && a.place.coordinates.lng !== 0
   )
 
-  if (validActivities.length < 3) return null
+  // Need at least 2 activities to optimize (or 3 if no starting location)
+  if (validActivities.length < 2) return null
+  if (!startingLocation && validActivities.length < 3) return null
 
   await loadGoogleMaps()
 
   const directionsService = new google.maps.DirectionsService()
 
-  const origin = validActivities[0].place.coordinates
-  const destination = validActivities[validActivities.length - 1].place.coordinates
-  const waypoints = validActivities.slice(1, -1).map(a => ({
-    location: new google.maps.LatLng(a.place.coordinates.lat, a.place.coordinates.lng),
-    stopover: true
-  }))
+  // If we have a starting location (e.g., accommodation), use it as origin
+  // Otherwise, use first activity as origin
+  const origin = startingLocation || validActivities[0].place.coordinates
 
-  return new Promise((resolve) => {
-    directionsService.route(
-      {
-        origin: new google.maps.LatLng(origin.lat, origin.lng),
-        destination: new google.maps.LatLng(destination.lat, destination.lng),
-        waypoints,
-        travelMode: google.maps.TravelMode.WALKING,
-        optimizeWaypoints: true
-      },
-      (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          const order = result.routes[0].waypoint_order
-          // Map back to original indices
-          // 0 = first activity (origin), then optimized waypoints, then last activity (destination)
-          const fullOrder = [0, ...order.map(i => i + 1), validActivities.length - 1]
-          resolve(fullOrder)
-        } else {
-          resolve(null)
-        }
+  // For a one-way optimized route:
+  // - Find the activity farthest from origin to use as destination
+  // - This gives us a sensible "end point" for the day
+  // - All other activities become waypoints to be optimized
+
+  if (startingLocation) {
+    // Find activity farthest from starting location to use as destination
+    let farthestIdx = 0
+    let maxDistance = 0
+    validActivities.forEach((activity, idx) => {
+      const dist = calculateDistance(origin, activity.place.coordinates)
+      if (dist > maxDistance) {
+        maxDistance = dist
+        farthestIdx = idx
       }
-    )
-  })
+    })
+
+    const destination = validActivities[farthestIdx]
+    const waypointActivities = validActivities.filter((_, idx) => idx !== farthestIdx)
+    const waypoints = waypointActivities.map(a => ({
+      location: new google.maps.LatLng(a.place.coordinates.lat, a.place.coordinates.lng),
+      stopover: true
+    }))
+
+    return new Promise((resolve) => {
+      directionsService.route(
+        {
+          origin: new google.maps.LatLng(origin.lat, origin.lng),
+          destination: new google.maps.LatLng(
+            destination.place.coordinates.lat,
+            destination.place.coordinates.lng
+          ),
+          waypoints,
+          travelMode: google.maps.TravelMode.WALKING,
+          optimizeWaypoints: true
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            const order = result.routes[0].waypoint_order
+
+            // Map waypoint order back to original activity indices
+            // waypointActivities excludes the farthest activity (destination)
+            // so we need to map through that filtered list
+            const optimizedWaypoints = order.map(i => activities.indexOf(waypointActivities[i]))
+            // Add the farthest activity at the end (it's the destination)
+            const fullOrder = [...optimizedWaypoints, activities.indexOf(destination)]
+
+            resolve(fullOrder)
+          } else {
+            resolve(null)
+          }
+        }
+      )
+    })
+  } else {
+    // No starting location: use first activity as origin, find farthest as destination
+    let farthestIdx = 1
+    let maxDistance = 0
+    for (let i = 1; i < validActivities.length; i++) {
+      const dist = calculateDistance(origin, validActivities[i].place.coordinates)
+      if (dist > maxDistance) {
+        maxDistance = dist
+        farthestIdx = i
+      }
+    }
+
+    const destination = validActivities[farthestIdx]
+    const waypointActivities = validActivities.filter((_, idx) => idx !== 0 && idx !== farthestIdx)
+    const waypoints = waypointActivities.map(a => ({
+      location: new google.maps.LatLng(a.place.coordinates.lat, a.place.coordinates.lng),
+      stopover: true
+    }))
+
+    return new Promise((resolve) => {
+      directionsService.route(
+        {
+          origin: new google.maps.LatLng(origin.lat, origin.lng),
+          destination: new google.maps.LatLng(
+            destination.place.coordinates.lat,
+            destination.place.coordinates.lng
+          ),
+          waypoints,
+          travelMode: google.maps.TravelMode.WALKING,
+          optimizeWaypoints: true
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            const order = result.routes[0].waypoint_order
+
+            // First activity (origin) stays first
+            // Map waypoint indices, then add destination at end
+            const waypointIndices = waypointActivities.map(a => validActivities.indexOf(a))
+            const optimizedMiddle = order.map(i => waypointIndices[i])
+            const fullOrder = [0, ...optimizedMiddle, farthestIdx]
+
+            resolve(fullOrder)
+          } else {
+            resolve(null)
+          }
+        }
+      )
+    })
+  }
 }
 
 export function formatDistance(meters: number): string {

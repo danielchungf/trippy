@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { Activity } from "@/types"
 import { loadGoogleMaps, getDirections, formatDistance, formatDuration } from "@/lib/maps"
 import { Button } from "@/components/ui/button"
@@ -19,16 +19,26 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
   const polylineRef = useRef<google.maps.Polyline | null>(null)
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
+  const isUpdatingRouteRef = useRef(false)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [routeMode, setRouteMode] = useState<'lines' | 'directions'>('lines')
-  const [travelMode, setTravelMode] = useState<google.maps.TravelMode>(google.maps.TravelMode.WALKING)
+  const [travelMode, setTravelMode] = useState<'WALKING' | 'DRIVING'>('WALKING')
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
 
-  // Filter activities with valid coordinates
-  const validActivities = activities.filter(
-    a => a.place.coordinates.lat !== 0 && a.place.coordinates.lng !== 0
+  // Filter activities with valid coordinates - memoize to prevent unnecessary re-renders
+  const validActivities = useMemo(() =>
+    activities.filter(
+      a => a.place.coordinates.lat !== 0 && a.place.coordinates.lng !== 0
+    ),
+    [activities]
+  )
+
+  // Create a stable key for activities to use in dependencies
+  const activitiesKey = useMemo(() =>
+    validActivities.map(a => `${a.id}:${a.place.coordinates.lat},${a.place.coordinates.lng}`).join('|'),
+    [validActivities]
   )
 
   // Initialize map
@@ -142,8 +152,13 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
   }, [validActivities])
 
   // Update route display
-  const updateRoute = useCallback(async () => {
-    if (!googleMapRef.current) return
+  useEffect(() => {
+    // Don't run until map is fully loaded
+    if (!googleMapRef.current || isLoading) return
+
+    // Prevent concurrent updates
+    if (isUpdatingRouteRef.current) return
+    isUpdatingRouteRef.current = true
 
     // Clear existing route
     if (polylineRef.current) {
@@ -154,9 +169,12 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
       directionsRendererRef.current.setMap(null)
       directionsRendererRef.current = null
     }
-    setRouteInfo(null)
 
-    if (!showRoute || validActivities.length < 2) return
+    if (!showRoute || validActivities.length < 2) {
+      setRouteInfo(null)
+      isUpdatingRouteRef.current = false
+      return
+    }
 
     if (routeMode === 'lines') {
       // Simple polyline
@@ -173,69 +191,63 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
         strokeWeight: 3,
         map: googleMapRef.current
       })
+      setRouteInfo(null)
+      isUpdatingRouteRef.current = false
     } else {
       // Google Directions
-      const result = await getDirections(validActivities, travelMode)
-
-      if (result && googleMapRef.current) {
-        directionsRendererRef.current = new google.maps.DirectionsRenderer({
-          map: googleMapRef.current,
-          directions: { routes: result.routes } as google.maps.DirectionsResult,
-          suppressMarkers: true,
-          polylineOptions: {
-            strokeColor: '#3b82f6',
-            strokeOpacity: 0.8,
-            strokeWeight: 4
+      getDirections(validActivities, travelMode).then(result => {
+        if (result && googleMapRef.current) {
+          // Clear any existing renderer before creating new one
+          if (directionsRendererRef.current) {
+            directionsRendererRef.current.setMap(null)
           }
-        })
 
-        setRouteInfo({
-          distance: result.totalDistance,
-          duration: result.totalDuration
-        })
-      }
+          directionsRendererRef.current = new google.maps.DirectionsRenderer({
+            map: googleMapRef.current,
+            directions: result.directionsResult,
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: '#3b82f6',
+              strokeOpacity: 0.8,
+              strokeWeight: 4
+            }
+          })
+
+          setRouteInfo({
+            distance: result.totalDistance,
+            duration: result.totalDuration
+          })
+        } else {
+          setRouteInfo(null)
+        }
+        isUpdatingRouteRef.current = false
+      }).catch(() => {
+        isUpdatingRouteRef.current = false
+      })
     }
-  }, [showRoute, validActivities, routeMode, travelMode])
-
-  useEffect(() => {
-    updateRoute()
-  }, [updateRoute])
-
-  if (error) {
-    return (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="text-center p-4">
-          <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
-          <p className="text-sm text-destructive">{error}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your environment
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (validActivities.length === 0) {
-    return (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="text-center p-4">
-          <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
-          <p className="text-muted-foreground">No activities with locations yet</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Add activities to see them on the map
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showRoute, activitiesKey, routeMode, travelMode, isLoading])
 
   return (
     <div className="relative w-full h-full">
-      {/* Map container */}
+      {/* Map container - always rendered so it can initialize */}
       <div ref={mapRef} className="w-full h-full" />
 
+      {/* Error overlay */}
+      {error && (
+        <div className="absolute inset-0 bg-muted flex items-center justify-center">
+          <div className="text-center p-4">
+            <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your environment
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Loading overlay */}
-      {isLoading && (
+      {!error && isLoading && (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
@@ -244,8 +256,21 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
         </div>
       )}
 
+      {/* Empty state overlay */}
+      {!error && !isLoading && validActivities.length === 0 && (
+        <div className="absolute inset-0 bg-muted flex items-center justify-center">
+          <div className="text-center p-4">
+            <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">No activities with locations yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add activities to see them on the map
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Route controls */}
-      {!isLoading && validActivities.length >= 2 && (
+      {!isLoading && !error && validActivities.length >= 2 && (
         <div className="absolute top-4 left-4 flex flex-col gap-2">
           <div className="bg-background rounded-lg shadow-lg p-2 flex gap-1">
             <Button
@@ -280,16 +305,16 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
           {showRoute && routeMode === 'directions' && (
             <div className="bg-background rounded-lg shadow-lg p-2 flex gap-1">
               <Button
-                variant={travelMode === google.maps.TravelMode.WALKING ? "secondary" : "ghost"}
+                variant={travelMode === 'WALKING' ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setTravelMode(google.maps.TravelMode.WALKING)}
+                onClick={() => setTravelMode('WALKING')}
               >
                 <Footprints className="h-4 w-4" />
               </Button>
               <Button
-                variant={travelMode === google.maps.TravelMode.DRIVING ? "secondary" : "ghost"}
+                variant={travelMode === 'DRIVING' ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setTravelMode(google.maps.TravelMode.DRIVING)}
+                onClick={() => setTravelMode('DRIVING')}
               >
                 <Car className="h-4 w-4" />
               </Button>
@@ -308,11 +333,13 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
       )}
 
       {/* Activity count */}
-      <div className="absolute bottom-4 left-4 bg-background rounded-lg shadow-lg px-3 py-2">
-        <p className="text-sm text-muted-foreground">
-          {validActivities.length} {validActivities.length === 1 ? 'location' : 'locations'}
-        </p>
-      </div>
+      {!isLoading && !error && validActivities.length > 0 && (
+        <div className="absolute bottom-4 left-4 bg-background rounded-lg shadow-lg px-3 py-2">
+          <p className="text-sm text-muted-foreground">
+            {validActivities.length} {validActivities.length === 1 ? 'location' : 'locations'}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

@@ -90,6 +90,8 @@ export function addLocation(tripId: string, data: {
   name: string
   startDate: string
   endDate: string
+  coordinates?: { lat: number; lng: number }
+  googlePlaceId?: string
 }): Location | undefined {
   const trips = getTrips()
   const trip = trips.find(t => t.id === tripId)
@@ -99,7 +101,9 @@ export function addLocation(tripId: string, data: {
     id: uuidv4(),
     name: data.name,
     startDate: data.startDate,
-    endDate: data.endDate
+    endDate: data.endDate,
+    coordinates: data.coordinates,
+    googlePlaceId: data.googlePlaceId
   }
 
   trip.locations.push(newLocation)
@@ -331,7 +335,7 @@ export function moveActivity(tripId: string, fromDate: string, toDate: string, a
 }
 
 // Create activity from saved place (assign place to day)
-export function createActivityFromPlace(tripId: string, date: string, placeId: string, section: Activity['section']): Activity | undefined {
+export function createActivityFromPlace(tripId: string, date: string, placeId: string): Activity | undefined {
   const trips = getTrips()
   const trip = trips.find(t => t.id === tripId)
   if (!trip) return undefined
@@ -352,7 +356,6 @@ export function createActivityFromPlace(tripId: string, date: string, placeId: s
       coordinates: place.coordinates,
       googlePlaceId: place.googlePlaceId
     },
-    section,
     notes: place.notes
   }
 

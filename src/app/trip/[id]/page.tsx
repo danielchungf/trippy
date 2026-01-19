@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
-  Calendar,
+  Calendar as CalendarIcon,
   List,
   Plus,
   MapPin,
@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Trash2,
   MoreHorizontal,
-  Edit2
+  Edit2,
+  ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,13 +46,24 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { PlaceSearch } from "@/components/maps/PlaceSearch"
+import { PlaceSearchResult } from "@/lib/maps"
+import { Coordinates } from "@/types"
+import {
   Trip,
   Location,
   Accommodation,
   AccommodationType,
   formatDate,
   formatDateRange,
-  getTripDuration
+  getTripDuration,
+  parseLocalDate,
+  formatLocalDate
 } from "@/types"
 import {
   getTrip,
@@ -75,8 +87,12 @@ export default function TripPage() {
   const [isLocationOpen, setIsLocationOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const [locationName, setLocationName] = useState("")
-  const [locationStartDate, setLocationStartDate] = useState("")
-  const [locationEndDate, setLocationEndDate] = useState("")
+  const [locationCoordinates, setLocationCoordinates] = useState<Coordinates | undefined>()
+  const [locationGooglePlaceId, setLocationGooglePlaceId] = useState<string | undefined>()
+  const [locationStartDate, setLocationStartDate] = useState<Date | undefined>()
+  const [locationEndDate, setLocationEndDate] = useState<Date | undefined>()
+  const [isLocationStartOpen, setIsLocationStartOpen] = useState(false)
+  const [isLocationEndOpen, setIsLocationEndOpen] = useState(false)
 
   // Accommodation dialog state
   const [isAccommodationOpen, setIsAccommodationOpen] = useState(false)
@@ -84,9 +100,13 @@ export default function TripPage() {
   const [accommodationName, setAccommodationName] = useState("")
   const [accommodationType, setAccommodationType] = useState<AccommodationType>("hotel")
   const [accommodationAddress, setAccommodationAddress] = useState("")
-  const [accommodationCheckIn, setAccommodationCheckIn] = useState("")
-  const [accommodationCheckOut, setAccommodationCheckOut] = useState("")
+  const [accommodationCoordinates, setAccommodationCoordinates] = useState<Coordinates | undefined>()
+  const [accommodationGooglePlaceId, setAccommodationGooglePlaceId] = useState<string | undefined>()
+  const [accommodationCheckIn, setAccommodationCheckIn] = useState<Date | undefined>()
+  const [accommodationCheckOut, setAccommodationCheckOut] = useState<Date | undefined>()
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
+  const [isCheckInOpen, setIsCheckInOpen] = useState(false)
+  const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
 
   useEffect(() => {
     const loadedTrip = getTrip(tripId)
@@ -107,31 +127,50 @@ export default function TripPage() {
     if (location) {
       setEditingLocation(location)
       setLocationName(location.name)
-      setLocationStartDate(location.startDate)
-      setLocationEndDate(location.endDate)
+      setLocationCoordinates(location.coordinates)
+      setLocationGooglePlaceId(location.googlePlaceId)
+      setLocationStartDate(parseLocalDate(location.startDate))
+      setLocationEndDate(parseLocalDate(location.endDate))
     } else {
       setEditingLocation(null)
       setLocationName("")
-      setLocationStartDate(trip?.startDate || "")
-      setLocationEndDate(trip?.endDate || "")
+      setLocationCoordinates(undefined)
+      setLocationGooglePlaceId(undefined)
+      setLocationStartDate(trip ? parseLocalDate(trip.startDate) : undefined)
+      setLocationEndDate(trip ? parseLocalDate(trip.endDate) : undefined)
     }
+    setIsLocationStartOpen(false)
+    setIsLocationEndOpen(false)
     setIsLocationOpen(true)
+  }
+
+  const handleLocationSearchSelect = (place: PlaceSearchResult) => {
+    setLocationName(place.name)
+    setLocationCoordinates(place.coordinates)
+    setLocationGooglePlaceId(place.placeId)
   }
 
   const handleSaveLocation = () => {
     if (!locationName || !locationStartDate || !locationEndDate) return
 
+    const startDateStr = formatLocalDate(locationStartDate)
+    const endDateStr = formatLocalDate(locationEndDate)
+
     if (editingLocation) {
       updateLocation(tripId, editingLocation.id, {
         name: locationName,
-        startDate: locationStartDate,
-        endDate: locationEndDate
+        coordinates: locationCoordinates,
+        googlePlaceId: locationGooglePlaceId,
+        startDate: startDateStr,
+        endDate: endDateStr
       })
     } else {
       addLocation(tripId, {
         name: locationName,
-        startDate: locationStartDate,
-        endDate: locationEndDate
+        coordinates: locationCoordinates,
+        googlePlaceId: locationGooglePlaceId,
+        startDate: startDateStr,
+        endDate: endDateStr
       })
     }
 
@@ -151,19 +190,42 @@ export default function TripPage() {
       setAccommodationName(accommodation.name)
       setAccommodationType(accommodation.type)
       setAccommodationAddress(accommodation.address)
-      setAccommodationCheckIn(accommodation.checkIn)
-      setAccommodationCheckOut(accommodation.checkOut)
+      setAccommodationCoordinates(accommodation.coordinates)
+      setAccommodationGooglePlaceId(accommodation.googlePlaceId)
+      setAccommodationCheckIn(parseLocalDate(accommodation.checkIn))
+      setAccommodationCheckOut(parseLocalDate(accommodation.checkOut))
       setAccommodationLocationId(accommodation.locationId || "")
     } else {
       setEditingAccommodation(null)
       setAccommodationName("")
       setAccommodationType("hotel")
       setAccommodationAddress("")
-      setAccommodationCheckIn(trip?.startDate || "")
-      setAccommodationCheckOut(trip?.endDate || "")
+      setAccommodationCoordinates(undefined)
+      setAccommodationGooglePlaceId(undefined)
+      setAccommodationCheckIn(trip ? parseLocalDate(trip.startDate) : undefined)
+      setAccommodationCheckOut(trip ? parseLocalDate(trip.endDate) : undefined)
       setAccommodationLocationId("")
     }
+    setIsCheckInOpen(false)
+    setIsCheckOutOpen(false)
     setIsAccommodationOpen(true)
+  }
+
+  const handleAccommodationSearchSelect = (place: PlaceSearchResult) => {
+    setAccommodationName(place.name)
+    setAccommodationAddress(place.address)
+    setAccommodationCoordinates(place.coordinates)
+    setAccommodationGooglePlaceId(place.placeId)
+  }
+
+  // Get center location for accommodation search based on selected trip location or first location
+  const getAccommodationSearchCenter = (): Coordinates | undefined => {
+    if (accommodationLocationId && accommodationLocationId !== 'none') {
+      const location = trip?.locations.find(l => l.id === accommodationLocationId)
+      return location?.coordinates
+    }
+    // Fall back to first location with coordinates
+    return trip?.locations.find(l => l.coordinates)?.coordinates
   }
 
   const handleSaveAccommodation = () => {
@@ -173,9 +235,11 @@ export default function TripPage() {
       name: accommodationName,
       type: accommodationType,
       address: accommodationAddress,
-      checkIn: accommodationCheckIn,
-      checkOut: accommodationCheckOut,
-      locationId: accommodationLocationId || undefined
+      coordinates: accommodationCoordinates,
+      googlePlaceId: accommodationGooglePlaceId,
+      checkIn: formatLocalDate(accommodationCheckIn),
+      checkOut: formatLocalDate(accommodationCheckOut),
+      locationId: accommodationLocationId && accommodationLocationId !== 'none' ? accommodationLocationId : undefined
     }
 
     if (editingAccommodation) {
@@ -257,32 +321,87 @@ export default function TripPage() {
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">City/Area</label>
-                          <Input
-                            placeholder="e.g., Barcelona"
-                            value={locationName}
-                            onChange={(e) => setLocationName(e.target.value)}
+                          <PlaceSearch
+                            onSelect={handleLocationSearchSelect}
+                            placeholder="Search for a city..."
                           />
+                          {locationName && (
+                            <div className="mt-2 p-2 rounded-md bg-muted">
+                              <p className="font-medium text-sm">{locationName}</p>
+                              {locationCoordinates && (
+                                <p className="text-xs text-muted-foreground">Location saved</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Start Date</label>
-                            <Input
-                              type="date"
-                              value={locationStartDate}
-                              onChange={(e) => setLocationStartDate(e.target.value)}
-                              min={trip.startDate}
-                              max={trip.endDate}
-                            />
+                            <Popover open={isLocationStartOpen} onOpenChange={setIsLocationStartOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {locationStartDate ? (
+                                    locationStartDate.toLocaleDateString()
+                                  ) : (
+                                    "Select date"
+                                  )}
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={locationStartDate}
+                                  onSelect={(date) => {
+                                    setLocationStartDate(date)
+                                    setIsLocationStartOpen(false)
+                                  }}
+                                  disabled={(date) => {
+                                    const start = parseLocalDate(trip.startDate)
+                                    const end = parseLocalDate(trip.endDate)
+                                    return date < start || date > end
+                                  }}
+                                  defaultMonth={locationStartDate}
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium">End Date</label>
-                            <Input
-                              type="date"
-                              value={locationEndDate}
-                              onChange={(e) => setLocationEndDate(e.target.value)}
-                              min={locationStartDate || trip.startDate}
-                              max={trip.endDate}
-                            />
+                            <Popover open={isLocationEndOpen} onOpenChange={setIsLocationEndOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {locationEndDate ? (
+                                    locationEndDate.toLocaleDateString()
+                                  ) : (
+                                    "Select date"
+                                  )}
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={locationEndDate}
+                                  onSelect={(date) => {
+                                    setLocationEndDate(date)
+                                    setIsLocationEndOpen(false)
+                                  }}
+                                  disabled={(date) => {
+                                    const start = locationStartDate || parseLocalDate(trip.startDate)
+                                    const end = parseLocalDate(trip.endDate)
+                                    return date < start || date > end
+                                  }}
+                                  defaultMonth={locationEndDate || locationStartDate}
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       </div>
@@ -402,7 +521,7 @@ export default function TripPage() {
                                   <SelectValue placeholder="Select location" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">None</SelectItem>
+                                  <SelectItem value="none">None</SelectItem>
                                   {trip.locations.map(loc => (
                                     <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                                   ))}
@@ -413,32 +532,86 @@ export default function TripPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Address</label>
-                          <Input
-                            placeholder="Address"
-                            value={accommodationAddress}
-                            onChange={(e) => setAccommodationAddress(e.target.value)}
+                          <PlaceSearch
+                            onSelect={handleAccommodationSearchSelect}
+                            placeholder="Search for accommodation..."
+                            centerLocation={getAccommodationSearchCenter()}
                           />
+                          {accommodationAddress && (
+                            <div className="mt-2 p-2 rounded-md bg-muted">
+                              <p className="font-medium text-sm">{accommodationName}</p>
+                              <p className="text-xs text-muted-foreground">{accommodationAddress}</p>
+                            </div>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Check-in</label>
-                            <Input
-                              type="date"
-                              value={accommodationCheckIn}
-                              onChange={(e) => setAccommodationCheckIn(e.target.value)}
-                              min={trip.startDate}
-                              max={trip.endDate}
-                            />
+                            <Popover open={isCheckInOpen} onOpenChange={setIsCheckInOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {accommodationCheckIn ? (
+                                    accommodationCheckIn.toLocaleDateString()
+                                  ) : (
+                                    "Select date"
+                                  )}
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={accommodationCheckIn}
+                                  onSelect={(date) => {
+                                    setAccommodationCheckIn(date)
+                                    setIsCheckInOpen(false)
+                                  }}
+                                  disabled={(date) => {
+                                    const start = parseLocalDate(trip.startDate)
+                                    const end = parseLocalDate(trip.endDate)
+                                    return date < start || date > end
+                                  }}
+                                  defaultMonth={accommodationCheckIn}
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Check-out</label>
-                            <Input
-                              type="date"
-                              value={accommodationCheckOut}
-                              onChange={(e) => setAccommodationCheckOut(e.target.value)}
-                              min={accommodationCheckIn || trip.startDate}
-                              max={trip.endDate}
-                            />
+                            <Popover open={isCheckOutOpen} onOpenChange={setIsCheckOutOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {accommodationCheckOut ? (
+                                    accommodationCheckOut.toLocaleDateString()
+                                  ) : (
+                                    "Select date"
+                                  )}
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={accommodationCheckOut}
+                                  onSelect={(date) => {
+                                    setAccommodationCheckOut(date)
+                                    setIsCheckOutOpen(false)
+                                  }}
+                                  disabled={(date) => {
+                                    const start = accommodationCheckIn || parseLocalDate(trip.startDate)
+                                    const end = parseLocalDate(trip.endDate)
+                                    return date < start || date > end
+                                  }}
+                                  defaultMonth={accommodationCheckOut || accommodationCheckIn}
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       </div>
@@ -516,7 +689,7 @@ export default function TripPage() {
                         <List className="h-4 w-4" />
                       </TabsTrigger>
                       <TabsTrigger value="calendar" className="h-7 px-2">
-                        <Calendar className="h-4 w-4" />
+                        <CalendarIcon className="h-4 w-4" />
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
