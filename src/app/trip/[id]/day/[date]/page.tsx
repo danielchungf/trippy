@@ -32,6 +32,9 @@ import {
   Bookmark,
   GripVertical,
   Sparkles,
+  Home,
+  LogIn,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,12 +61,13 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Trip,
   Activity,
-  ActivitySection,
   PlaceInfo,
+  Accommodation,
   formatDate,
 } from "@/types"
 import {
@@ -87,7 +91,6 @@ export default function DayPage() {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
-  const [activitySection, setActivitySection] = useState<ActivitySection>("morning")
   const [showRoute, setShowRoute] = useState(true)
   const [isOptimizing, setIsOptimizing] = useState(false)
 
@@ -105,13 +108,14 @@ export default function DayPage() {
 
   // Activity form state
   const [activityTitle, setActivityTitle] = useState("")
+  const [activityTitleTouched, setActivityTitleTouched] = useState(false)
   const [activityTime, setActivityTime] = useState("")
+  const [hasTime, setHasTime] = useState(false)
   const [activityDuration, setActivityDuration] = useState("")
+  const [isCustomDuration, setIsCustomDuration] = useState(false)
   const [activityNotes, setActivityNotes] = useState("")
   const [selectedPlaceId, setSelectedPlaceId] = useState<string>("")
-  const [manualPlaceName, setManualPlaceName] = useState("")
-  const [manualPlaceAddress, setManualPlaceAddress] = useState("")
-  const [addMode, setAddMode] = useState<'saved' | 'search' | 'manual'>('saved')
+  const [addMode, setAddMode] = useState<'saved' | 'search'>('search')
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
   useEffect(() => {
@@ -137,38 +141,46 @@ export default function DayPage() {
   const prevDay = dayIndex > 0 ? trip?.days[dayIndex - 1] : null
   const nextDay = trip && dayIndex < trip.days.length - 1 ? trip.days[dayIndex + 1] : null
 
-  const handleOpenActivityDialog = (section: ActivitySection, activity?: Activity) => {
-    setActivitySection(section)
-
+  const handleOpenActivityDialog = (activity?: Activity) => {
+    const presetDurations = ['15', '30', '45', '60', '90', '120', '180', '240']
     if (activity) {
       setEditingActivity(activity)
       setActivityTitle(activity.title)
-      setActivityTime(activity.time || "")
-      setActivityDuration(activity.duration?.toString() || "")
+      setActivityTitleTouched(true) // When editing, treat title as touched
+      setActivityTime(activity.time || "09:00")
+      setHasTime(!!activity.time)
+      const durationStr = activity.duration?.toString() || ""
+      setActivityDuration(durationStr)
+      setIsCustomDuration(durationStr !== "" && !presetDurations.includes(durationStr))
       setActivityNotes(activity.notes || "")
       setSelectedPlaceId(activity.savedPlaceId || "")
-      setManualPlaceName(activity.place.name)
-      setManualPlaceAddress(activity.place.address)
-      setAddMode(activity.savedPlaceId ? 'saved' : 'manual')
+      setSearchedPlace(activity.place.googlePlaceId ? {
+        placeId: activity.place.googlePlaceId,
+        name: activity.place.name,
+        address: activity.place.address,
+        coordinates: activity.place.coordinates
+      } : null)
+      setAddMode(activity.savedPlaceId ? 'saved' : 'search')
     } else {
       setEditingActivity(null)
       setActivityTitle("")
-      setActivityTime("")
+      setActivityTitleTouched(false)
+      setActivityTime("09:00")
+      setHasTime(false)
       setActivityDuration("")
+      setIsCustomDuration(false)
       setActivityNotes("")
       setSelectedPlaceId("")
-      setManualPlaceName("")
-      setManualPlaceAddress("")
-      setAddMode(trip?.savedPlaces.length ? 'saved' : 'manual')
+      setSearchedPlace(null)
+      setAddMode(trip?.savedPlaces.length ? 'saved' : 'search')
     }
 
     setIsActivityOpen(true)
   }
 
   const handleSaveActivity = () => {
-    if (!activityTitle) return
-
     let place: PlaceInfo
+    let title = activityTitle
 
     if (addMode === 'saved' && selectedPlaceId) {
       const savedPlace = trip?.savedPlaces.find(p => p.id === selectedPlaceId)
@@ -179,6 +191,8 @@ export default function DayPage() {
         coordinates: savedPlace.coordinates,
         googlePlaceId: savedPlace.googlePlaceId
       }
+      // Use place name as title if not provided
+      if (!title) title = savedPlace.name
     } else if (addMode === 'search' && searchedPlace) {
       place = {
         name: searchedPlace.name,
@@ -186,22 +200,19 @@ export default function DayPage() {
         coordinates: searchedPlace.coordinates,
         googlePlaceId: searchedPlace.placeId
       }
+      // Use place name as title if not provided
+      if (!title) title = searchedPlace.name
     } else {
-      place = {
-        name: manualPlaceName || activityTitle,
-        address: manualPlaceAddress,
-        coordinates: { lat: 0, lng: 0 }
-      }
+      return // Must have a place from search or saved
     }
 
     const data = {
-      title: activityTitle,
-      time: activityTime || undefined,
-      duration: activityDuration ? parseInt(activityDuration) : undefined,
+      title,
+      time: hasTime ? activityTime : undefined,
+      duration: hasTime && activityDuration ? parseInt(activityDuration) : undefined,
       notes: activityNotes || undefined,
       savedPlaceId: addMode === 'saved' ? selectedPlaceId : undefined,
-      place,
-      section: activitySection
+      place
     }
 
     if (editingActivity) {
@@ -217,9 +228,24 @@ export default function DayPage() {
 
   const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
     setSearchedPlace(place)
-    if (!activityTitle) {
+    // Auto-fill title with place name if user hasn't manually edited it
+    if (!activityTitleTouched) {
       setActivityTitle(place.name)
     }
+  }
+
+  const handleSavedPlaceSelect = (placeId: string) => {
+    setSelectedPlaceId(placeId)
+    // Auto-fill title with place name if user hasn't manually edited it
+    const savedPlace = trip?.savedPlaces.find(p => p.id === placeId)
+    if (savedPlace && !activityTitleTouched) {
+      setActivityTitle(savedPlace.name)
+    }
+  }
+
+  const handleActivityTitleChange = (value: string) => {
+    setActivityTitle(value)
+    setActivityTitleTouched(true)
   }
 
   const handleDeleteActivity = (activityId: string) => {
@@ -227,52 +253,47 @@ export default function DayPage() {
     refreshTrip()
   }
 
-  const handleAssignSavedPlace = (placeId: string, section: ActivitySection) => {
-    createActivityFromPlace(tripId, date, placeId, section)
+  const handleAssignSavedPlace = (placeId: string) => {
+    createActivityFromPlace(tripId, date, placeId)
     refreshTrip()
   }
 
-  const handleDragEnd = (event: DragEndEvent, section: ActivitySection) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
     if (over && active.id !== over.id) {
-      const sectionActivities = activitiesBySection[section]
-      const oldIndex = sectionActivities.findIndex(a => a.id === active.id)
-      const newIndex = sectionActivities.findIndex(a => a.id === over.id)
+      const activities = day?.activities || []
+      const oldIndex = activities.findIndex(a => a.id === active.id)
+      const newIndex = activities.findIndex(a => a.id === over.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // Create new ordered array for this section
-        const reordered = [...sectionActivities]
+        const reordered = [...activities]
         const [removed] = reordered.splice(oldIndex, 1)
         reordered.splice(newIndex, 0, removed)
-
-        // Get full activity order including all sections
-        const allActivityIds = [
-          ...activitiesBySection.morning.map(a => a.id),
-          ...activitiesBySection.afternoon.map(a => a.id),
-          ...activitiesBySection.evening.map(a => a.id),
-        ]
-
-        // Replace section activities with reordered ones
-        const sectionStart = section === 'morning' ? 0
-          : section === 'afternoon' ? activitiesBySection.morning.length
-          : activitiesBySection.morning.length + activitiesBySection.afternoon.length
-
-        const sectionLength = sectionActivities.length
-        allActivityIds.splice(sectionStart, sectionLength, ...reordered.map(a => a.id))
-
-        reorderActivities(tripId, date, allActivityIds)
+        reorderActivities(tripId, date, reordered.map(a => a.id))
         refreshTrip()
       }
     }
   }
 
   const handleOptimizeRoute = async () => {
-    if (!day || day.activities.length < 3) return
+    if (!day) return
+
+    // Find accommodation for this day (staying or check-in)
+    const currentAccommodation = trip?.accommodations.find(a => {
+      // Staying: date is between check-in and check-out (inclusive of check-in)
+      return date >= a.checkIn && date < a.checkOut
+    })
+
+    const startingLocation = currentAccommodation?.coordinates
+
+    // Need at least 2 activities if we have a starting location, 3 otherwise
+    const minActivities = startingLocation ? 2 : 3
+    if (day.activities.length < minActivities) return
 
     setIsOptimizing(true)
     try {
-      const optimizedOrder = await optimizeRoute(day.activities)
+      const optimizedOrder = await optimizeRoute(day.activities, startingLocation)
       if (optimizedOrder) {
         const reorderedIds = optimizedOrder.map(i => day.activities[i].id)
         reorderActivities(tripId, date, reorderedIds)
@@ -287,21 +308,23 @@ export default function DayPage() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
-  const activitiesBySection: Record<ActivitySection, Activity[]> = {
-    morning: day.activities.filter(a => a.section === 'morning'),
-    afternoon: day.activities.filter(a => a.section === 'afternoon'),
-    evening: day.activities.filter(a => a.section === 'evening')
-  }
-
-  const sections: { key: ActivitySection; label: string; timeRange: string }[] = [
-    { key: 'morning', label: 'Morning', timeRange: '6am - 12pm' },
-    { key: 'afternoon', label: 'Afternoon', timeRange: '12pm - 6pm' },
-    { key: 'evening', label: 'Evening', timeRange: '6pm - 12am' }
-  ]
-
   const unassignedPlaces = trip.savedPlaces.filter(
     place => !day.activities.some(a => a.savedPlaceId === place.id)
   )
+
+  // Find accommodations for this day
+  const checkInAccommodations = trip.accommodations.filter(a => a.checkIn === date)
+  const checkOutAccommodations = trip.accommodations.filter(a => a.checkOut === date)
+  // Staying: date is between check-in (exclusive) and check-out (exclusive)
+  const stayingAccommodations = trip.accommodations.filter(a => {
+    return date > a.checkIn && date < a.checkOut
+  })
+
+  // Current accommodation (where we're staying tonight) - for route optimization
+  const currentAccommodation = trip.accommodations.find(a => {
+    return date >= a.checkIn && date < a.checkOut
+  })
+  const hasAccommodationWithCoords = !!currentAccommodation?.coordinates
 
   return (
     <div className="min-h-screen bg-background">
@@ -361,8 +384,83 @@ export default function DayPage() {
 
           {/* Activities Sidebar */}
           <div className="space-y-4">
+            {/* Accommodation Cards */}
+            {(checkOutAccommodations.length > 0 || checkInAccommodations.length > 0 || stayingAccommodations.length > 0) && (
+              <div className="space-y-2">
+                {checkOutAccommodations.map(accommodation => (
+                  <AccommodationCard
+                    key={`checkout-${accommodation.id}`}
+                    accommodation={accommodation}
+                    type="checkout"
+                  />
+                ))}
+                {stayingAccommodations.map(accommodation => (
+                  <AccommodationCard
+                    key={`staying-${accommodation.id}`}
+                    accommodation={accommodation}
+                    type="staying"
+                  />
+                ))}
+                {checkInAccommodations.map(accommodation => (
+                  <AccommodationCard
+                    key={`checkin-${accommodation.id}`}
+                    accommodation={accommodation}
+                    type="checkin"
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Activities Card */}
+            <Card>
+              <CardHeader className="py-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-sm font-medium">Activities</CardTitle>
+                    <Badge variant="secondary">{day.activities.length}</Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenActivityDialog()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="py-2 px-4">
+                {day.activities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No activities yet
+                  </p>
+                ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={day.activities.map(a => a.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {day.activities.map(activity => (
+                          <SortableActivityCard
+                            key={activity.id}
+                            activity={activity}
+                            onEdit={() => handleOpenActivityDialog(activity)}
+                            onDelete={() => handleDeleteActivity(activity.id)}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Optimize Route Button */}
-            {day.activities.length >= 3 && (
+            {((hasAccommodationWithCoords && day.activities.length >= 2) || day.activities.length >= 3) && (
               <Button
                 variant="outline"
                 className="w-full"
@@ -373,56 +471,6 @@ export default function DayPage() {
                 {isOptimizing ? 'Optimizing...' : 'Optimize Route'}
               </Button>
             )}
-
-            {/* Activity Sections */}
-            {sections.map(section => (
-              <Card key={section.key}>
-                <CardHeader className="py-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-sm font-medium">{section.label}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{section.timeRange}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenActivityDialog(section.key)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-2 px-4">
-                  {activitiesBySection[section.key].length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No activities yet
-                    </p>
-                  ) : (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleDragEnd(event, section.key)}
-                    >
-                      <SortableContext
-                        items={activitiesBySection[section.key].map(a => a.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-2">
-                          {activitiesBySection[section.key].map(activity => (
-                            <SortableActivityCard
-                              key={activity.id}
-                              activity={activity}
-                              onEdit={() => handleOpenActivityDialog(section.key, activity)}
-                              onDelete={() => handleDeleteActivity(activity.id)}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
 
             {/* Unassigned Saved Places */}
             {unassignedPlaces.length > 0 && (
@@ -445,23 +493,13 @@ export default function DayPage() {
                           <p className="text-sm font-medium truncate">{place.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{place.address}</p>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {sections.map(s => (
-                              <DropdownMenuItem
-                                key={s.key}
-                                onClick={() => handleAssignSavedPlace(place.id, s.key)}
-                              >
-                                Add to {s.label}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAssignSavedPlace(place.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                     {unassignedPlaces.length > 5 && (
@@ -489,28 +527,47 @@ export default function DayPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Activity Title</label>
-              <Input
-                placeholder="e.g., Visit Sagrada Familia"
-                value={activityTitle}
-                onChange={(e) => setActivityTitle(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Location</label>
-              <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
-                  {trip.savedPlaces.length > 0 && (
+              <label className="text-sm font-medium">Location <span className="text-destructive">*</span></label>
+              {trip.savedPlaces.length > 0 ? (
+                <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
                     <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
-                  )}
-                  <TabsTrigger value="manual" className="flex-1">Manual</TabsTrigger>
-                </TabsList>
-                <TabsContent value="search" className="mt-2">
+                  </TabsList>
+                  <TabsContent value="search" className="mt-2">
+                    <PlaceSearch
+                      onSelect={handlePlaceSearchSelect}
+                      placeholder="Search Google Maps..."
+                      centerLocation={location?.coordinates}
+                    />
+                    {searchedPlace && (
+                      <div className="mt-2 p-2 rounded-md bg-muted">
+                        <p className="font-medium text-sm">{searchedPlace.name}</p>
+                        <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="saved" className="mt-2">
+                    <Select value={selectedPlaceId} onValueChange={handleSavedPlaceSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a saved place" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trip.savedPlaces.map(place => (
+                          <SelectItem key={place.id} value={place.id}>
+                            {place.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <>
                   <PlaceSearch
                     onSelect={handlePlaceSearchSelect}
                     placeholder="Search Google Maps..."
+                    centerLocation={location?.coordinates}
                   />
                   {searchedPlace && (
                     <div className="mt-2 p-2 rounded-md bg-muted">
@@ -518,68 +575,73 @@ export default function DayPage() {
                       <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
                     </div>
                   )}
-                </TabsContent>
-                <TabsContent value="saved" className="mt-2">
-                  <Select value={selectedPlaceId} onValueChange={setSelectedPlaceId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a saved place" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trip.savedPlaces.map(place => (
-                        <SelectItem key={place.id} value={place.id}>
-                          {place.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TabsContent>
-                <TabsContent value="manual" className="mt-2 space-y-2">
-                  <Input
-                    placeholder="Place name"
-                    value={manualPlaceName}
-                    onChange={(e) => setManualPlaceName(e.target.value)}
-                  />
-                  <Input
-                    placeholder="Address (optional)"
-                    value={manualPlaceAddress}
-                    onChange={(e) => setManualPlaceAddress(e.target.value)}
-                  />
-                </TabsContent>
-              </Tabs>
+                </>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Time</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Activity Name <span className="text-muted-foreground text-xs">(optional)</span></label>
+              <Input
+                placeholder="Defaults to location name"
+                value={activityTitle}
+                onChange={(e) => handleActivityTitleChange(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Time & Duration</label>
+                <Switch
+                  checked={hasTime}
+                  onCheckedChange={setHasTime}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   type="time"
                   value={activityTime}
                   onChange={(e) => setActivityTime(e.target.value)}
+                  disabled={!hasTime}
+                  className={!hasTime ? "opacity-50" : ""}
                 />
+                <Select
+                  value={isCustomDuration ? 'custom' : activityDuration}
+                  onValueChange={(val) => {
+                    if (val === 'custom') {
+                      setIsCustomDuration(true)
+                      setActivityDuration('')
+                    } else {
+                      setIsCustomDuration(false)
+                      setActivityDuration(val)
+                    }
+                  }}
+                  disabled={!hasTime}
+                >
+                  <SelectTrigger className={!hasTime ? "opacity-50" : ""}>
+                    <SelectValue placeholder="Duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="90">1.5 hours</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                    <SelectItem value="180">3 hours</SelectItem>
+                    <SelectItem value="240">4 hours</SelectItem>
+                    <SelectItem value="custom">Custom...</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Duration (min)</label>
+              {hasTime && isCustomDuration && (
                 <Input
                   type="number"
-                  placeholder="60"
+                  placeholder="Enter duration in minutes"
                   value={activityDuration}
                   onChange={(e) => setActivityDuration(e.target.value)}
+                  autoFocus
                 />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Section</label>
-              <Select value={activitySection} onValueChange={(v) => setActivitySection(v as ActivitySection)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
-                </SelectContent>
-              </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -595,13 +657,75 @@ export default function DayPage() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSaveActivity} disabled={!activityTitle}>
+            <Button
+              onClick={handleSaveActivity}
+              disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
+            >
               {editingActivity ? 'Save' : 'Add Activity'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function AccommodationCard({
+  accommodation,
+  type
+}: {
+  accommodation: Accommodation
+  type: 'checkin' | 'checkout' | 'staying'
+}) {
+  const isCheckIn = type === 'checkin'
+  const isCheckOut = type === 'checkout'
+  const isStaying = type === 'staying'
+
+  const Icon = isCheckIn ? LogIn : isCheckOut ? LogOut : Home
+  const label = isCheckIn ? 'Check-in' : isCheckOut ? 'Check-out' : 'Staying'
+  const time = isCheckIn ? accommodation.checkInTime : isCheckOut ? accommodation.checkOutTime : undefined
+
+  const borderColor = isCheckIn ? 'border-l-green-500' : isCheckOut ? 'border-l-orange-500' : 'border-l-blue-500'
+  const iconBgColor = isCheckIn ? 'bg-green-100 text-green-600' : isCheckOut ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+  const badgeVariant = isCheckIn ? 'default' : isStaying ? 'outline' : 'secondary'
+
+  return (
+    <Card className={`border-l-4 ${borderColor}`}>
+      <CardContent className="py-3 px-4">
+        <div className="flex items-start gap-3">
+          <div className={`p-2 rounded-full ${iconBgColor}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <Badge variant={badgeVariant as "default" | "secondary" | "outline"} className="text-xs">
+                {label}
+              </Badge>
+              {time && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {time}
+                </span>
+              )}
+            </div>
+            <p className="font-medium text-sm mt-1">{accommodation.name}</p>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <Home className="h-3 w-3" />
+              <span className="capitalize">{accommodation.type}</span>
+            </div>
+            {accommodation.address && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <MapPin className="h-3 w-3" />
+                <span className="truncate">{accommodation.address}</span>
+              </div>
+            )}
+            {accommodation.notes && (
+              <p className="text-xs text-muted-foreground mt-1 italic">{accommodation.notes}</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

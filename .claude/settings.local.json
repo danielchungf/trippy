@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest add calendar:*)",
+      "Bash(npx shadcn@latest add popover:*)",
+      "Bash(npx shadcn@latest add switch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nImprove activity modal and route optimization\n\n- Fix route optimization to use one-way routing \\(farthest activity as destination\\)\n- Fix directions map blinking with useMemo for stable references\n- Add accommodation cards for staying days \\(not just check-in/check-out\\)\n- Reorder activity modal: Location first \\(required\\), Activity Name second \\(optional\\)\n- Add time/duration toggle switch for clearer UX\n- Add duration presets with custom option dropdown\n- Add Switch UI component\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
