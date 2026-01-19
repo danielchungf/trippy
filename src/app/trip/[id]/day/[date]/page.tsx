@@ -602,7 +602,7 @@ export default function DayPage() {
                   value={activityTime}
                   onChange={(e) => setActivityTime(e.target.value)}
                   disabled={!hasTime}
-                  className={!hasTime ? "opacity-50" : ""}
+                  className={!hasTime ? "text-muted-foreground" : ""}
                 />
                 <Select
                   value={isCustomDuration ? 'custom' : activityDuration}
@@ -617,7 +617,7 @@ export default function DayPage() {
                   }}
                   disabled={!hasTime}
                 >
-                  <SelectTrigger className={!hasTime ? "opacity-50" : ""}>
+                  <SelectTrigger className={!hasTime ? "text-muted-foreground" : ""}>
                     <SelectValue placeholder="Duration" />
                   </SelectTrigger>
                   <SelectContent>
