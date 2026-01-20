@@ -941,7 +941,7 @@ function CalendarView({ trip }: { trip: Trip }) {
     lane: number // vertical stacking position
   }
 
-  const getSegmentsForWeek = (week: DayInfo[], weekIndex: number): LocationSegment[] => {
+  const getSegmentsForWeek = (week: DayInfo[]): LocationSegment[] => {
     const segments: LocationSegment[] = []
     const weekStartDate = week[0].date
     const weekEndDate = week[6].date
@@ -1018,19 +1018,15 @@ function CalendarView({ trip }: { trip: Trip }) {
 
       {/* Calendar weeks */}
       <div>
-        {weeks.map((week, weekIndex) => {
-          const segments = getSegmentsForWeek(week, weekIndex)
+        {weeks.map((week, weekIdx) => {
+          const segments = getSegmentsForWeek(week)
           const maxLane = segments.length > 0 ? Math.max(...segments.map(s => s.lane)) : -1
           const barsHeight = (maxLane + 1) * (barHeight + barGap)
           const rowHeight = dayLabelHeight + barsHeight + 8
 
-          // Find month label position
-          const firstOfMonthDay = week.find(d => d.isFirstOfMonth)
-          const showMonthLabel = firstOfMonthDay !== undefined
-
           return (
             <div
-              key={weekIndex}
+              key={weekIdx}
               className="grid grid-cols-7 border-b border-border/30 relative"
               style={{ minHeight: `${Math.max(rowHeight, 50)}px` }}
             >
@@ -1070,7 +1066,7 @@ function CalendarView({ trip }: { trip: Trip }) {
               ))}
 
               {/* Location bars overlay */}
-              {segments.map((segment, segIndex) => {
+              {segments.map((segment) => {
                 const leftPercent = (segment.startCol / 7) * 100
                 const widthPercent = ((segment.endCol - segment.startCol + 1) / 7) * 100
                 const top = dayLabelHeight + segment.lane * (barHeight + barGap)
@@ -1084,7 +1080,7 @@ function CalendarView({ trip }: { trip: Trip }) {
 
                 return (
                   <div
-                    key={`${segment.location.id}-${weekIndex}`}
+                    key={`${segment.location.id}-${weekIdx}`}
                     className="absolute z-10 flex items-center px-2 text-xs font-medium text-white overflow-hidden whitespace-nowrap"
                     style={{
                       left: `calc(${leftPercent}% + 2px)`,
