@@ -5,15 +5,13 @@ import { Activity } from "@/types"
 import { loadGoogleMaps, getDirections, formatDistance, formatDuration } from "@/lib/maps"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Route, Footprints, Car } from "lucide-react"
+import { MapPin, Footprints, Car } from "lucide-react"
 
 interface DayMapProps {
   activities: Activity[]
-  showRoute?: boolean
-  onRouteToggle?: (show: boolean) => void
 }
 
-export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapProps) {
+export function DayMap({ activities }: DayMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const googleMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -100,9 +98,9 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
     }
   }, [])
 
-  // Update markers when activities change
+  // Update markers when activities change or map finishes loading
   useEffect(() => {
-    if (!googleMapRef.current) return
+    if (!googleMapRef.current || isLoading) return
 
     // Clear existing markers
     markersRef.current.forEach(marker => {
@@ -149,7 +147,7 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
         googleMapRef.current.setZoom(15)
       }
     }
-  }, [validActivities])
+  }, [validActivities, isLoading])
 
   // Update route display
   useEffect(() => {
@@ -170,7 +168,7 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
       directionsRendererRef.current = null
     }
 
-    if (!showRoute || validActivities.length < 2) {
+    if (validActivities.length < 2) {
       setRouteInfo(null)
       isUpdatingRouteRef.current = false
       return
@@ -226,7 +224,7 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showRoute, activitiesKey, routeMode, travelMode, isLoading])
+  }, [activitiesKey, routeMode, travelMode, isLoading])
 
   return (
     <div className="relative w-full h-full">
@@ -272,37 +270,24 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
       {/* Route controls */}
       {!isLoading && !error && validActivities.length >= 2 && (
         <div className="absolute top-4 left-4 flex flex-col gap-2">
-          <div className="bg-background rounded-lg shadow-lg p-2 flex gap-1">
+          <div className="bg-background rounded-lg shadow-lg p-1 flex gap-1">
             <Button
-              variant={showRoute ? "default" : "outline"}
+              variant={routeMode === 'lines' ? "default" : "ghost"}
               size="sm"
-              onClick={() => onRouteToggle?.(!showRoute)}
+              onClick={() => setRouteMode('lines')}
             >
-              <Route className="h-4 w-4 mr-1" />
-              Route
+              Lines
             </Button>
-
-            {showRoute && (
-              <>
-                <Button
-                  variant={routeMode === 'lines' ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setRouteMode('lines')}
-                >
-                  Lines
-                </Button>
-                <Button
-                  variant={routeMode === 'directions' ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setRouteMode('directions')}
-                >
-                  Directions
-                </Button>
-              </>
-            )}
+            <Button
+              variant={routeMode === 'directions' ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setRouteMode('directions')}
+            >
+              Directions
+            </Button>
           </div>
 
-          {showRoute && routeMode === 'directions' && (
+          {routeMode === 'directions' && (
             <div className="bg-background rounded-lg shadow-lg p-2 flex gap-1">
               <Button
                 variant={travelMode === 'WALKING' ? "secondary" : "ghost"}
@@ -321,7 +306,7 @@ export function DayMap({ activities, showRoute = true, onRouteToggle }: DayMapPr
             </div>
           )}
 
-          {routeInfo && (
+          {routeMode === 'directions' && routeInfo && (
             <div className="bg-background rounded-lg shadow-lg px-3 py-2">
               <div className="flex gap-2 text-sm">
                 <Badge variant="secondary">{formatDistance(routeInfo.distance)}</Badge>

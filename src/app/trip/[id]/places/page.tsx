@@ -56,6 +56,8 @@ import {
   deleteSavedPlace,
   createActivityFromPlace
 } from "@/lib/storage"
+import { PlaceSearch } from "@/components/maps/PlaceSearch"
+import { PlaceSearchResult } from "@/lib/maps"
 
 const CATEGORIES: { value: PlaceCategory; label: string; icon: React.ReactNode }[] = [
   { value: 'food', label: 'Food', icon: <Utensils className="h-4 w-4" /> },
@@ -80,10 +82,11 @@ export default function SavedPlacesPage() {
   const [isPlaceOpen, setIsPlaceOpen] = useState(false)
   const [editingPlace, setEditingPlace] = useState<SavedPlace | null>(null)
   const [placeName, setPlaceName] = useState("")
-  const [placeAddress, setPlaceAddress] = useState("")
+  const [placeNameTouched, setPlaceNameTouched] = useState(false)
   const [placeCategory, setPlaceCategory] = useState<PlaceCategory | string>("food")
   const [placeLocationId, setPlaceLocationId] = useState("")
   const [placeNotes, setPlaceNotes] = useState("")
+  const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
   // Assign to day dialog
   const [isAssignOpen, setIsAssignOpen] = useState(false)
@@ -108,28 +111,50 @@ export default function SavedPlacesPage() {
     if (place) {
       setEditingPlace(place)
       setPlaceName(place.name)
-      setPlaceAddress(place.address)
+      setPlaceNameTouched(true)
       setPlaceCategory(place.category)
       setPlaceLocationId(place.locationId || "")
       setPlaceNotes(place.notes || "")
+      setSearchedPlace(place.googlePlaceId ? {
+        placeId: place.googlePlaceId,
+        name: place.name,
+        address: place.address,
+        coordinates: place.coordinates
+      } : null)
     } else {
       setEditingPlace(null)
       setPlaceName("")
-      setPlaceAddress("")
+      setPlaceNameTouched(false)
       setPlaceCategory("food")
       setPlaceLocationId("")
       setPlaceNotes("")
+      setSearchedPlace(null)
     }
     setIsPlaceOpen(true)
   }
 
+  const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
+    setSearchedPlace(place)
+    if (!placeNameTouched) {
+      setPlaceName(place.name)
+    }
+  }
+
+  const handlePlaceNameChange = (value: string) => {
+    setPlaceName(value)
+    setPlaceNameTouched(true)
+  }
+
   const handleSavePlace = () => {
-    if (!placeName) return
+    if (!searchedPlace) return
+
+    const name = placeName || searchedPlace.name
 
     const data = {
-      name: placeName,
-      address: placeAddress,
-      coordinates: { lat: 0, lng: 0 },
+      name,
+      address: searchedPlace.address,
+      coordinates: searchedPlace.coordinates,
+      googlePlaceId: searchedPlace.placeId,
       category: placeCategory,
       locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
       notes: placeNotes || undefined
@@ -142,6 +167,7 @@ export default function SavedPlacesPage() {
     }
 
     setIsPlaceOpen(false)
+    setSearchedPlace(null)
     refreshTrip()
   }
 
@@ -318,7 +344,7 @@ export default function SavedPlacesPage() {
 
       {/* Add/Edit Place Dialog */}
       <Dialog open={isPlaceOpen} onOpenChange={setIsPlaceOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {editingPlace ? 'Edit Place' : 'Add Place'}
@@ -326,21 +352,25 @@ export default function SavedPlacesPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                placeholder="e.g., La Boqueria Market"
-                value={placeName}
-                onChange={(e) => setPlaceName(e.target.value)}
-              />
+              <label className="text-sm font-medium">Location <span className="text-destructive">*</span></label>
+              <PlaceSearch onSelect={handlePlaceSearchSelect} />
+              {searchedPlace && (
+                <div className="mt-2 p-2 rounded-md bg-muted">
+                  <p className="font-medium text-sm">{searchedPlace.name}</p>
+                  <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                </div>
+              )}
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Address</label>
+              <label className="text-sm font-medium">Name <span className="text-muted-foreground text-xs">(optional)</span></label>
               <Input
-                placeholder="Address"
-                value={placeAddress}
-                onChange={(e) => setPlaceAddress(e.target.value)}
+                placeholder="Defaults to location name"
+                value={placeName}
+                onChange={(e) => handlePlaceNameChange(e.target.value)}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Category</label>
@@ -362,7 +392,7 @@ export default function SavedPlacesPage() {
               </div>
               {trip.locations.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Location</label>
+                  <label className="text-sm font-medium">Trip Location</label>
                   <Select value={placeLocationId} onValueChange={setPlaceLocationId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select location" />
@@ -377,6 +407,7 @@ export default function SavedPlacesPage() {
                 </div>
               )}
             </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Notes</label>
               <Input
@@ -390,7 +421,7 @@ export default function SavedPlacesPage() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSavePlace} disabled={!placeName}>
+            <Button onClick={handleSavePlace} disabled={!searchedPlace}>
               {editingPlace ? 'Save' : 'Add Place'}
             </Button>
           </DialogFooter>

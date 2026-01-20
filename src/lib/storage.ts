@@ -88,6 +88,7 @@ export function deleteTrip(id: string): boolean {
 // Add a location to a trip
 export function addLocation(tripId: string, data: {
   name: string
+  color?: string
   startDate: string
   endDate: string
   coordinates?: { lat: number; lng: number }
@@ -100,6 +101,7 @@ export function addLocation(tripId: string, data: {
   const newLocation: Location = {
     id: uuidv4(),
     name: data.name,
+    color: data.color,
     startDate: data.startDate,
     endDate: data.endDate,
     coordinates: data.coordinates,
@@ -330,6 +332,20 @@ export function moveActivity(tripId: string, fromDate: string, toDate: string, a
   const [activity] = trip.days[fromDayIndex].activities.splice(actIndex, 1)
   trip.days[toDayIndex].activities.push(activity)
 
+  saveTrips(trips)
+  return true
+}
+
+// Update a day's name
+export function updateDayName(tripId: string, date: string, name: string | undefined): boolean {
+  const trips = getTrips()
+  const trip = trips.find(t => t.id === tripId)
+  if (!trip) return false
+
+  const dayIndex = trip.days.findIndex(d => d.date === date)
+  if (dayIndex === -1) return false
+
+  trip.days[dayIndex].name = name || undefined
   saveTrips(trips)
   return true
 }

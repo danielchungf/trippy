@@ -77,6 +77,7 @@ import {
   deleteActivity,
   createActivityFromPlace,
   reorderActivities,
+  updateDayName,
 } from "@/lib/storage"
 import { DayMap } from "@/components/maps/DayMap"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
@@ -91,8 +92,9 @@ export default function DayPage() {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
-  const [showRoute, setShowRoute] = useState(true)
   const [isOptimizing, setIsOptimizing] = useState(false)
+  const [isEditingDayName, setIsEditingDayName] = useState(false)
+  const [editingDayNameValue, setEditingDayNameValue] = useState("")
 
   // DnD sensors
   const sensors = useSensors(
@@ -140,6 +142,25 @@ export default function DayPage() {
 
   const prevDay = dayIndex > 0 ? trip?.days[dayIndex - 1] : null
   const nextDay = trip && dayIndex < trip.days.length - 1 ? trip.days[dayIndex + 1] : null
+
+  const handleEditDayName = () => {
+    setEditingDayNameValue(day?.name || "")
+    setIsEditingDayName(true)
+  }
+
+  const handleSaveDayName = () => {
+    updateDayName(tripId, date, editingDayNameValue.trim() || undefined)
+    setIsEditingDayName(false)
+    refreshTrip()
+  }
+
+  const handleDayNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveDayName()
+    } else if (e.key === 'Escape') {
+      setIsEditingDayName(false)
+    }
+  }
 
   const handleOpenActivityDialog = (activity?: Activity) => {
     const presetDurations = ['15', '30', '45', '60', '90', '120', '180', '240']
@@ -339,7 +360,29 @@ export default function DayPage() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-xl font-bold">Day {dayIndex + 1}</h1>
+                {isEditingDayName ? (
+                  <Input
+                    autoFocus
+                    placeholder={`Day ${dayIndex + 1}`}
+                    value={editingDayNameValue}
+                    onChange={(e) => setEditingDayNameValue(e.target.value)}
+                    onKeyDown={handleDayNameKeyDown}
+                    onBlur={handleSaveDayName}
+                    className="h-8 text-xl font-bold w-48"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 group">
+                    <h1 className="text-xl font-bold">{day.name || `Day ${dayIndex + 1}`}</h1>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={handleEditDayName}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   {formatDate(date)}
                   {location && ` · ${location.name}`}
@@ -373,11 +416,7 @@ export default function DayPage() {
           <div className="lg:col-span-2">
             <Card className="h-[400px] lg:h-[600px] overflow-hidden">
               <CardContent className="p-0 h-full">
-                <DayMap
-                  activities={day.activities}
-                  showRoute={showRoute}
-                  onRouteToggle={setShowRoute}
-                />
+                <DayMap activities={day.activities} />
               </CardContent>
             </Card>
           </div>
@@ -444,10 +483,11 @@ export default function DayPage() {
                       strategy={verticalListSortingStrategy}
                     >
                       <div className="space-y-2">
-                        {day.activities.map(activity => (
+                        {day.activities.map((activity, index) => (
                           <SortableActivityCard
                             key={activity.id}
                             activity={activity}
+                            index={index}
                             onEdit={() => handleOpenActivityDialog(activity)}
                             onDelete={() => handleDeleteActivity(activity.id)}
                           />
@@ -617,7 +657,7 @@ export default function DayPage() {
                   }}
                   disabled={!hasTime}
                 >
-                  <SelectTrigger className={!hasTime ? "text-muted-foreground" : ""}>
+                  <SelectTrigger className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}>
                     <SelectValue placeholder="Duration" />
                   </SelectTrigger>
                   <SelectContent>
@@ -731,10 +771,12 @@ function AccommodationCard({
 
 function SortableActivityCard({
   activity,
+  index,
   onEdit,
   onDelete
 }: {
   activity: Activity
+  index: number
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -765,6 +807,9 @@ function SortableActivityCard({
         className="mt-1 cursor-grab active:cursor-grabbing touch-none"
       >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium shrink-0">
+        {index + 1}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm">{activity.title}</p>

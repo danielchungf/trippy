@@ -63,7 +63,8 @@ import {
   formatDateRange,
   getTripDuration,
   parseLocalDate,
-  formatLocalDate
+  formatLocalDate,
+  LOCATION_COLORS
 } from "@/types"
 import {
   getTrip,
@@ -72,7 +73,8 @@ import {
   deleteLocation,
   addAccommodation,
   updateAccommodation,
-  deleteAccommodation
+  deleteAccommodation,
+  updateDayName
 } from "@/lib/storage"
 
 export default function TripPage() {
@@ -87,6 +89,7 @@ export default function TripPage() {
   const [isLocationOpen, setIsLocationOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const [locationName, setLocationName] = useState("")
+  const [locationColor, setLocationColor] = useState<string>(LOCATION_COLORS[0].value)
   const [locationCoordinates, setLocationCoordinates] = useState<Coordinates | undefined>()
   const [locationGooglePlaceId, setLocationGooglePlaceId] = useState<string | undefined>()
   const [locationStartDate, setLocationStartDate] = useState<Date | undefined>()
@@ -127,6 +130,7 @@ export default function TripPage() {
     if (location) {
       setEditingLocation(location)
       setLocationName(location.name)
+      setLocationColor(location.color || LOCATION_COLORS[0].value)
       setLocationCoordinates(location.coordinates)
       setLocationGooglePlaceId(location.googlePlaceId)
       setLocationStartDate(parseLocalDate(location.startDate))
@@ -134,6 +138,10 @@ export default function TripPage() {
     } else {
       setEditingLocation(null)
       setLocationName("")
+      // Pick next available color based on existing locations
+      const usedColors = trip?.locations.map(l => l.color) || []
+      const nextColor = LOCATION_COLORS.find(c => !usedColors.includes(c.value))?.value || LOCATION_COLORS[0].value
+      setLocationColor(nextColor)
       setLocationCoordinates(undefined)
       setLocationGooglePlaceId(undefined)
       setLocationStartDate(trip ? parseLocalDate(trip.startDate) : undefined)
@@ -159,6 +167,7 @@ export default function TripPage() {
     if (editingLocation) {
       updateLocation(tripId, editingLocation.id, {
         name: locationName,
+        color: locationColor,
         coordinates: locationCoordinates,
         googlePlaceId: locationGooglePlaceId,
         startDate: startDateStr,
@@ -167,6 +176,7 @@ export default function TripPage() {
     } else {
       addLocation(tripId, {
         name: locationName,
+        color: locationColor,
         coordinates: locationCoordinates,
         googlePlaceId: locationGooglePlaceId,
         startDate: startDateStr,
@@ -334,6 +344,29 @@ export default function TripPage() {
                             </div>
                           )}
                         </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Color</label>
+                          <div className="space-y-2 p-1 -m-1">
+                            {[0, 1, 2].map(row => (
+                              <div key={row} className="grid grid-cols-14 gap-1.5">
+                                {LOCATION_COLORS.filter(c => c.row === row).map(color => (
+                                  <button
+                                    key={color.value}
+                                    type="button"
+                                    className={`aspect-square rounded-full transition-all ${
+                                      locationColor === color.value
+                                        ? 'ring-2 ring-offset-2 ring-primary'
+                                        : 'hover:scale-110'
+                                    }`}
+                                    style={{ backgroundColor: color.value }}
+                                    onClick={() => setLocationColor(color.value)}
+                                    title={color.name}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Start Date</label>
@@ -433,6 +466,10 @@ export default function TripPage() {
                           {index > 0 && (
                             <span className="text-muted-foreground">→</span>
                           )}
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: location.color || LOCATION_COLORS[0].value }}
+                          />
                           <div>
                             <p className="font-medium">{location.name}</p>
                             <p className="text-xs text-muted-foreground">
@@ -697,7 +734,7 @@ export default function TripPage() {
               </CardHeader>
               <CardContent>
                 {viewMode === 'list' ? (
-                  <DaysList trip={trip} />
+                  <DaysList trip={trip} onRefresh={refreshTrip} />
                 ) : (
                   <CalendarView trip={trip} />
                 )}
@@ -710,7 +747,10 @@ export default function TripPage() {
   )
 }
 
-function DaysList({ trip }: { trip: Trip }) {
+function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => void }) {
+  const [editingDayDate, setEditingDayDate] = useState<string | null>(null)
+  const [editingDayName, setEditingDayName] = useState("")
+
   // Group days by location
   const daysByLocation: { location: Location | null; days: typeof trip.days }[] = []
 
@@ -724,6 +764,29 @@ function DaysList({ trip }: { trip: Trip }) {
       daysByLocation.push({ location, days: [day] })
     }
   })
+
+  const handleEditDayName = (day: typeof trip.days[0], e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditingDayDate(day.date)
+    setEditingDayName(day.name || "")
+  }
+
+  const handleSaveDayName = (date: string) => {
+    updateDayName(trip.id, date, editingDayName.trim() || undefined)
+    setEditingDayDate(null)
+    setEditingDayName("")
+    onRefresh()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent, date: string) => {
+    if (e.key === 'Enter') {
+      handleSaveDayName(date)
+    } else if (e.key === 'Escape') {
+      setEditingDayDate(null)
+      setEditingDayName("")
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -739,31 +802,66 @@ function DaysList({ trip }: { trip: Trip }) {
             {group.days.map((day) => {
               const dayNumber = trip.days.indexOf(day) + 1
               const activityCount = day.activities.length
+              const isEditing = editingDayDate === day.date
+              const displayName = day.name || `Day ${dayNumber}`
 
               return (
-                <Link
-                  key={day.date}
-                  href={`/trip/${trip.id}/day/${day.date}`}
-                  className="block"
-                >
-                  <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors">
-                    <div className="flex items-center gap-3">
+                <div key={day.date} className="relative group">
+                  {isEditing ? (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-medium">{dayNumber}</span>
                       </div>
-                      <div>
-                        <p className="font-medium">{formatDate(day.date)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {activityCount === 0
-                            ? 'No activities planned'
-                            : `${activityCount} ${activityCount === 1 ? 'activity' : 'activities'}`
-                          }
+                      <div className="flex-1">
+                        <Input
+                          autoFocus
+                          placeholder={`Day ${dayNumber}`}
+                          value={editingDayName}
+                          onChange={(e) => setEditingDayName(e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, day.date)}
+                          onBlur={() => handleSaveDayName(day.date)}
+                          className="h-8 text-sm font-medium"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDate(day.date)}
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </Link>
+                  ) : (
+                    <Link
+                      href={`/trip/${trip.id}/day/${day.date}`}
+                      className="block"
+                    >
+                      <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-sm font-medium">{dayNumber}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{displayName}</p>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => handleEditDayName(day, e)}
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(day.date)} · {activityCount === 0
+                                ? 'No activities planned'
+                                : `${activityCount} ${activityCount === 1 ? 'activity' : 'activities'}`
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  )}
+                </div>
               )
             })}
           </div>
@@ -777,99 +875,233 @@ function DaysList({ trip }: { trip: Trip }) {
 }
 
 function CalendarView({ trip }: { trip: Trip }) {
-  const startDate = new Date(trip.startDate)
-  const endDate = new Date(trip.endDate)
+  const tripStart = parseLocalDate(trip.startDate)
+  const tripEnd = parseLocalDate(trip.endDate)
 
-  // Get the month(s) to display
-  const months: Date[] = []
-  const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-  const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+  // Find the first Sunday on or before the trip start
+  const calendarStart = new Date(tripStart)
+  calendarStart.setDate(calendarStart.getDate() - calendarStart.getDay())
 
-  while (current <= end) {
-    months.push(new Date(current))
-    current.setMonth(current.getMonth() + 1)
+  // Find the last Saturday on or after the trip end
+  const calendarEnd = new Date(tripEnd)
+  const daysUntilSaturday = (6 - calendarEnd.getDay()) % 7
+  calendarEnd.setDate(calendarEnd.getDate() + daysUntilSaturday)
+
+  // Build all days from calendar start to calendar end
+  type DayInfo = {
+    dayNum: number
+    date: Date
+    dateStr: string
+    isInTrip: boolean
+    tripDay: typeof trip.days[0] | undefined
+    isFirstOfMonth: boolean
+    monthLabel: string
+    colIndex: number // 0-6 for day of week
   }
 
-  return (
-    <div className="space-y-6">
-      {months.map(month => (
-        <MonthCalendar
-          key={month.toISOString()}
-          month={month}
-          trip={trip}
-        />
-      ))}
-    </div>
-  )
-}
+  const allDays: DayInfo[] = []
+  const current = new Date(calendarStart)
+  let colIndex = 0
 
-function MonthCalendar({ month, trip }: { month: Date; trip: Trip }) {
-  const year = month.getFullYear()
-  const monthIndex = month.getMonth()
-
-  const monthName = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-
-  const firstDay = new Date(year, monthIndex, 1)
-  const lastDay = new Date(year, monthIndex + 1, 0)
-
-  const startPadding = firstDay.getDay()
-  const daysInMonth = lastDay.getDate()
-
-  const tripStart = new Date(trip.startDate)
-  const tripEnd = new Date(trip.endDate)
-
-  const days = Array.from({ length: 42 }, (_, i) => {
-    const dayNum = i - startPadding + 1
-    if (dayNum < 1 || dayNum > daysInMonth) return null
-
-    const date = new Date(year, monthIndex, dayNum)
-    const dateStr = date.toISOString().split('T')[0]
+  while (current <= calendarEnd) {
+    const date = new Date(current)
+    const dateStr = formatLocalDate(date)
     const isInTrip = date >= tripStart && date <= tripEnd
     const tripDay = trip.days.find(d => d.date === dateStr)
-    const location = tripDay?.locationId
-      ? trip.locations.find(l => l.id === tripDay.locationId)
-      : null
+    const isFirstOfMonth = date.getDate() === 1
+    const monthLabel = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
 
-    return { dayNum, date, dateStr, isInTrip, tripDay, location }
-  })
+    allDays.push({
+      dayNum: date.getDate(),
+      date,
+      dateStr,
+      isInTrip,
+      tripDay,
+      isFirstOfMonth,
+      monthLabel,
+      colIndex: colIndex % 7
+    })
 
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    current.setDate(current.getDate() + 1)
+    colIndex++
+  }
+
+  // Group into weeks
+  const weeks: DayInfo[][] = []
+  for (let i = 0; i < allDays.length; i += 7) {
+    weeks.push(allDays.slice(i, i + 7))
+  }
+
+  // Calculate location bar segments for each row
+  // A segment represents a portion of a location that appears in one row
+  type LocationSegment = {
+    location: typeof trip.locations[0]
+    startCol: number // 0-6
+    endCol: number // 0-6 (inclusive)
+    lane: number // vertical stacking position
+  }
+
+  const getSegmentsForWeek = (week: DayInfo[], weekIndex: number): LocationSegment[] => {
+    const segments: LocationSegment[] = []
+    const weekStartDate = week[0].date
+    const weekEndDate = week[6].date
+
+    trip.locations.forEach(location => {
+      const locStart = parseLocalDate(location.startDate)
+      const locEnd = parseLocalDate(location.endDate)
+
+      // Check if location overlaps with this week
+      if (locEnd < weekStartDate || locStart > weekEndDate) return
+
+      // Calculate start and end columns within this week
+      let startCol = 0
+      let endCol = 6
+
+      if (locStart > weekStartDate) {
+        startCol = Math.floor((locStart.getTime() - weekStartDate.getTime()) / (1000 * 60 * 60 * 24))
+      }
+      if (locEnd < weekEndDate) {
+        endCol = Math.floor((locEnd.getTime() - weekStartDate.getTime()) / (1000 * 60 * 60 * 24))
+      }
+
+      // Clamp to valid range
+      startCol = Math.max(0, Math.min(6, startCol))
+      endCol = Math.max(0, Math.min(6, endCol))
+
+      segments.push({
+        location,
+        startCol,
+        endCol,
+        lane: 0 // Will be assigned below
+      })
+    })
+
+    // Assign lanes to avoid overlaps
+    segments.forEach((seg, i) => {
+      let lane = 0
+      let conflict = true
+      while (conflict) {
+        conflict = false
+        for (let j = 0; j < i; j++) {
+          const other = segments[j]
+          if (other.lane === lane) {
+            // Check if they overlap horizontally
+            if (!(seg.endCol < other.startCol || seg.startCol > other.endCol)) {
+              conflict = true
+              lane++
+              break
+            }
+          }
+        }
+      }
+      seg.lane = lane
+    })
+
+    return segments
+  }
+
+  const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const barHeight = 22
+  const barGap = 2
+  const dayLabelHeight = 24
 
   return (
-    <div>
-      <h3 className="font-medium mb-3">{monthName}</h3>
-      <div className="grid grid-cols-7 gap-1">
+    <div className="select-none">
+      {/* Week day headers */}
+      <div className="grid grid-cols-7 border-b border-border/50">
         {weekDays.map(day => (
-          <div key={day} className="text-center text-xs text-muted-foreground py-2">
+          <div key={day} className="text-center text-[10px] font-medium text-muted-foreground py-1.5">
             {day}
           </div>
         ))}
-        {days.map((day, i) => (
-          <div key={i} className="aspect-square p-1">
-            {day && (
-              day.isInTrip ? (
-                <Link href={`/trip/${trip.id}/day/${day.dateStr}`}>
-                  <div className={`
-                    w-full h-full rounded-md flex flex-col items-center justify-center
-                    ${day.location ? 'bg-primary/10' : 'bg-muted'}
-                    hover:ring-2 ring-primary cursor-pointer transition-all
-                  `}>
-                    <span className="text-sm font-medium">{day.dayNum}</span>
-                    {day.tripDay && day.tripDay.activities.length > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {day.tripDay.activities.length}
+      </div>
+
+      {/* Calendar weeks */}
+      <div>
+        {weeks.map((week, weekIndex) => {
+          const segments = getSegmentsForWeek(week, weekIndex)
+          const maxLane = segments.length > 0 ? Math.max(...segments.map(s => s.lane)) : -1
+          const barsHeight = (maxLane + 1) * (barHeight + barGap)
+          const rowHeight = dayLabelHeight + barsHeight + 8
+
+          // Find month label position
+          const firstOfMonthDay = week.find(d => d.isFirstOfMonth)
+          const showMonthLabel = firstOfMonthDay !== undefined
+
+          return (
+            <div
+              key={weekIndex}
+              className="grid grid-cols-7 border-b border-border/30 relative"
+              style={{ minHeight: `${Math.max(rowHeight, 50)}px` }}
+            >
+              {/* Day cells with numbers */}
+              {week.map((day, dayIndex) => (
+                <div
+                  key={dayIndex}
+                  className={`relative border-r border-border/20 last:border-r-0 ${
+                    day.isInTrip ? '' : 'bg-muted/30'
+                  }`}
+                >
+                  {/* Month label badge */}
+                  {day.isFirstOfMonth && (
+                    <span className="absolute top-1 left-1 text-[9px] font-bold bg-foreground text-background px-1 py-0.5 rounded">
+                      {day.monthLabel}
+                    </span>
+                  )}
+                  {/* Day number */}
+                  <div className={`p-1 ${day.isFirstOfMonth ? 'pl-10' : ''}`}>
+                    {day.isInTrip ? (
+                      <Link href={`/trip/${trip.id}/day/${day.dateStr}`} className="block">
+                        <span className={`text-xs font-medium ${
+                          day.tripDay && day.tripDay.activities.length > 0
+                            ? 'text-foreground'
+                            : 'text-muted-foreground'
+                        }`}>
+                          {day.dayNum}
+                        </span>
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/50">
+                        {day.dayNum}
                       </span>
                     )}
                   </div>
-                </Link>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                  {day.dayNum}
                 </div>
-              )
-            )}
-          </div>
-        ))}
+              ))}
+
+              {/* Location bars overlay */}
+              {segments.map((segment, segIndex) => {
+                const leftPercent = (segment.startCol / 7) * 100
+                const widthPercent = ((segment.endCol - segment.startCol + 1) / 7) * 100
+                const top = dayLabelHeight + segment.lane * (barHeight + barGap)
+
+                // Check if this is the start of the location
+                const locStart = parseLocalDate(segment.location.startDate)
+                const isStart = week[segment.startCol].date.getTime() === locStart.getTime()
+                // Check if this is the end of the location
+                const locEnd = parseLocalDate(segment.location.endDate)
+                const isEnd = week[segment.endCol].date.getTime() === locEnd.getTime()
+
+                return (
+                  <div
+                    key={`${segment.location.id}-${weekIndex}`}
+                    className="absolute z-10 flex items-center px-2 text-xs font-medium text-white overflow-hidden whitespace-nowrap"
+                    style={{
+                      left: `calc(${leftPercent}% + 2px)`,
+                      width: `calc(${widthPercent}% - 4px)`,
+                      top: `${top}px`,
+                      height: `${barHeight}px`,
+                      backgroundColor: segment.location.color || '#3b82f6',
+                      borderRadius: `${isStart ? '4px' : '0'} ${isEnd ? '4px' : '0'} ${isEnd ? '4px' : '0'} ${isStart ? '4px' : '0'}`
+                    }}
+                  >
+                    {isStart && segment.location.name}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
