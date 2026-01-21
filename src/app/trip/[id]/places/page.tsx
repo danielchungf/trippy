@@ -55,7 +55,7 @@ import {
   updateSavedPlace,
   deleteSavedPlace,
   createActivityFromPlace
-} from "@/lib/storage"
+} from "@/lib/db"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
 import { PlaceSearchResult } from "@/lib/maps"
 
@@ -94,16 +94,19 @@ export default function SavedPlacesPage() {
   const [assignDay, setAssignDay] = useState("")
 
   useEffect(() => {
-    const loadedTrip = getTrip(tripId)
-    if (loadedTrip) {
-      setTrip(loadedTrip)
-    } else {
-      router.push('/')
+    async function loadTrip() {
+      const loadedTrip = await getTrip(tripId)
+      if (loadedTrip) {
+        setTrip(loadedTrip)
+      } else {
+        router.push('/')
+      }
     }
+    loadTrip()
   }, [tripId, router])
 
-  const refreshTrip = () => {
-    const updated = getTrip(tripId)
+  const refreshTrip = async () => {
+    const updated = await getTrip(tripId)
     if (updated) setTrip(updated)
   }
 
@@ -145,7 +148,7 @@ export default function SavedPlacesPage() {
     setPlaceNameTouched(true)
   }
 
-  const handleSavePlace = () => {
+  const handleSavePlace = async () => {
     if (!searchedPlace) return
 
     const name = placeName || searchedPlace.name
@@ -161,19 +164,19 @@ export default function SavedPlacesPage() {
     }
 
     if (editingPlace) {
-      updateSavedPlace(tripId, editingPlace.id, data)
+      await updateSavedPlace(tripId, editingPlace.id, data)
     } else {
-      addSavedPlace(tripId, data)
+      await addSavedPlace(tripId, data)
     }
 
     setIsPlaceOpen(false)
     setSearchedPlace(null)
-    refreshTrip()
+    await refreshTrip()
   }
 
-  const handleDeletePlace = (placeId: string) => {
-    deleteSavedPlace(tripId, placeId)
-    refreshTrip()
+  const handleDeletePlace = async (placeId: string) => {
+    await deleteSavedPlace(tripId, placeId)
+    await refreshTrip()
   }
 
   const handleOpenAssignDialog = (place: SavedPlace) => {
@@ -182,11 +185,11 @@ export default function SavedPlacesPage() {
     setIsAssignOpen(true)
   }
 
-  const handleAssignToDay = () => {
+  const handleAssignToDay = async () => {
     if (!assigningPlace || !assignDay) return
-    createActivityFromPlace(tripId, assignDay, assigningPlace.id)
+    await createActivityFromPlace(tripId, assignDay, assigningPlace.id)
     setIsAssignOpen(false)
-    refreshTrip()
+    await refreshTrip()
   }
 
   if (!trip) {

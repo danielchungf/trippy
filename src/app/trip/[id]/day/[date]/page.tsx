@@ -78,7 +78,7 @@ import {
   createActivityFromPlace,
   reorderActivities,
   updateDayName,
-} from "@/lib/storage"
+} from "@/lib/db"
 import { DayMap } from "@/components/maps/DayMap"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
 import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
@@ -121,16 +121,19 @@ export default function DayPage() {
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
   useEffect(() => {
-    const loadedTrip = getTrip(tripId)
-    if (loadedTrip) {
-      setTrip(loadedTrip)
-    } else {
-      router.push('/')
+    async function loadTrip() {
+      const loadedTrip = await getTrip(tripId)
+      if (loadedTrip) {
+        setTrip(loadedTrip)
+      } else {
+        router.push('/')
+      }
     }
+    loadTrip()
   }, [tripId, router])
 
-  const refreshTrip = useCallback(() => {
-    const updated = getTrip(tripId)
+  const refreshTrip = useCallback(async () => {
+    const updated = await getTrip(tripId)
     if (updated) setTrip(updated)
   }, [tripId])
 
@@ -148,10 +151,10 @@ export default function DayPage() {
     setIsEditingDayName(true)
   }
 
-  const handleSaveDayName = () => {
-    updateDayName(tripId, date, editingDayNameValue.trim() || undefined)
+  const handleSaveDayName = async () => {
+    await updateDayName(tripId, date, editingDayNameValue.trim() || undefined)
     setIsEditingDayName(false)
-    refreshTrip()
+    await refreshTrip()
   }
 
   const handleDayNameKeyDown = (e: React.KeyboardEvent) => {
@@ -199,7 +202,7 @@ export default function DayPage() {
     setIsActivityOpen(true)
   }
 
-  const handleSaveActivity = () => {
+  const handleSaveActivity = async () => {
     let place: PlaceInfo
     let title = activityTitle
 
@@ -237,14 +240,14 @@ export default function DayPage() {
     }
 
     if (editingActivity) {
-      updateActivity(tripId, date, editingActivity.id, data)
+      await updateActivity(tripId, date, editingActivity.id, data)
     } else {
-      addActivity(tripId, date, data)
+      await addActivity(tripId, date, data)
     }
 
     setIsActivityOpen(false)
     setSearchedPlace(null)
-    refreshTrip()
+    await refreshTrip()
   }
 
   const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
@@ -269,17 +272,17 @@ export default function DayPage() {
     setActivityTitleTouched(true)
   }
 
-  const handleDeleteActivity = (activityId: string) => {
-    deleteActivity(tripId, date, activityId)
-    refreshTrip()
+  const handleDeleteActivity = async (activityId: string) => {
+    await deleteActivity(tripId, date, activityId)
+    await refreshTrip()
   }
 
-  const handleAssignSavedPlace = (placeId: string) => {
-    createActivityFromPlace(tripId, date, placeId)
-    refreshTrip()
+  const handleAssignSavedPlace = async (placeId: string) => {
+    await createActivityFromPlace(tripId, date, placeId)
+    await refreshTrip()
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
     if (over && active.id !== over.id) {
@@ -291,8 +294,8 @@ export default function DayPage() {
         const reordered = [...activities]
         const [removed] = reordered.splice(oldIndex, 1)
         reordered.splice(newIndex, 0, removed)
-        reorderActivities(tripId, date, reordered.map(a => a.id))
-        refreshTrip()
+        await reorderActivities(tripId, date, reordered.map(a => a.id))
+        await refreshTrip()
       }
     }
   }
@@ -317,8 +320,8 @@ export default function DayPage() {
       const optimizedOrder = await optimizeRoute(day.activities, startingLocation)
       if (optimizedOrder) {
         const reorderedIds = optimizedOrder.map(i => day.activities[i].id)
-        reorderActivities(tripId, date, reorderedIds)
-        refreshTrip()
+        await reorderActivities(tripId, date, reorderedIds)
+        await refreshTrip()
       }
     } finally {
       setIsOptimizing(false)

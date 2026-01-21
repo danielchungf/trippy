@@ -138,6 +138,7 @@ export interface Trip {
   startDate: string // ISO date
   endDate: string // ISO date
   coverImage?: string
+  color?: string // hex color for calendar view
   locations: Location[]
   accommodations: Accommodation[]
   savedPlaces: SavedPlace[]

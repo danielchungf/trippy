@@ -75,7 +75,7 @@ import {
   updateAccommodation,
   deleteAccommodation,
   updateDayName
-} from "@/lib/storage"
+} from "@/lib/db"
 
 export default function TripPage() {
   const params = useParams()
@@ -112,16 +112,19 @@ export default function TripPage() {
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
 
   useEffect(() => {
-    const loadedTrip = getTrip(tripId)
-    if (loadedTrip) {
-      setTrip(loadedTrip)
-    } else {
-      router.push('/')
+    async function loadTrip() {
+      const loadedTrip = await getTrip(tripId)
+      if (loadedTrip) {
+        setTrip(loadedTrip)
+      } else {
+        router.push('/')
+      }
     }
+    loadTrip()
   }, [tripId, router])
 
-  const refreshTrip = () => {
-    const updated = getTrip(tripId)
+  const refreshTrip = async () => {
+    const updated = await getTrip(tripId)
     if (updated) setTrip(updated)
   }
 
@@ -158,14 +161,14 @@ export default function TripPage() {
     setLocationGooglePlaceId(place.placeId)
   }
 
-  const handleSaveLocation = () => {
+  const handleSaveLocation = async () => {
     if (!locationName || !locationStartDate || !locationEndDate) return
 
     const startDateStr = formatLocalDate(locationStartDate)
     const endDateStr = formatLocalDate(locationEndDate)
 
     if (editingLocation) {
-      updateLocation(tripId, editingLocation.id, {
+      await updateLocation(tripId, editingLocation.id, {
         name: locationName,
         color: locationColor,
         coordinates: locationCoordinates,
@@ -174,7 +177,7 @@ export default function TripPage() {
         endDate: endDateStr
       })
     } else {
-      addLocation(tripId, {
+      await addLocation(tripId, {
         name: locationName,
         color: locationColor,
         coordinates: locationCoordinates,
@@ -185,12 +188,12 @@ export default function TripPage() {
     }
 
     setIsLocationOpen(false)
-    refreshTrip()
+    await refreshTrip()
   }
 
-  const handleDeleteLocation = (locationId: string) => {
-    deleteLocation(tripId, locationId)
-    refreshTrip()
+  const handleDeleteLocation = async (locationId: string) => {
+    await deleteLocation(tripId, locationId)
+    await refreshTrip()
   }
 
   // Accommodation handlers
@@ -238,7 +241,7 @@ export default function TripPage() {
     return trip?.locations.find(l => l.coordinates)?.coordinates
   }
 
-  const handleSaveAccommodation = () => {
+  const handleSaveAccommodation = async () => {
     if (!accommodationName || !accommodationCheckIn || !accommodationCheckOut) return
 
     const data = {
@@ -253,18 +256,18 @@ export default function TripPage() {
     }
 
     if (editingAccommodation) {
-      updateAccommodation(tripId, editingAccommodation.id, data)
+      await updateAccommodation(tripId, editingAccommodation.id, data)
     } else {
-      addAccommodation(tripId, data)
+      await addAccommodation(tripId, data)
     }
 
     setIsAccommodationOpen(false)
-    refreshTrip()
+    await refreshTrip()
   }
 
-  const handleDeleteAccommodation = (accommodationId: string) => {
-    deleteAccommodation(tripId, accommodationId)
-    refreshTrip()
+  const handleDeleteAccommodation = async (accommodationId: string) => {
+    await deleteAccommodation(tripId, accommodationId)
+    await refreshTrip()
   }
 
   if (!trip) {
@@ -747,7 +750,7 @@ export default function TripPage() {
   )
 }
 
-function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => void }) {
+function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => Promise<void> }) {
   const [editingDayDate, setEditingDayDate] = useState<string | null>(null)
   const [editingDayName, setEditingDayName] = useState("")
 
@@ -772,11 +775,11 @@ function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => void }) {
     setEditingDayName(day.name || "")
   }
 
-  const handleSaveDayName = (date: string) => {
-    updateDayName(trip.id, date, editingDayName.trim() || undefined)
+  const handleSaveDayName = async (date: string) => {
+    await updateDayName(trip.id, date, editingDayName.trim() || undefined)
     setEditingDayDate(null)
     setEditingDayName("")
-    onRefresh()
+    await onRefresh()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent, date: string) => {
@@ -809,8 +812,20 @@ function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => void }) {
                 <div key={day.date} className="relative group">
                   {isEditing ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-medium">{dayNumber}</span>
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: group.location?.color
+                            ? `${group.location.color}20`
+                            : 'hsl(var(--primary) / 0.1)'
+                        }}
+                      >
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: group.location?.color }}
+                        >
+                          {dayNumber}
+                        </span>
                       </div>
                       <div className="flex-1">
                         <Input
@@ -834,8 +849,20 @@ function DaysList({ trip, onRefresh }: { trip: Trip; onRefresh: () => void }) {
                     >
                       <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-medium">{dayNumber}</span>
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{
+                              backgroundColor: group.location?.color
+                                ? `${group.location.color}20`
+                                : 'hsl(var(--primary) / 0.1)'
+                            }}
+                          >
+                            <span
+                              className="text-sm font-medium"
+                              style={{ color: group.location?.color }}
+                            >
+                              {dayNumber}
+                            </span>
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -1071,12 +1098,9 @@ function CalendarView({ trip }: { trip: Trip }) {
                 const widthPercent = ((segment.endCol - segment.startCol + 1) / 7) * 100
                 const top = dayLabelHeight + segment.lane * (barHeight + barGap)
 
-                // Check if this is the start of the location
+                // Check if this is the start of the location (to show the name)
                 const locStart = parseLocalDate(segment.location.startDate)
                 const isStart = week[segment.startCol].date.getTime() === locStart.getTime()
-                // Check if this is the end of the location
-                const locEnd = parseLocalDate(segment.location.endDate)
-                const isEnd = week[segment.endCol].date.getTime() === locEnd.getTime()
 
                 return (
                   <div
@@ -1088,7 +1112,7 @@ function CalendarView({ trip }: { trip: Trip }) {
                       top: `${top}px`,
                       height: `${barHeight}px`,
                       backgroundColor: segment.location.color || '#3b82f6',
-                      borderRadius: `${isStart ? '4px' : '0'} ${isEnd ? '4px' : '0'} ${isEnd ? '4px' : '0'} ${isStart ? '4px' : '0'}`
+                      borderRadius: '4px'
                     }}
                   >
                     {isStart && segment.location.name}
