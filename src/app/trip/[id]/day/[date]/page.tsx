@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -71,7 +71,6 @@ import {
   formatDate,
 } from "@/types"
 import {
-  getTrip,
   addActivity,
   updateActivity,
   deleteActivity,
@@ -79,6 +78,7 @@ import {
   reorderActivities,
   updateDayName,
 } from "@/lib/db"
+import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
 import { DayMap } from "@/components/maps/DayMap"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
 import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
@@ -89,7 +89,10 @@ export default function DayPage() {
   const tripId = params.id as string
   const date = params.date as string
 
-  const [trip, setTrip] = useState<Trip | null>(null)
+  // React Query hook for trip data
+  const { data: trip, isLoading } = useTrip(tripId)
+  const refreshTrip = useRefreshTrip(tripId)
+
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [isOptimizing, setIsOptimizing] = useState(false)
@@ -120,22 +123,11 @@ export default function DayPage() {
   const [addMode, setAddMode] = useState<'saved' | 'search'>('search')
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
-  useEffect(() => {
-    async function loadTrip() {
-      const loadedTrip = await getTrip(tripId)
-      if (loadedTrip) {
-        setTrip(loadedTrip)
-      } else {
-        router.push('/')
-      }
-    }
-    loadTrip()
-  }, [tripId, router])
-
-  const refreshTrip = useCallback(async () => {
-    const updated = await getTrip(tripId)
-    if (updated) setTrip(updated)
-  }, [tripId])
+  // Redirect if trip not found (after loading completes)
+  if (!isLoading && !trip) {
+    router.push('/')
+    return null
+  }
 
   const day = trip?.days.find(d => d.date === date)
   const dayIndex = trip?.days.findIndex(d => d.date === date) ?? -1

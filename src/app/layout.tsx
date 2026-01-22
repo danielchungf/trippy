@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import "./globals.css"
+import { QueryProvider } from "@/components/providers/QueryProvider"
 
 export const metadata: Metadata = {
   title: "Piper - Trip Planning",
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased min-h-screen font-sans">
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
       </body>
     </html>
   )

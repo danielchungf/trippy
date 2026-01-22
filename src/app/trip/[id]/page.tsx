@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -67,7 +67,6 @@ import {
   LOCATION_COLORS
 } from "@/types"
 import {
-  getTrip,
   addLocation,
   updateLocation,
   deleteLocation,
@@ -75,16 +74,20 @@ import {
   updateAccommodation,
   deleteAccommodation,
   updateDayName,
-  TripWithOwnership
 } from "@/lib/db"
+import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
 import { ShareDialog } from "@/components/trip/ShareDialog"
+import { EditTripDialog } from "@/components/trip/EditTripDialog"
 
 export default function TripPage() {
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
 
-  const [trip, setTrip] = useState<TripWithOwnership | null>(null)
+  // React Query hook for trip data
+  const { data: trip, isLoading } = useTrip(tripId)
+  const refreshTrip = useRefreshTrip(tripId)
+
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
 
   // Location dialog state
@@ -113,21 +116,10 @@ export default function TripPage() {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
 
-  useEffect(() => {
-    async function loadTrip() {
-      const loadedTrip = await getTrip(tripId)
-      if (loadedTrip) {
-        setTrip(loadedTrip)
-      } else {
-        router.push('/')
-      }
-    }
-    loadTrip()
-  }, [tripId, router])
-
-  const refreshTrip = async () => {
-    const updated = await getTrip(tripId)
-    if (updated) setTrip(updated)
+  // Redirect if trip not found (after loading completes)
+  if (!isLoading && !trip) {
+    router.push('/')
+    return null
   }
 
   // Location handlers
@@ -295,6 +287,15 @@ export default function TripPage() {
                 {formatDateRange(trip.startDate, trip.endDate)} · {duration} days
               </p>
             </div>
+            <EditTripDialog
+              tripId={tripId}
+              tripName={trip.name}
+              tripColor={trip.color}
+              tripStartDate={trip.startDate}
+              tripEndDate={trip.endDate}
+              isOwner={trip.isOwner}
+              onUpdate={refreshTrip}
+            />
             <ShareDialog
               tripId={tripId}
               tripName={trip.name}

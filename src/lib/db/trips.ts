@@ -263,10 +263,91 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
   })
 }
 
-// Get a single trip by ID
+// Get a single trip by ID (optimized - queries only this trip)
 export async function getTrip(id: string): Promise<TripWithOwnership | undefined> {
-  const trips = await getTrips()
-  return trips.find(t => t.id === id)
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return undefined
+
+  // Fetch the specific trip
+  const { data: tripRow, error: tripError } = await supabase
+    .from('trips')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (tripError || !tripRow) {
+    return undefined
+  }
+
+  // Check if user has access (owner or shared member)
+  const isOwner = tripRow.owner_id === user.id
+  if (!isOwner) {
+    const { data: membership } = await supabase
+      .from('trip_members')
+      .select('id')
+      .eq('trip_id', id)
+      .eq('user_id', user.id)
+      .eq('status', 'accepted')
+      .single()
+
+    if (!membership) {
+      return undefined // User doesn't have access
+    }
+  }
+
+  // Fetch all related data in parallel
+  const [locationsResult, accommodationsResult, savedPlacesResult, daysResult] = await Promise.all([
+    supabase.from('locations').select('*').eq('trip_id', id),
+    supabase.from('accommodations').select('*').eq('trip_id', id),
+    supabase.from('saved_places').select('*').eq('trip_id', id),
+    supabase.from('days').select('*').eq('trip_id', id),
+  ])
+
+  // Fetch activities for all days
+  const dayIds = (daysResult.data || []).map(d => d.id)
+  const activitiesResult = dayIds.length > 0
+    ? await supabase.from('activities').select('*').in('day_id', dayIds).order('sort_order')
+    : { data: [] }
+
+  const locations = (locationsResult.data || []).map(rowToLocation)
+  const accommodations = (accommodationsResult.data || []).map(rowToAccommodation)
+  const savedPlaces = (savedPlacesResult.data || []).map(rowToSavedPlace)
+
+  const days: Day[] = (daysResult.data || []).map((dayRow: DayRow) => {
+    const activities = (activitiesResult.data || [])
+      .filter((a: ActivityRow) => a.day_id === dayRow.id)
+      .map(rowToActivity)
+
+    return {
+      date: dayRow.date,
+      name: dayRow.name || undefined,
+      locationId: dayRow.location_id || undefined,
+      activities,
+    }
+  })
+
+  const trip: TripWithOwnership = {
+    id: tripRow.id,
+    name: tripRow.name,
+    startDate: tripRow.start_date,
+    endDate: tripRow.end_date,
+    coverImage: tripRow.cover_image || undefined,
+    color: tripRow.color || undefined,
+    locations,
+    accommodations,
+    savedPlaces,
+    days,
+    isOwner,
+  }
+
+  // Generate days if none exist
+  if (days.length === 0) {
+    trip.days = generateDaysFromTrip(trip)
+  }
+
+  return trip
 }
 
 // Create a new trip

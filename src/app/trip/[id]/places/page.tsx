@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -50,12 +50,12 @@ import {
   PlaceCategory
 } from "@/types"
 import {
-  getTrip,
   addSavedPlace,
   updateSavedPlace,
   deleteSavedPlace,
   createActivityFromPlace
 } from "@/lib/db"
+import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
 import { PlaceSearchResult } from "@/lib/maps"
 
@@ -73,7 +73,10 @@ export default function SavedPlacesPage() {
   const router = useRouter()
   const tripId = params.id as string
 
-  const [trip, setTrip] = useState<Trip | null>(null)
+  // React Query hook for trip data
+  const { data: trip, isLoading } = useTrip(tripId)
+  const refreshTrip = useRefreshTrip(tripId)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterLocation, setFilterLocation] = useState<string>("all")
@@ -93,21 +96,10 @@ export default function SavedPlacesPage() {
   const [assigningPlace, setAssigningPlace] = useState<SavedPlace | null>(null)
   const [assignDay, setAssignDay] = useState("")
 
-  useEffect(() => {
-    async function loadTrip() {
-      const loadedTrip = await getTrip(tripId)
-      if (loadedTrip) {
-        setTrip(loadedTrip)
-      } else {
-        router.push('/')
-      }
-    }
-    loadTrip()
-  }, [tripId, router])
-
-  const refreshTrip = async () => {
-    const updated = await getTrip(tripId)
-    if (updated) setTrip(updated)
+  // Redirect if trip not found (after loading completes)
+  if (!isLoading && !trip) {
+    router.push('/')
+    return null
   }
 
   const handleOpenPlaceDialog = (place?: SavedPlace) => {

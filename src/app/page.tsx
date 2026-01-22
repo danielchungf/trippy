@@ -20,7 +20,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
 import { getTripStatus, parseLocalDate, LOCATION_COLORS } from "@/types"
-import { getTrips, createTrip, TripWithOwnership } from "@/lib/db"
+import { TripWithOwnership } from "@/lib/db"
+import { useTrips, useCreateTrip } from "@/lib/hooks/use-trips"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { TripCard } from "@/components/home/TripCard"
 import { TripTabs, TripTabValue } from "@/components/home/TripTabs"
@@ -31,7 +32,6 @@ import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 export default function HomePage() {
-  const [trips, setTrips] = useState<TripWithOwnership[]>([])
   const [activeTab, setActiveTab] = useState<TripTabValue>('upcoming')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
@@ -41,35 +41,30 @@ export default function HomePage() {
   const [user, setUser] = useState<User | null>(null)
   const isDesktop = useMediaQuery("(min-width: 1024px)")
 
+  // React Query hooks
+  const { data: trips = [], isLoading } = useTrips()
+  const createTripMutation = useCreateTrip()
+
   useEffect(() => {
-    async function loadData() {
+    async function loadUser() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-
-      if (user) {
-        const dbTrips = await getTrips()
-        setTrips(dbTrips)
-      }
     }
 
-    loadData()
+    loadUser()
   }, [])
 
   const handleCreateTrip = async () => {
     if (!newTripName || !dateRange?.from || !dateRange?.to) return
 
-    const trip = await createTrip({
+    await createTripMutation.mutateAsync({
       name: newTripName,
       startDate: dateRange.from.toISOString().split('T')[0],
       endDate: dateRange.to.toISOString().split('T')[0],
       color: tripColor,
     })
 
-    if (trip) {
-      // New trips are always owned by the creator
-      setTrips([...trips, { ...trip, isOwner: true }])
-    }
     setNewTripName("")
     setDateRange(undefined)
     setTripColor(undefined)
@@ -103,6 +98,7 @@ export default function HomePage() {
           onTabChange={setActiveTab}
           onCreateTrip={() => setIsCreateOpen(true)}
           user={user}
+          isLoading={isLoading}
         />
       ) : (
         <MobileLayout
@@ -111,6 +107,7 @@ export default function HomePage() {
           onTabChange={setActiveTab}
           onCreateTrip={() => setIsCreateOpen(true)}
           user={user}
+          isLoading={isLoading}
         />
       )}
 
@@ -211,13 +208,15 @@ function MobileLayout({
   activeTab,
   onTabChange,
   onCreateTrip,
-  user
+  user,
+  isLoading
 }: {
   trips: TripWithOwnership[]
   activeTab: TripTabValue
   onTabChange: (tab: TripTabValue) => void
   onCreateTrip: () => void
   user: User | null
+  isLoading: boolean
 }) {
   return (
     <div className="flex flex-col min-h-screen pb-[52px]">
@@ -242,7 +241,9 @@ function MobileLayout({
 
       {/* Trip cards list */}
       <div className="flex-1 px-[15px] pb-[40px] space-y-[20px] overflow-auto">
-        {trips.length > 0 ? (
+        {isLoading ? (
+          <LoadingSkeleton />
+        ) : trips.length > 0 ? (
           trips.map(trip => (
             <TripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
           ))
@@ -263,7 +264,8 @@ function DesktopLayout({
   activeTab,
   onTabChange,
   onCreateTrip,
-  user
+  user,
+  isLoading
 }: {
   trips: TripWithOwnership[]
   allTrips: TripWithOwnership[]
@@ -271,6 +273,7 @@ function DesktopLayout({
   onTabChange: (tab: TripTabValue) => void
   onCreateTrip: () => void
   user: User | null
+  isLoading: boolean
 }) {
   return (
     <div className="flex min-h-screen">
@@ -295,7 +298,9 @@ function DesktopLayout({
         </div>
 
         <div className="space-y-[20px]">
-          {trips.length > 0 ? (
+          {isLoading ? (
+            <LoadingSkeleton />
+          ) : trips.length > 0 ? (
             trips.map(trip => (
               <TripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
             ))
@@ -328,6 +333,29 @@ function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
         <Plus className="h-4 w-4" />
         Create Trip
       </button>
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-[20px]">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="bg-white border-[0.5px] border-[#e5e5e5] rounded-[15px] overflow-hidden"
+        >
+          {/* Image skeleton */}
+          <div className="p-[5px]">
+            <div className="h-[120px] rounded-[10px] bg-[#f5f5f5] animate-pulse" />
+          </div>
+          {/* Content skeleton */}
+          <div className="px-[15px] pt-[10px] pb-[15px]">
+            <div className="h-[22px] w-3/4 bg-[#f5f5f5] rounded animate-pulse" />
+            <div className="h-[17px] w-1/2 bg-[#f5f5f5] rounded animate-pulse mt-[8px]" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
