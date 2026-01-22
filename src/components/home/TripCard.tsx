@@ -1,11 +1,13 @@
 "use client"
 
 import Link from "next/link"
+import { Users } from "lucide-react"
 import { Trip, parseLocalDate } from "@/types"
 import placeholderImage from "@/app/landscape-placeholder.jpg"
 
 interface TripCardProps {
   trip: Trip
+  isShared?: boolean
 }
 
 // Get countdown text for upcoming trips
@@ -37,7 +39,7 @@ function formatTripDateRange(startDate: string, endDate: string): string {
   return `${startMonth} ${start.getDate()} — ${endMonth} ${end.getDate()}`
 }
 
-export function TripCard({ trip }: TripCardProps) {
+export function TripCard({ trip, isShared = false }: TripCardProps) {
   const countdown = getCountdownText(trip)
 
   return (
@@ -59,6 +61,13 @@ export function TripCard({ trip }: TripCardProps) {
                 <span className="text-[12px] font-semibold text-[#0a0a0a] tracking-[-0.24px]">
                   {countdown}
                 </span>
+              </div>
+            )}
+
+            {/* Shared indicator */}
+            {isShared && (
+              <div className="absolute top-[10px] right-[10px] bg-white rounded-full p-[6px]">
+                <Users className="h-3.5 w-3.5 text-[#0a0a0a]" />
               </div>
             )}
           </div>

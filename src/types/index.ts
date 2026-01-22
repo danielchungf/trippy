@@ -148,6 +148,27 @@ export interface Trip {
 // Trip status (derived)
 export type TripStatus = 'upcoming' | 'ongoing' | 'past'
 
+// Trip member role
+export type TripMemberRole = 'owner' | 'editor'
+
+// Trip member status
+export type TripMemberStatus = 'pending' | 'accepted'
+
+// Trip member
+export interface TripMember {
+  id: string
+  tripId: string
+  userId?: string
+  role: TripMemberRole
+  invitedBy: string
+  invitedEmail?: string
+  status: TripMemberStatus
+  createdAt: string
+  // Populated from user data
+  email?: string
+  name?: string
+}
+
 // Parse ISO date string (YYYY-MM-DD) as local date, not UTC
 export function parseLocalDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number)

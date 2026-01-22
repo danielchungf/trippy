@@ -7,7 +7,16 @@ export {
   createTrip,
   updateTrip,
   deleteTrip,
+  type TripWithOwnership,
 } from './trips'
+
+export {
+  getTripMembers,
+  inviteMember,
+  removeMember,
+  acceptPendingInvites,
+  isOwnerOfTrip,
+} from './sharing'
 
 export {
   addLocation,

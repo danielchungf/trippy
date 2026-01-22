@@ -148,19 +148,41 @@ function rowToActivity(row: ActivityRow): Activity {
   }
 }
 
-// Get all trips for the current user
-export async function getTrips(): Promise<Trip[]> {
+// Extended trip with ownership info
+export interface TripWithOwnership extends Trip {
+  isOwner: boolean
+}
+
+// Get all trips for the current user (owned + shared)
+export async function getTrips(): Promise<TripWithOwnership[]> {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  // Fetch trips
-  const { data: tripRows, error: tripError } = await supabase
+  // Get trip IDs where user is a member (editor)
+  const { data: memberTrips } = await supabase
+    .from('trip_members')
+    .select('trip_id')
+    .eq('user_id', user.id)
+    .eq('status', 'accepted')
+    .eq('role', 'editor')
+
+  const sharedTripIds = memberTrips?.map(m => m.trip_id) || []
+
+  // Fetch trips owned by user OR shared with user
+  let query = supabase
     .from('trips')
     .select('*')
-    .eq('owner_id', user.id)
     .order('start_date', { ascending: true })
+
+  if (sharedTripIds.length > 0) {
+    query = query.or(`owner_id.eq.${user.id},id.in.(${sharedTripIds.join(',')})`)
+  } else {
+    query = query.eq('owner_id', user.id)
+  }
+
+  const { data: tripRows, error: tripError } = await query
 
   if (tripError || !tripRows) {
     console.error('Error fetching trips:', tripError)
@@ -213,7 +235,7 @@ export async function getTrips(): Promise<Trip[]> {
       }
     })
 
-    const trip: Trip = {
+    const trip: TripWithOwnership = {
       id: tripRow.id,
       name: tripRow.name,
       startDate: tripRow.start_date,
@@ -224,6 +246,7 @@ export async function getTrips(): Promise<Trip[]> {
       accommodations,
       savedPlaces,
       days,
+      isOwner: tripRow.owner_id === user.id,
     }
 
     // Generate days if none exist (ensures all dates have a day entry)
@@ -236,7 +259,7 @@ export async function getTrips(): Promise<Trip[]> {
 }
 
 // Get a single trip by ID
-export async function getTrip(id: string): Promise<Trip | undefined> {
+export async function getTrip(id: string): Promise<TripWithOwnership | undefined> {
   const trips = await getTrips()
   return trips.find(t => t.id === id)
 }

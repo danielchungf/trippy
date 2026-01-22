@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { acceptPendingInvites } from "@/lib/db"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -30,6 +31,9 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
+
+    // Accept any pending trip invites for this email
+    await acceptPendingInvites()
 
     router.push("/")
     router.refresh()

@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
-import { Trip, getTripStatus, parseLocalDate, LOCATION_COLORS } from "@/types"
-import { getTrips, createTrip } from "@/lib/db"
+import { getTripStatus, parseLocalDate, LOCATION_COLORS } from "@/types"
+import { getTrips, createTrip, TripWithOwnership } from "@/lib/db"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { TripCard } from "@/components/home/TripCard"
 import { TripTabs, TripTabValue } from "@/components/home/TripTabs"
@@ -31,7 +31,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 export default function HomePage() {
-  const [trips, setTrips] = useState<Trip[]>([])
+  const [trips, setTrips] = useState<TripWithOwnership[]>([])
   const [activeTab, setActiveTab] = useState<TripTabValue>('upcoming')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
@@ -67,7 +67,8 @@ export default function HomePage() {
     })
 
     if (trip) {
-      setTrips([...trips, trip])
+      // New trips are always owned by the creator
+      setTrips([...trips, { ...trip, isOwner: true }])
     }
     setNewTripName("")
     setDateRange(undefined)
@@ -212,7 +213,7 @@ function MobileLayout({
   onCreateTrip,
   user
 }: {
-  trips: Trip[]
+  trips: TripWithOwnership[]
   activeTab: TripTabValue
   onTabChange: (tab: TripTabValue) => void
   onCreateTrip: () => void
@@ -243,7 +244,7 @@ function MobileLayout({
       <div className="flex-1 px-[15px] pb-[40px] space-y-[20px] overflow-auto">
         {trips.length > 0 ? (
           trips.map(trip => (
-            <TripCard key={trip.id} trip={trip} />
+            <TripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
           ))
         ) : (
           <EmptyState onCreateTrip={onCreateTrip} />
@@ -264,8 +265,8 @@ function DesktopLayout({
   onCreateTrip,
   user
 }: {
-  trips: Trip[]
-  allTrips: Trip[]
+  trips: TripWithOwnership[]
+  allTrips: TripWithOwnership[]
   activeTab: TripTabValue
   onTabChange: (tab: TripTabValue) => void
   onCreateTrip: () => void
@@ -296,7 +297,7 @@ function DesktopLayout({
         <div className="space-y-[20px]">
           {trips.length > 0 ? (
             trips.map(trip => (
-              <TripCard key={trip.id} trip={trip} />
+              <TripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
             ))
           ) : (
             <EmptyState onCreateTrip={onCreateTrip} />

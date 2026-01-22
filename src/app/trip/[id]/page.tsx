@@ -74,15 +74,17 @@ import {
   addAccommodation,
   updateAccommodation,
   deleteAccommodation,
-  updateDayName
+  updateDayName,
+  TripWithOwnership
 } from "@/lib/db"
+import { ShareDialog } from "@/components/trip/ShareDialog"
 
 export default function TripPage() {
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
 
-  const [trip, setTrip] = useState<Trip | null>(null)
+  const [trip, setTrip] = useState<TripWithOwnership | null>(null)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
 
   // Location dialog state
@@ -293,6 +295,11 @@ export default function TripPage() {
                 {formatDateRange(trip.startDate, trip.endDate)} · {duration} days
               </p>
             </div>
+            <ShareDialog
+              tripId={tripId}
+              tripName={trip.name}
+              isOwner={trip.isOwner}
+            />
             <Link href={`/trip/${tripId}/places`}>
               <Button variant="outline">
                 <Bookmark className="h-4 w-4 mr-2" />
