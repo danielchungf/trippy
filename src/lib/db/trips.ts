@@ -160,15 +160,20 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
+  console.log('getTrips: Fetching for user', user.id, user.email)
+
   // Get trip IDs where user is a member (editor)
-  const { data: memberTrips } = await supabase
+  const { data: memberTrips, error: memberError } = await supabase
     .from('trip_members')
     .select('trip_id')
     .eq('user_id', user.id)
     .eq('status', 'accepted')
     .eq('role', 'editor')
 
+  console.log('getTrips: memberTrips query result:', memberTrips, 'Error:', memberError)
+
   const sharedTripIds = memberTrips?.map(m => m.trip_id) || []
+  console.log('getTrips: sharedTripIds:', sharedTripIds)
 
   // Fetch trips owned by user OR shared with user
   let query = supabase
