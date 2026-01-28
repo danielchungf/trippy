@@ -18,6 +18,7 @@ import {
   ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -277,9 +278,7 @@ export default function TripPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Link href="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <IconButton icon={<ArrowLeft />} />
             </Link>
             <div className="flex-1">
               <h1 className="font-fustat text-xl font-bold">{trip.name}</h1>
@@ -287,6 +286,11 @@ export default function TripPage() {
                 {formatDateRange(trip.startDate, trip.endDate)} · {duration} days
               </p>
             </div>
+            <ShareDialog
+              tripId={tripId}
+              tripName={trip.name}
+              isOwner={trip.isOwner}
+            />
             <EditTripDialog
               tripId={tripId}
               tripName={trip.name}
@@ -297,14 +301,8 @@ export default function TripPage() {
               isOwner={trip.isOwner}
               onUpdate={refreshTrip}
             />
-            <ShareDialog
-              tripId={tripId}
-              tripName={trip.name}
-              isOwner={trip.isOwner}
-            />
             <Link href={`/trip/${tripId}/places`}>
-              <Button variant="outline">
-                <Bookmark className="h-4 w-4 mr-2" />
+              <Button variant="secondary" leftIcon={<Bookmark />}>
                 Saved Places
                 {trip.savedPlaces.length > 0 && (
                   <Badge variant="secondary" className="ml-2">{trip.savedPlaces.length}</Badge>

@@ -24,6 +24,11 @@
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
+
+    /* Content color variables (RGB values for Tailwind alpha support) */
+    --color-neutral-800: 38 38 38;   /* #262626 */
+    --color-neutral-500: 115 115 115; /* #737373 */
+    --color-neutral-400: 163 163 163; /* #a3a3a3 */
   }
 }
 
@@ -35,18 +40,31 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Hide scrollbars but keep scrolling functional */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
+/* Lucide icons - scale stroke for 16x16 icons (2.7 at 24px viewBox = ~1.8px rendered at 16px) */
+svg.lucide {
+  stroke-width: 2.7 !important;
 }
 
 /* Typography System */
 @layer components {
-  /* Headings - Fustat font */
+  /* Headings - Fustat font (no color - use text-content-* classes) */
   .text-h1 {
     font-family: var(--font-fustat), sans-serif;
     font-size: 24px;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    color: #2f2f2f;
   }
   .text-h2 {
     font-family: var(--font-fustat), sans-serif;
@@ -54,7 +72,6 @@
     font-weight: 600;
     line-height: 1.3;
     letter-spacing: -0.02em;
-    color: #2f2f2f;
   }
   .text-h3 {
     font-family: var(--font-fustat), sans-serif;
@@ -62,30 +79,14 @@
     font-weight: 700;
     line-height: 1.3;
     letter-spacing: -0.02em;
-    color: #2f2f2f;
   }
 
-  /* Body text - Inter font */
+  /* Body text - Inter font (no color - use text-content-* classes) */
   .text-body {
     font-family: var(--font-inter), sans-serif;
     font-size: 14px;
     font-weight: 500;
     line-height: 1.5;
-    color: #2f2f2f;
-  }
-  .text-body-secondary {
-    font-family: var(--font-inter), sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.5;
-    color: #525252;
-  }
-  .text-body-muted {
-    font-family: var(--font-inter), sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.5;
-    color: #a1a1a1;
   }
 
   /* Small text - Inter font */
@@ -94,7 +95,6 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 1.5;
-    color: #525252;
   }
 
   /* Labels/badges - Fustat font */
@@ -102,26 +102,7 @@
     font-family: var(--font-fustat), sans-serif;
     font-size: 12px;
     font-weight: 700;
-    line-height: 1.4;
-    color: #2f2f2f;
-  }
-
-  /* Button text - Fustat font */
-  .text-button {
-    font-family: var(--font-fustat), sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.3;
-    letter-spacing: -0.02em;
-    color: #ffffff;
-  }
-  .text-button-secondary {
-    font-family: var(--font-fustat), sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.3;
-    letter-spacing: -0.02em;
-    color: #525252;
+    line-height: 1;
   }
 
   /* Legacy heading classes (for backwards compatibility) */
@@ -131,7 +112,6 @@
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    color: #2f2f2f;
   }
   .heading-16 {
     font-family: var(--font-fustat), sans-serif;
@@ -145,6 +125,5 @@
     font-size: 12px;
     font-weight: 700;
     line-height: 1.4;
-    color: #2f2f2f;
   }
 }

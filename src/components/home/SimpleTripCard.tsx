@@ -58,7 +58,7 @@ export function SimpleTripCard({ trip, isShared = false }: SimpleTripCardProps) 
             {/* Countdown badge */}
             {countdown && (
               <div className="absolute top-[10px] left-[10px] bg-white rounded-full px-[10px] py-[5px]">
-                <span className="text-label">
+                <span className="text-label text-content-primary">
                   {countdown}
                 </span>
               </div>
@@ -75,10 +75,10 @@ export function SimpleTripCard({ trip, isShared = false }: SimpleTripCardProps) 
 
         {/* Content */}
         <div className="px-[15px] pt-[10px] pb-[15px]">
-          <h3 className="text-h2 font-bold truncate">
+          <h3 className="text-h2 text-content-primary truncate">
             {trip.name}
           </h3>
-          <p className="text-body font-medium text-text-primary opacity-50 mt-[5px]">
+          <p className="text-body text-content-secondary mt-[5px]">
             {formatTripDateRange(trip.startDate, trip.endDate)}
           </p>
         </div>

@@ -169,8 +169,8 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
           className="w-[464px] aspect-[4/3] object-cover object-center rounded-[12px]"
         />
         {countdown && (
-          <div className="absolute top-[10px] left-[10px] bg-white rounded-[10px] px-[10px] py-[4px]">
-            <span className="text-label text-neutral-800">
+          <div className="absolute top-[10px] left-[10px] bg-white rounded-[10px] h-[24px] px-[10px] flex items-center">
+            <span className="text-label text-content-primary">
               {countdown}
             </span>
           </div>
@@ -181,10 +181,10 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
       <div className="flex-1 min-w-0 pl-[24px] pr-[20px] py-[20px] flex flex-col">
         {/* Title and date */}
         <div className="flex flex-col gap-[8px]">
-          <h3 className="text-h1 text-neutral-800 truncate">
+          <h3 className="text-h1 text-content-primary truncate">
             {trip.name}
           </h3>
-          <p className="text-h3 text-neutral-600">
+          <p className="text-h3 text-content-secondary">
             {formatTripDateRangeWithDuration(trip.startDate, trip.endDate)}
           </p>
         </div>
@@ -207,32 +207,32 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
         <div className="flex flex-col gap-[8px] mt-[24px]">
           <div className="flex items-center gap-[8px]">
             <MapPinned className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-neutral-600">
+            <span className="text-body text-content-secondary">
               {placesCount} places
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
             <Shrub className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-neutral-600">
+            <span className="text-body text-content-secondary">
               {activitiesCount} activities
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
             <NotepadText className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-neutral-600">
+            <span className="text-body text-content-secondary">
               {daysPlanned}/{duration} days planned
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
             <BedDouble className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-neutral-600">
+            <span className="text-body text-content-secondary">
               {staysLogged} stays logged
             </span>
           </div>
           {missingStays > 0 && (
             <div className="flex items-center gap-[8px]">
               <CircleAlert className="w-[20px] h-[20px] text-orange-400" />
-              <span className="text-body text-neutral-600">
+              <span className="text-body text-content-secondary">
                 {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
               </span>
             </div>

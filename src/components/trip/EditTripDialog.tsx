@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Settings, Trash2, ChevronDown, ImagePlus, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { IconButton } from "@/components/ui/icon-button"
 import {
   Dialog,
   DialogContent,
@@ -223,9 +224,7 @@ export function EditTripDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
+          <IconButton icon={<Settings />} />
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -274,17 +273,16 @@ export function EditTripDialog({
                 <label className="text-sm font-medium">Start Date</label>
                 <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {startDate ? (
                         startDate.toLocaleDateString()
                       ) : (
-                        "Select date"
+                        <span className="text-muted-foreground">Select date</span>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -307,17 +305,16 @@ export function EditTripDialog({
                 <label className="text-sm font-medium">End Date</label>
                 <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {endDate ? (
                         endDate.toLocaleDateString()
                       ) : (
-                        "Select date"
+                        <span className="text-muted-foreground">Select date</span>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -400,11 +397,11 @@ export function EditTripDialog({
             {isOwner && (
               <div className="pt-4 border-t">
                 <Button
-                  variant="destructive"
+                  variant="secondary"
                   className="w-full"
                   onClick={() => setShowDeleteAlert(true)}
+                  leftIcon={<Trash2 />}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
                   Delete Trip
                 </Button>
               </div>
@@ -413,7 +410,7 @@ export function EditTripDialog({
 
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </DialogClose>
             <Button onClick={handleSave} disabled={loading || !name.trim()}>
               {loading ? (isUploading ? "Uploading..." : "Saving...") : "Save"}

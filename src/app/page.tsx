@@ -232,17 +232,16 @@ export default function HomePage() {
               <label className="text-sm font-medium">Trip Dates</label>
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between font-normal"
+                  <button
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {dateRange?.from && dateRange?.to ? (
                       `${dateRange.from.toLocaleDateString()} - ${dateRange.to.toLocaleDateString()}`
                     ) : (
-                      "Select dates"
+                      <span className="text-muted-foreground">Select dates</span>
                     )}
                     <ChevronDown className="h-4 w-4 opacity-50" />
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
@@ -348,7 +347,7 @@ export default function HomePage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </DialogClose>
             <Button onClick={handleCreateTrip} disabled={isUploading || createTripMutation.isPending || !newTripName || !dateRange?.from || !dateRange?.to}>
               {isUploading || createTripMutation.isPending ? (
@@ -541,6 +540,9 @@ function DesktopLayout({
   user: User | null
   isLoading: boolean
 }) {
+  // Check if there's only one trip (nextTrip exists but no other upcoming or past trips)
+  const hasOnlyOneTrip = nextTrip && upcomingTrips.length === 0 && pastTrips.length === 0
+
   return (
     <div
       className="min-h-screen flex items-start justify-center overflow-auto rounded-[14px] px-[60px] py-[80px] bg-background"
@@ -554,56 +556,70 @@ function DesktopLayout({
             {nextTrip && (
               <section className="flex flex-col gap-[20px]">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-h1">
+                  <h2 className="text-h1 text-content-primary">
                     Your next trip
                   </h2>
-                  {user && (
-                    <UserMenu
-                      email={user.email}
-                      name={user.user_metadata?.name}
-                    />
-                  )}
+                  <div className="flex items-center gap-[8px]">
+                    {hasOnlyOneTrip && (
+                      <Button
+                        onClick={onCreateTrip}
+                        variant="primary"
+                        size="medium"
+                        leftIcon={<Plus />}
+                      >
+                        New trip
+                      </Button>
+                    )}
+                    {user && (
+                      <UserMenu
+                        email={user.email}
+                        name={user.user_metadata?.name}
+                      />
+                    )}
+                  </div>
                 </div>
                 <NextTripCard trip={nextTrip} variant="desktop" />
               </section>
             )}
 
-            {/* Upcoming section */}
-            <section className="flex flex-col gap-[20px]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-h1">
-                  Upcoming
-                </h2>
-                <div className="flex items-center gap-[12px]">
-                  <Button
-                    onClick={onCreateTrip}
-                    variant="primary"
-                    size="medium"
-                    leftIcon={<Plus />}
-                  >
-                    New trip
-                  </Button>
-                  {!nextTrip && user && (
-                    <UserMenu
-                      email={user.email}
-                      name={user.user_metadata?.name}
-                    />
-                  )}
+            {/* Upcoming section - hide if only one trip */}
+            {!hasOnlyOneTrip && (
+              <section className="flex flex-col gap-[20px]">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-h1 text-content-primary">
+                    Upcoming
+                  </h2>
+                  <div className="flex items-center gap-[12px]">
+                    <Button
+                      onClick={onCreateTrip}
+                      variant="primary"
+                      size="medium"
+                      leftIcon={<Plus />}
+                    >
+                      New trip
+                    </Button>
+                    {!nextTrip && user && (
+                      <UserMenu
+                        email={user.email}
+                        name={user.user_metadata?.name}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {upcomingTrips.length > 0 ? (
-                <div className="grid grid-cols-3 gap-[20px]">
-                  {upcomingTrips.map(trip => (
-                    <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
-                  ))}
-                </div>
-              ) : !nextTrip ? (
-                <EmptyState onCreateTrip={onCreateTrip} />
-              ) : (
-                <p className="text-text-muted text-center py-8">No other upcoming trips</p>
-              )}
-            </section>
+                {upcomingTrips.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-[20px]">
+                    {upcomingTrips.map(trip => (
+                      <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
+                    ))}
+                  </div>
+                ) : !nextTrip ? (
+                  <EmptyState onCreateTrip={onCreateTrip} />
+                ) : (
+                  <p className="text-text-muted text-center py-8">No other upcoming trips</p>
+                )}
+              </section>
+            )}
 
             {/* Past trips section */}
             {pastTrips.length > 0 && (

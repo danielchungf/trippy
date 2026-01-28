@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { IconButton } from "@/components/ui/icon-button"
 
 interface UserMenuProps {
   email?: string
@@ -29,14 +30,11 @@ export function UserMenu({ email, name }: UserMenuProps) {
   }
 
   const displayName = name || email?.split("@")[0] || "User"
-  const initial = displayName.charAt(0).toUpperCase()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="w-[36px] h-[36px] bg-[#f5f5f5] rounded-full flex items-center justify-center hover:bg-[#e5e5e5] transition-colors text-sm font-medium text-[#525252]">
-          {initial}
-        </button>
+        <IconButton icon={<User />} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem disabled className="text-[#a1a1a1]">

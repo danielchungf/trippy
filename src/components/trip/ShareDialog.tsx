@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, Mail, Crown, Trash2, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { UserRoundPlus, Mail, Crown, Trash2, Clock } from "lucide-react"
+import { IconButton } from "@/components/ui/icon-button"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { TripMember } from "@/types"
 import { getTripMembers, inviteMember, removeMember } from "@/lib/db"
 
@@ -71,10 +72,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Users className="h-4 w-4" />
-          Share
-        </Button>
+        <IconButton icon={<UserRoundPlus />} />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

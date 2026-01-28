@@ -59,7 +59,14 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Semantic text colors
+        // Content colors (for text)
+        content: {
+          primary: 'rgb(var(--color-neutral-800) / <alpha-value>)',
+          secondary: 'rgb(var(--color-neutral-500) / <alpha-value>)',
+          tertiary: 'rgb(var(--color-neutral-400) / <alpha-value>)',
+          inverse: '#ffffff',
+        },
+        // Legacy text colors (for backwards compatibility)
         text: {
           primary: '#2f2f2f',
           secondary: '#525252',
