@@ -117,15 +117,33 @@ export async function acceptPendingInvites(): Promise<number> {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) return 0
+  if (!user?.email) {
+    console.log('acceptPendingInvites: No user email found')
+    return 0
+  }
 
   const normalizedEmail = user.email.toLowerCase().trim()
+  console.log('acceptPendingInvites: Looking for invites for', normalizedEmail)
 
+  // First, check if there are any pending invites for this email
+  const { data: pendingInvites, error: fetchError } = await supabase
+    .from('trip_members')
+    .select('*')
+    .eq('invited_email', normalizedEmail)
+    .eq('status', 'pending')
+
+  console.log('acceptPendingInvites: Found pending invites:', pendingInvites, 'Error:', fetchError)
+
+  if (!pendingInvites || pendingInvites.length === 0) {
+    console.log('acceptPendingInvites: No pending invites found')
+    return 0
+  }
+
+  // Update each invite to accepted (keep invited_email for display purposes)
   const { data, error } = await supabase
     .from('trip_members')
     .update({
       user_id: user.id,
-      invited_email: null,
       status: 'accepted'
     })
     .eq('invited_email', normalizedEmail)
@@ -137,6 +155,7 @@ export async function acceptPendingInvites(): Promise<number> {
     return 0
   }
 
+  console.log('acceptPendingInvites: Successfully accepted invites:', data)
   return data?.length || 0
 }
 

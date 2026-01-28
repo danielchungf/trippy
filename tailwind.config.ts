@@ -9,6 +9,22 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        inter: ["var(--font-inter)", "sans-serif"],
+        fustat: ["var(--font-fustat)", "sans-serif"],
+      },
+      fontSize: {
+        // Headings (Fustat)
+        'h1': ['24px', { lineHeight: '1.2', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'h2': ['18px', { lineHeight: '1.3', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'h3': ['16px', { lineHeight: '1.3', fontWeight: '700', letterSpacing: '-0.02em' }],
+        // Body (Inter)
+        'body': ['14px', { lineHeight: '1.5', fontWeight: '500' }],
+        'body-sm': ['12px', { lineHeight: '1.5', fontWeight: '500' }],
+        'body-xs': ['10px', { lineHeight: '1.4', fontWeight: '500' }],
+        // Labels
+        'label': ['12px', { lineHeight: '1.4', fontWeight: '700' }],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -43,6 +59,24 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // Semantic text colors
+        text: {
+          primary: '#2f2f2f',
+          secondary: '#525252',
+          muted: '#a1a1a1',
+          inverse: '#ffffff',
+        },
+        // UI accent colors
+        'accent-blue': {
+          DEFAULT: '#51a2ff',
+          hover: '#4090e8',
+        },
+        'accent-cyan': '#00b3ff',
+        // Surface colors
+        surface: {
+          light: '#f5f5f5',
+          border: '#e5e5e5',
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

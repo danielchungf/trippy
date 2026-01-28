@@ -33,6 +33,7 @@ export function createTrip(data: {
   startDate: string
   endDate: string
   coverImage?: string
+  color?: string
 }): Trip {
   const trips = getTrips()
 
@@ -42,6 +43,7 @@ export function createTrip(data: {
     startDate: data.startDate,
     endDate: data.endDate,
     coverImage: data.coverImage,
+    color: data.color,
     locations: [],
     accommodations: [],
     savedPlaces: [],

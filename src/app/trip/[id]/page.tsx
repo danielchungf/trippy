@@ -282,7 +282,7 @@ export default function TripPage() {
               </Button>
             </Link>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">{trip.name}</h1>
+              <h1 className="font-fustat text-xl font-bold">{trip.name}</h1>
               <p className="text-sm text-muted-foreground">
                 {formatDateRange(trip.startDate, trip.endDate)} · {duration} days
               </p>
@@ -291,6 +291,7 @@ export default function TripPage() {
               tripId={tripId}
               tripName={trip.name}
               tripColor={trip.color}
+              tripCoverImage={trip.coverImage}
               tripStartDate={trip.startDate}
               tripEndDate={trip.endDate}
               isOwner={trip.isOwner}

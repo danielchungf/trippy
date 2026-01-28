@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Shrub, NotepadText, BedDouble, CircleAlert, MapPinned } from "lucide-react"
 import { Trip, parseLocalDate, getTripDuration } from "@/types"
+import { Button } from "@/components/ui/button"
 import placeholderImage from "@/app/landscape-placeholder.jpg"
 
 interface NextTripCardProps {
@@ -78,7 +79,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
               />
               {countdown && (
                 <div className="absolute top-[10px] left-[10px] bg-white rounded-full px-[10px] py-[5px]">
-                  <span className="text-[12px] font-semibold text-[#2f2f2f] tracking-[-0.24px]">
+                  <span className="text-label">
                     {countdown}
                   </span>
                 </div>
@@ -91,10 +92,10 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
             {/* Title and date */}
             <div className="flex flex-col gap-[12px]">
               <div className="flex flex-col gap-[8px]">
-                <h3 className="text-[18px] font-semibold text-[#2f2f2f] tracking-[-0.36px] truncate">
+                <h3 className="text-h2 truncate">
                   {trip.name}
                 </h3>
-                <p className="text-[14px] font-medium text-[#525252] tracking-[-0.28px]">
+                <p className="text-body font-medium text-text-secondary">
                   {formatTripDateRangeWithDuration(trip.startDate, trip.endDate)}
                 </p>
               </div>
@@ -105,7 +106,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
                   {locationTags.map((tag, index) => (
                     <span
                       key={index}
-                      className="px-[8px] py-[4px] border border-[rgba(0,0,0,0.1)] rounded-full text-[12px] font-medium text-[#a1a1a1] tracking-[-0.24px]"
+                      className="px-[8px] py-[4px] border border-[rgba(0,0,0,0.1)] rounded-full text-body-sm font-medium text-text-muted"
                     >
                       {tag}
                     </span>
@@ -115,32 +116,32 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
             </div>
 
             {/* Divider */}
-            <div className="h-[1px] bg-[#e5e5e5]" />
+            <div className="h-[1px] bg-surface-border" />
 
             {/* Stats */}
             <div className="flex flex-col gap-[8px]">
               <div className="flex items-center gap-[8px]">
-                <Shrub className="w-[20px] h-[20px] text-[#525252]" />
-                <span className="text-[14px] font-medium text-[#525252]">
+                <Shrub className="w-[20px] h-[20px] text-text-secondary" />
+                <span className="text-body font-medium text-text-secondary">
                   {activitiesCount} activities
                 </span>
               </div>
               <div className="flex items-center gap-[8px]">
-                <NotepadText className="w-[20px] h-[20px] text-[#525252]" />
-                <span className="text-[14px] font-medium text-[#525252]">
+                <NotepadText className="w-[20px] h-[20px] text-text-secondary" />
+                <span className="text-body font-medium text-text-secondary">
                   {daysPlanned}/{duration} days planned
                 </span>
               </div>
               <div className="flex items-center gap-[8px]">
-                <BedDouble className="w-[20px] h-[20px] text-[#525252]" />
-                <span className="text-[14px] font-medium text-[#525252]">
+                <BedDouble className="w-[20px] h-[20px] text-text-secondary" />
+                <span className="text-body font-medium text-text-secondary">
                   {staysLogged} stays logged
                 </span>
               </div>
               {missingStays > 0 && (
                 <div className="flex items-center gap-[8px]">
-                  <CircleAlert className="w-[20px] h-[20px] text-[#525252]" />
-                  <span className="text-[14px] font-medium text-[#525252]">
+                  <CircleAlert className="w-[20px] h-[20px] text-text-secondary" />
+                  <span className="text-body font-medium text-text-secondary">
                     {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
                   </span>
                 </div>
@@ -148,7 +149,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
             </div>
 
             {/* Keep planning button */}
-            <button className="w-full bg-[#51a2ff] text-white py-[12px] px-[15px] rounded-full text-[16px] font-bold text-center hover:bg-[#4090e8] transition-colors">
+            <button className="w-full bg-accent-blue text-white py-[12px] px-[15px] rounded-full text-button text-center hover:bg-accent-blue-hover transition-colors">
               Keep planning
             </button>
           </div>
@@ -159,42 +160,42 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
 
   // Desktop variant - horizontal layout
   return (
-    <div className="bg-white border-[0.5px] border-[rgba(47,47,47,0.1)] rounded-[16px] overflow-hidden flex">
-      {/* Image - 4:3 aspect ratio, fills card height */}
+    <div className="bg-white border border-neutral-200 rounded-[16px] overflow-hidden flex">
+      {/* Image container - 464px width, 4:3 aspect ratio */}
       <div className="p-[4px] shrink-0 relative">
         <img
           src={trip.coverImage || placeholderImage.src}
           alt={trip.name}
-          className="h-full aspect-[4/3] w-[477px] object-cover object-center rounded-[12px]"
+          className="w-[464px] aspect-[4/3] object-cover object-center rounded-[12px]"
         />
         {countdown && (
-          <div className="absolute top-[14px] left-[14px] bg-white rounded-full px-[10px] py-[5px]">
-            <span className="text-[12px] font-bold text-[#2f2f2f]">
+          <div className="absolute top-[10px] left-[10px] bg-white rounded-[10px] px-[10px] py-[4px]">
+            <span className="text-label text-neutral-800">
               {countdown}
             </span>
           </div>
         )}
       </div>
 
-      {/* Content - fills remaining space */}
-      <div className="flex-1 min-w-0 pl-[24px] pr-[20px] py-[20px] flex flex-col gap-[20px]">
+      {/* Content - determines the height */}
+      <div className="flex-1 min-w-0 pl-[24px] pr-[20px] py-[20px] flex flex-col">
         {/* Title and date */}
-        <div className="flex flex-col">
-          <h3 className="text-[24px] font-bold text-[#2f2f2f] truncate">
+        <div className="flex flex-col gap-[8px]">
+          <h3 className="text-h1 text-neutral-800 truncate">
             {trip.name}
           </h3>
-          <p className="text-[16px] font-medium text-[#525252] tracking-[-0.32px]">
+          <p className="text-h3 text-neutral-600">
             {formatTripDateRangeWithDuration(trip.startDate, trip.endDate)}
           </p>
         </div>
 
         {/* Location tags */}
         {locationTags.length > 0 && (
-          <div className="flex flex-wrap gap-[8px]">
+          <div className="flex flex-wrap gap-[8px] mt-[20px]">
             {locationTags.map((tag, index) => (
               <span
                 key={index}
-                className="px-[8px] py-[4px] border border-[rgba(0,0,0,0.1)] rounded-full text-[14px] font-medium text-[#a1a1a1] tracking-[-0.28px]"
+                className="px-[8px] py-[4px] border border-neutral-200 rounded-full text-body font-medium text-text-muted"
               >
                 {tag}
               </span>
@@ -202,49 +203,53 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="flex flex-col gap-[4px]">
+        {/* Stats - 24px gap from title/tags */}
+        <div className="flex flex-col gap-[8px] mt-[24px]">
           <div className="flex items-center gap-[8px]">
-            <MapPinned className="w-[24px] h-[24px] text-[#525252]" />
-            <span className="text-[16px] font-medium text-[#525252]">
+            <MapPinned className="w-[20px] h-[20px] text-blue-400" />
+            <span className="text-body text-neutral-600">
               {placesCount} places
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <Shrub className="w-[24px] h-[24px] text-[#525252]" />
-            <span className="text-[16px] font-medium text-[#525252]">
+            <Shrub className="w-[20px] h-[20px] text-blue-400" />
+            <span className="text-body text-neutral-600">
               {activitiesCount} activities
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <NotepadText className="w-[24px] h-[24px] text-[#525252]" />
-            <span className="text-[16px] font-medium text-[#525252]">
+            <NotepadText className="w-[20px] h-[20px] text-blue-400" />
+            <span className="text-body text-neutral-600">
               {daysPlanned}/{duration} days planned
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <BedDouble className="w-[24px] h-[24px] text-[#525252]" />
-            <span className="text-[16px] font-medium text-[#525252]">
+            <BedDouble className="w-[20px] h-[20px] text-blue-400" />
+            <span className="text-body text-neutral-600">
               {staysLogged} stays logged
             </span>
           </div>
           {missingStays > 0 && (
             <div className="flex items-center gap-[8px]">
-              <CircleAlert className="w-[24px] h-[24px] text-[#525252]" />
-              <span className="text-[16px] font-medium text-[#525252]">
+              <CircleAlert className="w-[20px] h-[20px] text-orange-400" />
+              <span className="text-body text-neutral-600">
                 {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
               </span>
             </div>
           )}
         </div>
 
-        {/* Keep planning button */}
-        <Link
-          href={`/trip/${trip.id}`}
-          className="w-full border border-[#e5e5e5] py-[8px] px-[12px] rounded-[8px] text-[16px] font-bold text-[#525252] text-center hover:bg-[#f5f5f5] transition-colors tracking-[-0.32px]"
+        {/* Keep planning button - full width, pushed to bottom */}
+        <Button
+          variant="secondary"
+          size="medium"
+          className="w-full mt-auto"
+          asChild
         >
-          Keep planning
-        </Link>
+          <Link href={`/trip/${trip.id}`}>
+            Keep planning
+          </Link>
+        </Button>
       </div>
     </div>
   )

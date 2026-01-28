@@ -47,7 +47,8 @@ import { Badge } from "@/components/ui/badge"
 import {
   Trip,
   SavedPlace,
-  PlaceCategory
+  PlaceCategory,
+  Coordinates
 } from "@/types"
 import {
   addSavedPlace,
@@ -95,6 +96,17 @@ export default function SavedPlacesPage() {
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [assigningPlace, setAssigningPlace] = useState<SavedPlace | null>(null)
   const [assignDay, setAssignDay] = useState("")
+
+  // Get center location for biasing search results
+  const getSearchCenter = (): Coordinates | undefined => {
+    // If a location filter is selected, use that location's coordinates
+    if (filterLocation && filterLocation !== "all") {
+      const location = trip?.locations.find(l => l.id === filterLocation)
+      return location?.coordinates
+    }
+    // Otherwise fall back to first location with coordinates
+    return trip?.locations.find(l => l.coordinates)?.coordinates
+  }
 
   // Redirect if trip not found (after loading completes)
   if (!isLoading && !trip) {
@@ -237,7 +249,7 @@ export default function SavedPlacesPage() {
               </Button>
             </Link>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">Saved Places</h1>
+              <h1 className="font-fustat text-xl font-bold">Saved Places</h1>
               <p className="text-sm text-muted-foreground">
                 {trip.savedPlaces.length} places saved
               </p>
@@ -303,7 +315,7 @@ export default function SavedPlacesPage() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
               <MapPin className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">No places saved yet</h2>
+            <h2 className="heading-24 mb-2">No places saved yet</h2>
             <p className="text-muted-foreground mb-6">Start adding places you want to visit</p>
             <Button onClick={() => handleOpenPlaceDialog()}>
               <Plus className="h-4 w-4 mr-2" />
@@ -316,7 +328,7 @@ export default function SavedPlacesPage() {
               <section key={category}>
                 <div className="flex items-center gap-2 mb-4">
                   {getCategoryIcon(category)}
-                  <h2 className="text-lg font-semibold">{getCategoryLabel(category)}</h2>
+                  <h2 className="font-fustat text-lg font-semibold">{getCategoryLabel(category)}</h2>
                   <Badge variant="secondary">{places.length}</Badge>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -348,7 +360,10 @@ export default function SavedPlacesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Location <span className="text-destructive">*</span></label>
-              <PlaceSearch onSelect={handlePlaceSearchSelect} />
+              <PlaceSearch
+                onSelect={handlePlaceSearchSelect}
+                centerLocation={getSearchCenter()}
+              />
               {searchedPlace && (
                 <div className="mt-2 p-2 rounded-md bg-muted">
                   <p className="font-medium text-sm">{searchedPlace.name}</p>
@@ -494,7 +509,7 @@ function PlaceCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium">{place.name}</h3>
+            <h3 className="font-fustat font-semibold">{place.name}</h3>
             {place.address && (
               <p className="text-sm text-muted-foreground truncate mt-1">
                 {place.address}
