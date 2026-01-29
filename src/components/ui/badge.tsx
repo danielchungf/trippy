@@ -1,19 +1,35 @@
 import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+const badgeVariants = cva(
+  "inline-flex items-center gap-2 rounded-[10px] border px-2 py-1",
+  {
+    variants: {
+      variant: {
+        default: "border-neutral-200 bg-transparent",
+        secondary: "border-transparent bg-secondary text-secondary-foreground",
+        outline: "border-neutral-200 bg-transparent",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {
   /** Tailwind bg class for the dot indicator (only shown when provided) */
   dotColor?: string
 }
 
-function Badge({ className, dotColor, children, ...props }: BadgeProps) {
+function Badge({ className, variant, dotColor, children, ...props }: BadgeProps) {
   return (
     <div
-      className={cn(
-        "inline-flex items-center gap-2 rounded-[10px] border border-neutral-200 px-2 py-1",
-        className
-      )}
+      className={cn(badgeVariants({ variant }), className)}
       {...props}
     >
       {dotColor && (
@@ -26,4 +42,4 @@ function Badge({ className, dotColor, children, ...props }: BadgeProps) {
   )
 }
 
-export { Badge }
+export { Badge, badgeVariants }
