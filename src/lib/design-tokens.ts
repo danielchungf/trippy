@@ -9,52 +9,36 @@
  * =====================================================================
  *
  * Headings (Fustat font):
- * - .text-h1: 24px, bold, -0.02em tracking - Page titles, section headers
- * - .text-h2: 18px, semibold, -0.02em tracking - Card titles
- * - .text-h3: 16px, semibold, -0.02em tracking - Section titles, button text
+ * - .text-h1: 18px, bold (700), 26px line-height, -2% tracking - Trip title
+ * - .text-h2: 16px, semibold (600), 24px line-height, -2% tracking - Dates, subheading
+ * - .text-h3: 14px, semibold (600), 20px line-height, -2% tracking - Badge text, card title
+ * - .text-h4: 12px, semibold (600), 18px line-height, -2% tracking - Small headings
  *
- * Body text (Inter font, default):
- * - .text-body: 14px, regular - Primary body text
- * - .text-body-secondary: 14px, regular, secondary color
- * - .text-body-muted: 14px, regular, muted color
- * - .text-small: 12px, regular, secondary color
+ * Body text (Inter font, regular):
+ * - .text-body: 14px, 18px line-height, -2% tracking - Primary body text
+ * - .text-small: 12px, 16px line-height, -2% tracking - Secondary body text
  *
- * Labels (Fustat font):
- * - .text-label: 12px, bold - Badges, countdown labels
- *
- * Buttons (Fustat font):
- * - .text-button: 16px, semibold, white - Primary button text
- * - .text-button-secondary: 16px, semibold, secondary - Outline button text
- *
- * Legacy classes (backwards compatible):
- * - .heading-24: Same as .text-h1
- * - .heading-16: Same as .text-h3
- * - .heading-12: Same as .text-label
+ * Labels (Fustat font, bold):
+ * - .text-label: 12px - Badges
  *
  * =====================================================================
  * TAILWIND COLORS (tailwind.config.ts)
  * =====================================================================
  *
- * Text colors (use with text-*):
- * - text-text-primary (#2f2f2f) - Main text color
- * - text-text-secondary (#525252) - Supporting text, icons
- * - text-text-muted (#a1a1a1) - Disabled, placeholder, subtle text
+ * Text colors (using Tailwind neutral palette):
+ * - text-text-primary (neutral-800) - Main text color
+ * - text-text-secondary (neutral-500) - Supporting text, icons
+ * - text-text-tertiary (neutral-400) - Disabled, placeholder, subtle text
  * - text-text-inverse (#ffffff) - Text on dark backgrounds
+ * - text-text-accent (blue-400) - Accent/link text
  *
- * Accent colors (use with bg-*, border-*):
- * - accent-blue (#51a2ff) - Primary action buttons
- * - accent-blue-hover (#4090e8) - Hover state for blue buttons
- * - accent-cyan (#00b3ff) - Active tabs, highlights
- *
- * Surface colors (use with bg-*, border-*):
- * - surface-light (#f5f5f5) - Backgrounds, skeletons, hover states
- * - surface-border (#e5e5e5) - Borders, dividers
+ * Border colors:
+ * - border-border-muted (neutral-200) - Subtle borders, dividers
  *
  * Usage examples:
- *   bg-surface-light
  *   text-text-primary
- *   border-surface-border
- *   bg-accent-blue hover:bg-accent-blue-hover
+ *   text-text-secondary
+ *   border-border-muted
  *
  * =====================================================================
  * FONTS
@@ -67,28 +51,23 @@
 export const tokens = {
   colors: {
     text: {
-      primary: '#2f2f2f',
-      secondary: '#525252',
-      muted: '#a1a1a1',
+      primary: 'neutral-800',   // rgb(38 38 38)
+      secondary: 'neutral-500', // rgb(115 115 115)
+      tertiary: 'neutral-400',  // rgb(163 163 163)
       inverse: '#ffffff',
+      accent: 'blue-400',       // rgb(96 165 250)
     },
-    accent: {
-      blue: '#51a2ff',
-      blueHover: '#4090e8',
-      cyan: '#00b3ff',
-    },
-    surface: {
-      light: '#f5f5f5',
-      border: '#e5e5e5',
+    border: {
+      muted: 'neutral-200',     // rgb(229 229 229)
     },
   },
   typography: {
-    h1: { size: '24px', weight: '700', lineHeight: '1.2', letterSpacing: '-0.02em' },
-    h2: { size: '18px', weight: '600', lineHeight: '1.3', letterSpacing: '-0.02em' },
-    h3: { size: '16px', weight: '600', lineHeight: '1.3', letterSpacing: '-0.02em' },
-    body: { size: '14px', weight: '400', lineHeight: '1.5' },
-    bodySm: { size: '12px', weight: '400', lineHeight: '1.5' },
-    bodyXs: { size: '10px', weight: '400', lineHeight: '1.4' },
+    h1: { size: '18px', weight: '700', lineHeight: '26px', tracking: '-0.02em' },  // Trip title
+    h2: { size: '16px', weight: '600', lineHeight: '24px', tracking: '-0.02em' },  // Dates, subheading
+    h3: { size: '14px', weight: '600', lineHeight: '20px', tracking: '-0.02em' },  // Badge text, card title
+    h4: { size: '12px', weight: '600', lineHeight: '18px', tracking: '-0.02em' },  // Small headings
+    body: { size: '14px', weight: '400', lineHeight: '18px', tracking: '-0.02em' },
+    bodySm: { size: '12px', weight: '400', lineHeight: '16px', tracking: '-0.02em' },
     label: { size: '12px', weight: '700', lineHeight: '1.4' },
   },
 } as const

@@ -413,7 +413,7 @@ function MobileLayout({
       ) : (
         // Calendar tab - placeholder
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-text-muted">Calendar view coming soon</p>
+          <p className="text-text-tertiary">Calendar view coming soon</p>
         </div>
       )}
 
@@ -556,7 +556,7 @@ function DesktopLayout({
             {nextTrip && (
               <section className="flex flex-col gap-[20px]">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-h1 text-content-primary">
+                  <h2 className="text-h1 text-text-primary">
                     Your next trip
                   </h2>
                   <div className="flex items-center gap-[8px]">
@@ -586,7 +586,7 @@ function DesktopLayout({
             {!hasOnlyOneTrip && (
               <section className="flex flex-col gap-[20px]">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-h1 text-content-primary">
+                  <h2 className="text-h1 text-text-primary">
                     Upcoming
                   </h2>
                   <div className="flex items-center gap-[12px]">
@@ -616,7 +616,7 @@ function DesktopLayout({
                 ) : !nextTrip ? (
                   <EmptyState onCreateTrip={onCreateTrip} />
                 ) : (
-                  <p className="text-text-muted text-center py-8">No other upcoming trips</p>
+                  <p className="text-text-tertiary text-center py-8">No other upcoming trips</p>
                 )}
               </section>
             )}
@@ -644,11 +644,11 @@ function DesktopLayout({
 function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
   return (
     <div className="text-center py-16">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-light mb-4">
-        <MapPin className="h-8 w-8 text-text-muted" />
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 mb-4">
+        <MapPin className="h-8 w-8 text-text-tertiary" />
       </div>
       <h2 className="text-h1 mb-2">No trips yet</h2>
-      <p className="text-text-muted mb-6">Create your first trip to get started</p>
+      <p className="text-text-tertiary mb-6">Create your first trip to get started</p>
       <button
         onClick={onCreateTrip}
         className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition-colors text-h3 font-fustat"
@@ -666,16 +666,16 @@ function LoadingSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="bg-white border-[0.5px] border-surface-border rounded-[15px] overflow-hidden"
+          className="bg-white border-[0.5px] border-neutral-200 rounded-[15px] overflow-hidden"
         >
           {/* Image skeleton */}
           <div className="p-[5px]">
-            <div className="h-[120px] rounded-[10px] bg-surface-light animate-pulse" />
+            <div className="h-[120px] rounded-[10px] bg-neutral-100 animate-pulse" />
           </div>
           {/* Content skeleton */}
           <div className="px-[15px] pt-[10px] pb-[15px]">
-            <div className="h-[22px] w-3/4 bg-surface-light rounded animate-pulse" />
-            <div className="h-[17px] w-1/2 bg-surface-light rounded animate-pulse mt-[8px]" />
+            <div className="h-[22px] w-3/4 bg-neutral-100 rounded animate-pulse" />
+            <div className="h-[17px] w-1/2 bg-neutral-100 rounded animate-pulse mt-[8px]" />
           </div>
         </div>
       ))}
@@ -688,25 +688,25 @@ function LoadingSkeletonDesktop() {
     <div className="flex flex-col gap-[40px]">
       {/* Featured trip skeleton */}
       <section className="flex flex-col gap-[20px]">
-        <div className="h-[29px] w-[200px] bg-surface-light rounded animate-pulse" />
-        <div className="bg-white border-[0.5px] border-surface-border rounded-[15px] h-[300px] animate-pulse" />
+        <div className="h-[29px] w-[200px] bg-neutral-100 rounded animate-pulse" />
+        <div className="bg-white border-[0.5px] border-neutral-200 rounded-[15px] h-[300px] animate-pulse" />
       </section>
 
       {/* Grid skeleton */}
       <section className="flex flex-col gap-[20px]">
-        <div className="h-[29px] w-[150px] bg-surface-light rounded animate-pulse" />
+        <div className="h-[29px] w-[150px] bg-neutral-100 rounded animate-pulse" />
         <div className="grid grid-cols-3 gap-[20px]">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white border-[0.5px] border-surface-border rounded-[15px] overflow-hidden"
+              className="bg-white border-[0.5px] border-neutral-200 rounded-[15px] overflow-hidden"
             >
               <div className="p-[5px]">
-                <div className="h-[120px] rounded-[10px] bg-surface-light animate-pulse" />
+                <div className="h-[120px] rounded-[10px] bg-neutral-100 animate-pulse" />
               </div>
               <div className="px-[15px] pt-[10px] pb-[15px]">
-                <div className="h-[22px] w-3/4 bg-surface-light rounded animate-pulse" />
-                <div className="h-[17px] w-1/2 bg-surface-light rounded animate-pulse mt-[8px]" />
+                <div className="h-[22px] w-3/4 bg-neutral-100 rounded animate-pulse" />
+                <div className="h-[17px] w-1/2 bg-neutral-100 rounded animate-pulse mt-[8px]" />
               </div>
             </div>
           ))}

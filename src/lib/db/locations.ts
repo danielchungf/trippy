@@ -46,14 +46,14 @@ export async function addLocation(tripId: string, data: {
       googlePlaceId: data.googlePlaceId,
     }] })
 
-    // Update day location assignments in database
-    for (const day of updatedDays) {
-      await supabase
+    // Update day location assignments in database (in parallel)
+    await Promise.all(updatedDays.map(day =>
+      supabase
         .from('days')
         .update({ location_id: day.locationId || null })
         .eq('trip_id', tripId)
         .eq('date', day.date)
-    }
+    ))
   }
 
   return {
@@ -102,13 +102,13 @@ export async function updateLocation(tripId: string, locationId: string, data: P
     const trip = await getTrip(tripId)
     if (trip) {
       const updatedDays = generateDaysFromTrip(trip)
-      for (const day of updatedDays) {
-        await supabase
+      await Promise.all(updatedDays.map(day =>
+        supabase
           .from('days')
           .update({ location_id: day.locationId || null })
           .eq('trip_id', tripId)
           .eq('date', day.date)
-      }
+      ))
     }
   }
 

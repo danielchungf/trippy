@@ -24,11 +24,6 @@
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
-
-    /* Content color variables (RGB values for Tailwind alpha support) */
-    --color-neutral-800: 38 38 38;   /* #262626 */
-    --color-neutral-500: 115 115 115; /* #737373 */
-    --color-neutral-400: 163 163 163; /* #a3a3a3 */
   }
 }
 
@@ -51,50 +46,68 @@
   }
 }
 
-/* Lucide icons - scale stroke for 16x16 icons (2.7 at 24px viewBox = ~1.8px rendered at 16px) */
+/* Lucide icons stroke width scaling
+   Default 24px viewBox with 2px stroke renders at different visual weights depending on icon size.
+   We adjust stroke-width to maintain consistent visual weight across sizes.
+
+   For 16x16 icons: 2.7 stroke in 24px viewBox = ~1.8px rendered
+   For 20x20 icons: 2.0 stroke in 24px viewBox = ~1.67px rendered
+*/
 svg.lucide {
-  stroke-width: 2.7 !important;
+  stroke-width: 2.7; /* Default for 16x16 icons */
+}
+svg.lucide.icon-20 {
+  stroke-width: 2.0; /* For 20x20 icons */
 }
 
 /* Typography System */
 @layer components {
-  /* Headings - Fustat font (no color - use text-content-* classes) */
+  /* Headings - Fustat font (no color - use text-text-* classes) */
   .text-h1 {
     font-family: var(--font-fustat), sans-serif;
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 26px;
     letter-spacing: -0.02em;
   }
   .text-h2 {
     font-family: var(--font-fustat), sans-serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 24px;
     letter-spacing: -0.02em;
   }
   .text-h3 {
     font-family: var(--font-fustat), sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.3;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.02em;
+  }
+  .text-h4 {
+    font-family: var(--font-fustat), sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
     letter-spacing: -0.02em;
   }
 
-  /* Body text - Inter font (no color - use text-content-* classes) */
+  /* Body text - Inter font, regular (no color - use text-text-* classes) */
   .text-body {
     font-family: var(--font-inter), sans-serif;
     font-size: 14px;
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: 400;
+    line-height: 18px;
+    letter-spacing: -0.02em;
   }
 
   /* Small text - Inter font */
   .text-small {
     font-family: var(--font-inter), sans-serif;
     font-size: 12px;
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: 400;
+    line-height: 16px;
+    letter-spacing: -0.02em;
   }
 
   /* Labels/badges - Fustat font */
@@ -103,27 +116,5 @@ svg.lucide {
     font-size: 12px;
     font-weight: 700;
     line-height: 1;
-  }
-
-  /* Legacy heading classes (for backwards compatibility) */
-  .heading-24 {
-    font-family: var(--font-fustat), sans-serif;
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-  .heading-16 {
-    font-family: var(--font-fustat), sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.3;
-    letter-spacing: -0.02em;
-  }
-  .heading-12 {
-    font-family: var(--font-fustat), sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.4;
   }
 }

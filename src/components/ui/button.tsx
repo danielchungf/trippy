@@ -14,7 +14,7 @@ const buttonVariants = cva(
         primary:
           "font-fustat font-bold bg-blue-400 text-white hover:[background:linear-gradient(rgba(0,0,0,0.05),rgba(0,0,0,0.05)),_rgb(96,165,250)]",
         secondary:
-          "font-fustat font-bold bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50",
+          "font-fustat font-bold bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
         // Standard shadcn variants for dialogs/forms
         default:
           "bg-primary text-primary-foreground shadow hover:bg-primary/90",
@@ -44,7 +44,7 @@ const buttonVariants = cva(
   }
 )
 
-const iconClasses = "w-[16px] h-[16px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full"
+const iconClasses = "w-[16px] h-[16px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.33px]"
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,

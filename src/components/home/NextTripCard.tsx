@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Shrub, NotepadText, BedDouble, CircleAlert, MapPinned } from "lucide-react"
 import { Trip, parseLocalDate, getTripDuration } from "@/types"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import placeholderImage from "@/app/landscape-placeholder.jpg"
 
 interface NextTripCardProps {
@@ -62,8 +63,8 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
   })
   const missingStays = Math.max(0, tripNights - coveredNights)
 
-  // Get location names as tags
-  const locationTags = trip.locations?.map(loc => loc.name) || []
+  // Get unique location names as tags
+  const locationTags = [...new Set(trip.locations?.map(loc => loc.name) || [])]
 
   if (variant === 'mobile') {
     return (
@@ -104,19 +105,14 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
               {locationTags.length > 0 && (
                 <div className="flex flex-wrap gap-[8px]">
                   {locationTags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-[8px] py-[4px] border border-[rgba(0,0,0,0.1)] rounded-full text-body-sm font-medium text-text-muted"
-                    >
-                      {tag}
-                    </span>
+                    <Badge key={index}>{tag}</Badge>
                   ))}
                 </div>
               )}
             </div>
 
             {/* Divider */}
-            <div className="h-[1px] bg-surface-border" />
+            <div className="h-[1px] bg-neutral-200" />
 
             {/* Stats */}
             <div className="flex flex-col gap-[8px]">
@@ -149,7 +145,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
             </div>
 
             {/* Keep planning button */}
-            <button className="w-full bg-accent-blue text-white py-[12px] px-[15px] rounded-full text-button text-center hover:bg-accent-blue-hover transition-colors">
+            <button className="w-full bg-blue-400 text-white py-[12px] px-[15px] rounded-full text-button text-center hover:bg-blue-400-hover transition-colors">
               Keep planning
             </button>
           </div>
@@ -170,7 +166,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
         />
         {countdown && (
           <div className="absolute top-[10px] left-[10px] bg-white rounded-[10px] h-[24px] px-[10px] flex items-center">
-            <span className="text-label text-content-primary">
+            <span className="text-label text-text-primary">
               {countdown}
             </span>
           </div>
@@ -181,58 +177,53 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
       <div className="flex-1 min-w-0 pl-[24px] pr-[20px] py-[20px] flex flex-col">
         {/* Title and date */}
         <div className="flex flex-col gap-[8px]">
-          <h3 className="text-h1 text-content-primary truncate">
+          <h3 className="text-h1 text-text-primary truncate">
             {trip.name}
           </h3>
-          <p className="text-h3 text-content-secondary">
+          <p className="text-h3 text-text-secondary">
             {formatTripDateRangeWithDuration(trip.startDate, trip.endDate)}
           </p>
         </div>
 
         {/* Location tags */}
         {locationTags.length > 0 && (
-          <div className="flex flex-wrap gap-[8px] mt-[20px]">
+          <div className="flex flex-wrap gap-[8px] mt-[12px]">
             {locationTags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-[8px] py-[4px] border border-neutral-200 rounded-full text-body font-medium text-text-muted"
-              >
-                {tag}
-              </span>
+              <Badge key={index}>{tag}</Badge>
             ))}
           </div>
         )}
 
-        {/* Stats - 24px gap from title/tags */}
+        {/* Stats */}
         <div className="flex flex-col gap-[8px] mt-[24px]">
           <div className="flex items-center gap-[8px]">
-            <MapPinned className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-content-secondary">
+            <MapPinned className="w-[20px] h-[20px] text-blue-400 icon-20" />
+            <span className="text-body text-text-secondary">
               {placesCount} places
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <Shrub className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-content-secondary">
+            <Shrub className="w-[20px] h-[20px] text-blue-400 icon-20" />
+            <span className="text-body text-text-secondary">
               {activitiesCount} activities
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <NotepadText className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-content-secondary">
+            <NotepadText className="w-[20px] h-[20px] text-blue-400 icon-20" />
+            <span className="text-body text-text-secondary">
               {daysPlanned}/{duration} days planned
             </span>
           </div>
           <div className="flex items-center gap-[8px]">
-            <BedDouble className="w-[20px] h-[20px] text-blue-400" />
-            <span className="text-body text-content-secondary">
+            <BedDouble className="w-[20px] h-[20px] text-blue-400 icon-20" />
+            <span className="text-body text-text-secondary">
               {staysLogged} stays logged
             </span>
           </div>
           {missingStays > 0 && (
             <div className="flex items-center gap-[8px]">
-              <CircleAlert className="w-[20px] h-[20px] text-orange-400" />
-              <span className="text-body text-content-secondary">
+              <CircleAlert className="w-[20px] h-[20px] text-orange-400 icon-20" />
+              <span className="text-body text-text-secondary">
                 {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
               </span>
             </div>

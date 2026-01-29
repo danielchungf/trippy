@@ -15,13 +15,13 @@ const config: Config = {
       },
       fontSize: {
         // Headings (Fustat)
-        'h1': ['24px', { lineHeight: '1.2', fontWeight: '700', letterSpacing: '-0.02em' }],
-        'h2': ['18px', { lineHeight: '1.3', fontWeight: '700', letterSpacing: '-0.02em' }],
-        'h3': ['16px', { lineHeight: '1.3', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'h1': ['18px', { lineHeight: '26px', fontWeight: '700', letterSpacing: '-0.02em' }],  // Trip title
+        'h2': ['16px', { lineHeight: '24px', fontWeight: '600', letterSpacing: '-0.02em' }],  // Dates, subheading
+        'h3': ['14px', { lineHeight: '20px', fontWeight: '600', letterSpacing: '-0.02em' }],  // Badge text, card title
+        'h4': ['12px', { lineHeight: '18px', fontWeight: '600', letterSpacing: '-0.02em' }],  // Small headings
         // Body (Inter)
-        'body': ['14px', { lineHeight: '1.5', fontWeight: '500' }],
-        'body-sm': ['12px', { lineHeight: '1.5', fontWeight: '500' }],
-        'body-xs': ['10px', { lineHeight: '1.4', fontWeight: '500' }],
+        'body': ['14px', { lineHeight: '18px', fontWeight: '400', letterSpacing: '-0.02em' }],
+        'body-sm': ['12px', { lineHeight: '16px', fontWeight: '400', letterSpacing: '-0.02em' }],
         // Labels
         'label': ['12px', { lineHeight: '1.4', fontWeight: '700' }],
       },
@@ -59,31 +59,16 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Content colors (for text)
-        content: {
-          primary: 'rgb(var(--color-neutral-800) / <alpha-value>)',
-          secondary: 'rgb(var(--color-neutral-500) / <alpha-value>)',
-          tertiary: 'rgb(var(--color-neutral-400) / <alpha-value>)',
-          inverse: '#ffffff',
-        },
-        // Legacy text colors (for backwards compatibility)
+        // Text colors (using Tailwind neutral palette)
         text: {
-          primary: '#2f2f2f',
-          secondary: '#525252',
-          muted: '#a1a1a1',
+          primary: 'rgb(38 38 38 / <alpha-value>)',     // neutral-800
+          secondary: 'rgb(115 115 115 / <alpha-value>)', // neutral-500
+          tertiary: 'rgb(163 163 163 / <alpha-value>)', // neutral-400
           inverse: '#ffffff',
+          accent: 'rgb(96 165 250 / <alpha-value>)',    // blue-400
         },
-        // UI accent colors
-        'accent-blue': {
-          DEFAULT: '#51a2ff',
-          hover: '#4090e8',
-        },
-        'accent-cyan': '#00b3ff',
-        // Surface colors
-        surface: {
-          light: '#f5f5f5',
-          border: '#e5e5e5',
-        },
+        // Border colors
+        'border-muted': 'rgb(229 229 229 / <alpha-value>)', // neutral-200
       },
       borderRadius: {
         lg: "var(--radius)",
