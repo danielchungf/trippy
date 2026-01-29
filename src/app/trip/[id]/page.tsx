@@ -354,24 +354,19 @@ export default function TripPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
-              <div className="space-y-2 p-1 -m-1">
-                {[0, 1, 2].map(row => (
-                  <div key={row} className="grid grid-cols-14 gap-1.5">
-                    {LOCATION_COLORS.filter(c => c.row === row).map(color => (
-                      <button
-                        key={color.value}
-                        type="button"
-                        className={`aspect-square rounded-full transition-all ${
-                          locationColor === color.value
-                            ? 'ring-2 ring-offset-2 ring-primary'
-                            : 'hover:scale-110'
-                        }`}
-                        style={{ backgroundColor: color.value }}
-                        onClick={() => setLocationColor(color.value)}
-                        title={color.name}
-                      />
-                    ))}
-                  </div>
+              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
+                {LOCATION_COLORS.map(color => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    className={`aspect-square rounded-full transition-all ${color.value} ${
+                      locationColor === color.value
+                        ? 'ring-2 ring-offset-2 ring-primary'
+                        : 'hover:scale-110'
+                    }`}
+                    onClick={() => setLocationColor(color.value)}
+                    title={color.name}
+                  />
                 ))}
               </div>
             </div>
@@ -701,9 +696,15 @@ function TripHeader({
       {/* Row 2: Location Badges */}
       <div className="flex items-center gap-2 flex-wrap">
         {trip.locations.map((location) => (
-          <Badge key={location.id} dotColor={location.color || LOCATION_COLORS[0].value}>
-            {location.name}
-          </Badge>
+          <button
+            key={location.id}
+            onClick={() => onOpenLocationDialog(location)}
+            className="cursor-pointer"
+          >
+            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+              {location.name}
+            </Badge>
+          </button>
         ))}
         <NakedIconButton
           icon={<Plus />}
@@ -817,6 +818,7 @@ function ItineraryPanel({ trip, onRefresh }: { trip: TripWithOwnership; onRefres
             dayNumber={dayNumber}
             location={location}
             tripId={trip.id}
+            onRefresh={onRefresh}
           />
         )
       })}
@@ -829,63 +831,108 @@ function DayCard({
   day,
   dayNumber,
   location,
-  tripId
+  tripId,
+  onRefresh
 }: {
   day: Day
   dayNumber: number
   location?: Location
   tripId: string
+  onRefresh: () => Promise<void>
 }) {
-  const formattedDate = formatDate(day.date)
+  const [isEditNameOpen, setIsEditNameOpen] = useState(false)
+  const [dayName, setDayName] = useState(day.name || '')
+
+  const date = parseLocalDate(day.date)
+  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' })
+  const dayOfMonth = String(date.getDate()).padStart(2, '0')
+  const dayNumberPadded = String(dayNumber).padStart(2, '0')
   const hasActivities = day.activities.length > 0
 
+  const handleSaveDayName = async () => {
+    await updateDayName(tripId, day.date, dayName || undefined)
+    setIsEditNameOpen(false)
+    await onRefresh()
+  }
+
+  const handleBadgeClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDayName(day.name || '')
+    setIsEditNameOpen(true)
+  }
+
   return (
-    <Link href={`/trip/${tripId}/day/${day.date}`} className="block">
-      <div className="border-b border-neutral-200 p-4 hover:bg-neutral-50 transition-colors">
-        {/* Day Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-h3 text-text-primary">Day {dayNumber}</span>
-          <span className="text-body text-text-secondary">{formattedDate}</span>
-          {location && (
-            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-              {location.name}
-            </Badge>
+    <>
+      <Link href={`/trip/${tripId}/day/${day.date}`} className="block">
+        <div className="border-b border-neutral-200 p-4 hover:bg-neutral-50 transition-colors flex flex-col gap-3">
+          {/* Row 1: Badge + Day/Date */}
+          <div className="flex items-center justify-between">
+            {/* Left: Day Name Badge */}
+            <button onClick={handleBadgeClick}>
+              <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+                {day.name || `Day ${dayNumber}`}
+              </Badge>
+            </button>
+            {/* Right: Day/Date combo */}
+            <span className="text-mono-small text-text-secondary">
+              DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
+            </span>
+          </div>
+
+          {/* Row 2: Activities or Empty State */}
+          {hasActivities ? (
+            <div className="flex flex-col gap-1.5">
+              {day.activities.map((activity) => (
+                <ActivityRow key={activity.id} activity={activity} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-body text-text-secondary">
+              No activities planned
+            </p>
           )}
         </div>
+      </Link>
 
-        {/* Activities or Empty State */}
-        {hasActivities ? (
-          <div className="flex flex-col gap-2 mt-3">
-            {day.activities.map((activity) => (
-              <ActivityRow key={activity.id} activity={activity} />
-            ))}
+      {/* Edit Day Name Dialog */}
+      <Dialog open={isEditNameOpen} onOpenChange={setIsEditNameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Day Name</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="e.g., Beach Day, Museum Tour"
+              value={dayName}
+              onChange={(e) => setDayName(e.target.value)}
+              autoFocus
+            />
           </div>
-        ) : (
-          <p className="text-small text-text-tertiary mt-1">
-            No activities planned
-          </p>
-        )}
-      </div>
-    </Link>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSaveDayName}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
 // Activity Row Component
 function ActivityRow({ activity }: { activity: Activity }) {
   return (
-    <div className="flex items-start gap-3 py-1">
+    <div className="flex items-center gap-3">
       {/* Time */}
-      <span className="text-small text-text-secondary w-12 flex-shrink-0">
-        {activity.time || '—'}
+      <span className="text-mono-regular text-text-secondary w-[41px] shrink-0 text-left">
+        {activity.time || 'N/T'}
       </span>
-
-      {/* Activity Details */}
-      <div className="flex-1 min-w-0">
-        <p className="text-body text-text-primary truncate">{activity.title}</p>
-        {activity.place?.name && activity.place.name !== activity.title && (
-          <p className="text-small text-text-tertiary truncate">{activity.place.name}</p>
-        )}
-      </div>
+      {/* Activity Name */}
+      <span className="text-body text-text-primary truncate">
+        {activity.title}
+      </span>
     </div>
   )
 }
