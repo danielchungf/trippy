@@ -2,6 +2,22 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
+  safelist: [
+    'bg-blue-200',
+    'bg-sky-200',
+    'bg-cyan-200',
+    'bg-teal-200',
+    'bg-emerald-200',
+    'bg-green-200',
+    'bg-lime-200',
+    'bg-yellow-200',
+    'bg-amber-200',
+    'bg-orange-200',
+    'bg-red-200',
+    'bg-rose-200',
+    'bg-pink-200',
+    'bg-purple-200',
+  ],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -12,6 +28,7 @@ const config: Config = {
       fontFamily: {
         inter: ["var(--font-inter)", "sans-serif"],
         fustat: ["var(--font-fustat)", "sans-serif"],
+        'dm-mono': ["var(--font-dm-mono)", "monospace"],
       },
       fontSize: {
         // Headings (Fustat)

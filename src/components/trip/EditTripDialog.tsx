@@ -4,7 +4,7 @@ import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Settings, Trash2, ChevronDown, ImagePlus, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { IconButton } from "@/components/ui/icon-button"
+import { NakedIconButton } from "@/components/ui/naked-icon-button"
 import {
   Dialog,
   DialogContent,
@@ -224,7 +224,7 @@ export function EditTripDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
-          <IconButton icon={<Settings />} />
+          <NakedIconButton icon={<Settings />} />
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -245,24 +245,19 @@ export function EditTripDialog({
             {/* Trip Color */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
-              <div className="space-y-2 p-1 -m-1">
-                {[0, 1, 2].map(row => (
-                  <div key={row} className="grid grid-cols-14 gap-1.5">
-                    {LOCATION_COLORS.filter(c => c.row === row).map(colorOption => (
-                      <button
-                        key={colorOption.value}
-                        type="button"
-                        className={`aspect-square rounded-full transition-all ${
-                          color === colorOption.value
-                            ? 'ring-2 ring-offset-2 ring-primary'
-                            : 'hover:scale-110'
-                        }`}
-                        style={{ backgroundColor: colorOption.value }}
-                        onClick={() => setColor(colorOption.value)}
-                        title={colorOption.name}
-                      />
-                    ))}
-                  </div>
+              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
+                {LOCATION_COLORS.map(colorOption => (
+                  <button
+                    key={colorOption.value}
+                    type="button"
+                    className={`aspect-square rounded-full transition-all ${colorOption.value} ${
+                      color === colorOption.value
+                        ? 'ring-2 ring-offset-2 ring-primary'
+                        : 'hover:scale-110'
+                    }`}
+                    onClick={() => setColor(colorOption.value)}
+                    title={colorOption.name}
+                  />
                 ))}
               </div>
             </div>

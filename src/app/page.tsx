@@ -261,24 +261,19 @@ export default function HomePage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Color (for calendar)</label>
-              <div className="space-y-2 p-1 -m-1">
-                {[0, 1, 2].map(row => (
-                  <div key={row} className="grid grid-cols-14 gap-1.5">
-                    {LOCATION_COLORS.filter(c => c.row === row).map(color => (
-                      <button
-                        key={color.value}
-                        type="button"
-                        className={`aspect-square rounded-full transition-all ${
-                          tripColor === color.value
-                            ? 'ring-2 ring-offset-2 ring-primary'
-                            : 'hover:scale-110'
-                        }`}
-                        style={{ backgroundColor: color.value }}
-                        onClick={() => setTripColor(color.value)}
-                        title={color.name}
-                      />
-                    ))}
-                  </div>
+              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
+                {LOCATION_COLORS.map(color => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    className={`aspect-square rounded-full transition-all ${color.value} ${
+                      tripColor === color.value
+                        ? 'ring-2 ring-offset-2 ring-primary'
+                        : 'hover:scale-110'
+                    }`}
+                    onClick={() => setTripColor(color.value)}
+                    title={color.name}
+                  />
                 ))}
               </div>
             </div>

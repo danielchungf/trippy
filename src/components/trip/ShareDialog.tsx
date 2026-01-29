@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { UserRoundPlus, Mail, Crown, Trash2, Clock } from "lucide-react"
-import { IconButton } from "@/components/ui/icon-button"
+import { NakedIconButton } from "@/components/ui/naked-icon-button"
 import {
   Dialog,
   DialogContent,
@@ -72,7 +72,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <IconButton icon={<UserRoundPlus />} />
+        <NakedIconButton icon={<UserRoundPlus />} />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

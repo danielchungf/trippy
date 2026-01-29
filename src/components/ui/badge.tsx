@@ -3,7 +3,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Color of the dot indicator (only shown when provided) */
+  /** Tailwind bg class for the dot indicator (only shown when provided) */
   dotColor?: string
 }
 
@@ -18,8 +18,7 @@ function Badge({ className, dotColor, children, ...props }: BadgeProps) {
     >
       {dotColor && (
         <span
-          className="w-3 h-3 shrink-0 rounded-full"
-          style={{ backgroundColor: dotColor }}
+          className={cn("w-3 h-3 shrink-0 rounded-full", dotColor)}
         />
       )}
       <span className="text-h3 text-text-primary">{children}</span>
