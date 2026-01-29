@@ -47,6 +47,7 @@ export function createTrip(data: {
     locations: [],
     accommodations: [],
     savedPlaces: [],
+    packingItems: [],
     days: []
   }
 
