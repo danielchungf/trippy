@@ -50,6 +50,26 @@ export interface Day {
 // Accommodation type
 export type AccommodationType = 'hotel' | 'airbnb' | 'hostel' | 'family' | 'friend' | 'other'
 
+// Packing item category
+export type PackingCategory =
+  | 'clothing'
+  | 'toiletries'
+  | 'electronics'
+  | 'documents'
+  | 'health'
+  | 'accessories'
+  | 'misc'
+
+// Packing item
+export interface PackingItem {
+  id: string
+  name: string
+  category: PackingCategory
+  quantity: number
+  isPacked: boolean
+  notes?: string
+}
+
 // Accommodation (trip-level, spans days)
 export interface Accommodation {
   id: string
@@ -142,6 +162,7 @@ export interface Trip {
   locations: Location[]
   accommodations: Accommodation[]
   savedPlaces: SavedPlace[]
+  packingItems: PackingItem[]
   days: Day[]
 }
 

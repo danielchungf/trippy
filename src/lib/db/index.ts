@@ -45,3 +45,11 @@ export {
   updateDayName,
   createActivityFromPlace,
 } from './activities'
+
+export {
+  getPackingItems,
+  addPackingItem,
+  updatePackingItem,
+  deletePackingItem,
+  togglePackingItemPacked,
+} from './packing-items'
