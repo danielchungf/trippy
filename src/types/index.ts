@@ -13,6 +13,7 @@ export interface PlaceInfo {
   address: string
   coordinates: Coordinates
   googlePlaceId?: string
+  photos?: string[] // Used when auto-creating SavedPlace from Activity
 }
 
 // Saved Place (trip-level, saved during planning)
