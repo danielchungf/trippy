@@ -119,8 +119,9 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
       }
 
       // Create custom marker content - matches ActivityCard number circle
+      // translateY(50%) shifts the marker down so its center aligns with the coordinate
       const markerContent = document.createElement('div')
-      markerContent.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background-color: rgb(38, 38, 38); color: white; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: -0.02em; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: background-color 0.15s ease;'
+      markerContent.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background-color: rgb(38, 38, 38); color: white; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: -0.02em; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: background-color 0.15s ease; transform: translateY(50%);'
       markerContent.style.fontFamily = 'var(--font-dm-mono), ui-monospace, monospace'
       markerContent.textContent = (index + 1).toString()
 

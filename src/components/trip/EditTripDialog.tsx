@@ -393,6 +393,7 @@ export function EditTripDialog({
               <div className="pt-4 border-t">
                 <Button
                   variant="secondary"
+                  size="small"
                   className="w-full"
                   onClick={() => setShowDeleteAlert(true)}
                   leftIcon={<Trash2 />}
@@ -405,9 +406,9 @@ export function EditTripDialog({
 
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="secondary">Cancel</Button>
+              <Button variant="secondary" size="small">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSave} disabled={loading || !name.trim()}>
+            <Button variant="primary" size="small" onClick={handleSave} disabled={loading || !name.trim()}>
               {loading ? (isUploading ? "Uploading..." : "Saving...") : "Save"}
             </Button>
           </DialogFooter>

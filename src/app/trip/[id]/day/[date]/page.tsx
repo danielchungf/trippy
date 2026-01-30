@@ -47,12 +47,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -64,7 +58,6 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Trip,
   Activity,
   PlaceInfo,
   Accommodation,
@@ -99,7 +92,7 @@ export default function DayPage() {
   const [isEditingDayName, setIsEditingDayName] = useState(false)
   const [editingDayNameValue, setEditingDayNameValue] = useState("")
 
-  // DnD sensors
+  // DnD sensors - only activate drag on elements with data-drag-handle attribute
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -484,7 +477,6 @@ export default function DayPage() {
                             activity={activity}
                             index={index}
                             onEdit={() => handleOpenActivityDialog(activity)}
-                            onDelete={() => handleDeleteActivity(activity.id)}
                           />
                         ))}
                       </div>
@@ -688,16 +680,33 @@ export default function DayPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button
-              onClick={handleSaveActivity}
-              disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
-            >
-              {editingActivity ? 'Save' : 'Add Activity'}
-            </Button>
+          <DialogFooter className={editingActivity ? "flex justify-between sm:justify-between" : ""}>
+            {editingActivity && (
+              <Button
+                variant="secondary"
+                size="small"
+                leftIcon={<Trash2 />}
+                onClick={() => {
+                  handleDeleteActivity(editingActivity.id)
+                  setIsActivityOpen(false)
+                }}
+              >
+                Delete
+              </Button>
+            )}
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="secondary" size="small">Cancel</Button>
+              </DialogClose>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleSaveActivity}
+                disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
+              >
+                {editingActivity ? 'Save' : 'Add Activity'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -768,12 +777,10 @@ function SortableActivityCard({
   activity,
   index,
   onEdit,
-  onDelete
 }: {
   activity: Activity
   index: number
   onEdit: () => void
-  onDelete: () => void
 }) {
   const {
     attributes,
@@ -807,18 +814,29 @@ function SortableActivityCard({
         {index + 1}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{activity.title}</p>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {activity.time && (
-            <>
-              <Clock className="h-3 w-3" />
-              <span>{activity.time}</span>
-            </>
-          )}
-          {activity.duration && (
-            <span>· {activity.duration}min</span>
-          )}
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-sm">{activity.title}</p>
+          <button
+            type="button"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-muted rounded"
+            onClick={onEdit}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
         </div>
+        {(activity.time || activity.duration) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {activity.time && (
+              <>
+                <Clock className="h-3 w-3" />
+                <span>{activity.time}</span>
+              </>
+            )}
+            {activity.duration && (
+              <span>{activity.time ? '· ' : ''}{activity.duration}min</span>
+            )}
+          </div>
+        )}
         {activity.place.address && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
             <MapPin className="h-3 w-3" />
@@ -826,23 +844,6 @@ function SortableActivityCard({
           </div>
         )}
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onEdit}>
-            <Edit2 className="h-4 w-4 mr-2" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   )
 }
