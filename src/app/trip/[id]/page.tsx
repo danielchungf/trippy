@@ -5,6 +5,22 @@ import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
   Plus,
   Trash2,
   MoreHorizontal,
@@ -14,6 +30,9 @@ import {
   User,
   LogOut,
   Route,
+  GripVertical,
+  BedDouble,
+  ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -351,6 +370,7 @@ export default function TripPage() {
             trip={trip}
             selectedDayDate={selectedDayDate}
             onRefresh={refreshTrip}
+            onOpenAccommodationDialog={handleOpenAccommodationDialog}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-text-secondary">
@@ -826,11 +846,13 @@ function TabContent({
 function RightPanel({
   trip,
   selectedDayDate,
-  onRefresh
+  onRefresh,
+  onOpenAccommodationDialog
 }: {
   trip: TripWithOwnership
   selectedDayDate: string
   onRefresh: () => Promise<void>
+  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
 }) {
   const days = generateDaysFromTrip(trip)
   const dayIndex = days.findIndex(d => d.date === selectedDayDate)
@@ -847,6 +869,37 @@ function RightPanel({
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end for reordering activities
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const activities = day?.activities || []
+      const oldIndex = activities.findIndex(a => a.id === active.id)
+      const newIndex = activities.findIndex(a => a.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = [...activities]
+        const [removed] = reordered.splice(oldIndex, 1)
+        reordered.splice(newIndex, 0, removed)
+        await reorderActivities(trip.id, selectedDayDate, reordered.map(a => a.id))
+        await onRefresh()
+      }
+    }
+  }
 
   // Handle resize drag
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -952,6 +1005,14 @@ function RightPanel({
   const handleDeleteActivity = async (activityId: string) => {
     await deleteActivity(trip.id, selectedDayDate, activityId)
     setIsActivityOpen(false)
+    await onRefresh()
+  }
+
+  const handleRemoveTime = async (activity: Activity) => {
+    await updateActivity(trip.id, selectedDayDate, activity.id, {
+      time: '',
+      duration: 0,
+    })
     await onRefresh()
   }
 
@@ -1101,17 +1162,72 @@ function RightPanel({
 
           {/* Activities List */}
           <div className="flex-1 overflow-auto">
+            {/* Accommodation Row */}
+            {currentAccommodation && (
+              <div className="group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
+                {/* Left: Bed icon + Name */}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-text-secondary">
+                    <BedDouble />
+                  </span>
+                  <span className="text-h3 text-text-secondary">{currentAccommodation.name}</span>
+                </div>
+                {/* Right: Date range + External link */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-mono-regular text-text-secondary">
+                    {(() => {
+                      const checkIn = parseLocalDate(currentAccommodation.checkIn)
+                      const checkOut = parseLocalDate(currentAccommodation.checkOut)
+                      const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+                      const inMonth = monthFormat.format(checkIn).toUpperCase()
+                      const outMonth = monthFormat.format(checkOut).toUpperCase()
+                      const inDay = checkIn.getDate()
+                      const outDay = checkOut.getDate()
+                      if (inMonth === outMonth) {
+                        return `${inMonth} ${inDay}—${outDay}`
+                      }
+                      return `${inMonth} ${inDay}—${outMonth} ${outDay}`
+                    })()}
+                  </span>
+                  {currentAccommodation.googlePlaceId && (
+                    <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 transition-all duration-200">
+                      <NakedIconButton
+                        icon={<ExternalLink />}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`https://www.google.com/maps/place/?q=place_id:${currentAccommodation.googlePlaceId}`, '_blank')
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {day.activities.length > 0 ? (
-              day.activities.map((activity, index) => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  number={index + 1}
-                  onMouseEnter={() => setHoveredActivityIndex(index)}
-                  onMouseLeave={() => setHoveredActivityIndex(null)}
-                  onEdit={() => handleOpenActivityDialog(activity)}
-                />
-              ))
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={day.activities.map(a => a.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {day.activities.map((activity, index) => (
+                    <SortableActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      number={index + 1}
+                      onMouseEnter={() => setHoveredActivityIndex(index)}
+                      onMouseLeave={() => setHoveredActivityIndex(null)}
+                      onEdit={() => handleOpenActivityDialog(activity)}
+                      onRemoveTime={() => handleRemoveTime(activity)}
+                      onDelete={() => handleDeleteActivity(activity.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             ) : (
               <div className="p-4 text-body text-text-secondary">
                 No activities planned for this day
@@ -1286,22 +1402,134 @@ function RightPanel({
   )
 }
 
-// Activity Card Component
-function ActivityCard({
+// Sortable Activity Card Component (wrapper for drag-and-drop)
+function SortableActivityCard({
   activity,
   number,
   onMouseEnter,
   onMouseLeave,
-  onEdit
+  onEdit,
+  onRemoveTime,
+  onDelete
 }: {
   activity: Activity
   number: number
   onMouseEnter?: () => void
   onMouseLeave?: () => void
   onEdit?: () => void
+  onRemoveTime?: () => void
+  onDelete?: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: activity.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  // Format time as XX:XX
+  const formattedTime = activity.time || 'NO TIME'
+  const hasTime = !!activity.time
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer",
+        isDragging && "opacity-50 bg-neutral-100 shadow-lg z-50"
+      )}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Left: Drag handle + Number + Details */}
+      <div className="flex items-start">
+        {/* Drag handle */}
+        <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 group-hover:mr-2 transition-all duration-200 flex-shrink-0 -mt-1">
+          <div {...attributes} {...listeners}>
+            <NakedIconButton
+              icon={<GripVertical />}
+              className="cursor-grab active:cursor-grabbing touch-none"
+            />
+          </div>
+        </div>
+        {/* Numbered circle matching map markers */}
+        <div className="w-5 h-5 rounded-full bg-neutral-800 text-white flex items-center justify-center text-mono-small font-medium flex-shrink-0">
+          {number}
+        </div>
+        {/* Activity details */}
+        <div className="flex flex-col ml-2">
+          <span className="text-h3 text-text-primary">{activity.title}</span>
+          <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
+        </div>
+      </div>
+      {/* Right: Time + Dropdown menu */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-mono-regular text-text-secondary">{formattedTime}</span>
+        <DropdownMenu>
+          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+            <DropdownMenuTrigger asChild>
+              <NakedIconButton
+                icon={<MoreHorizontal />}
+                onClick={(e) => e.stopPropagation()}
+                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
+              />
+            </DropdownMenuTrigger>
+          </div>
+          <DropdownMenuContent align="end">
+            {onEdit && (
+              <DropdownMenuItem onClick={onEdit}>
+                Edit
+              </DropdownMenuItem>
+            )}
+            {onRemoveTime && hasTime && (
+              <DropdownMenuItem onClick={onRemoveTime}>
+                Remove time
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+// Activity Card Component (non-sortable version)
+function ActivityCard({
+  activity,
+  number,
+  onMouseEnter,
+  onMouseLeave,
+  onEdit,
+  onRemoveTime,
+  onDelete
+}: {
+  activity: Activity
+  number: number
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+  onEdit?: () => void
+  onRemoveTime?: () => void
+  onDelete?: () => void
 }) {
   // Format time as XX:XX
   const formattedTime = activity.time || 'NO TIME'
+  const hasTime = !!activity.time
 
   return (
     <div
@@ -1321,20 +1549,40 @@ function ActivityCard({
           <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
         </div>
       </div>
-      {/* Right: Time + Edit button */}
+      {/* Right: Time + Dropdown menu */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-mono-regular text-text-secondary">{formattedTime}</span>
-        {onEdit && (
-          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 transition-all duration-200">
-            <NakedIconButton
-              icon={<MoreHorizontal />}
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit()
-              }}
-            />
+        <DropdownMenu>
+          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+            <DropdownMenuTrigger asChild>
+              <NakedIconButton
+                icon={<MoreHorizontal />}
+                onClick={(e) => e.stopPropagation()}
+                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
+              />
+            </DropdownMenuTrigger>
           </div>
-        )}
+          <DropdownMenuContent align="end">
+            {onEdit && (
+              <DropdownMenuItem onClick={onEdit}>
+                Edit
+              </DropdownMenuItem>
+            )}
+            {onRemoveTime && hasTime && (
+              <DropdownMenuItem onClick={onRemoveTime}>
+                Remove time
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

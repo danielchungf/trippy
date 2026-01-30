@@ -284,7 +284,7 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
         </div>
       )}
 
-      {/* Route controls */}
+      {/* Route controls - Hidden for now, saved for later use
       {!isLoading && !error && validActivities.length >= 2 && (
         <div className="absolute top-4 left-4 flex flex-col gap-2">
           <div className="bg-background rounded-lg shadow-lg p-1 flex gap-1">
@@ -333,6 +333,7 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
           )}
         </div>
       )}
+      */}
 
     </div>
   )

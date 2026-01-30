@@ -14,7 +14,7 @@ function Badge({ className, dotColor, variant = "default", children, ...props }:
     <div
       className={cn(
         "inline-flex items-center gap-2 rounded-[10px] border px-2 py-1 transition-colors",
-        variant === "default" && "border-neutral-200 hover:bg-neutral-50",
+        variant === "default" && "border-neutral-200 bg-white hover:bg-neutral-50",
         variant === "secondary" && "border-transparent bg-neutral-100 text-neutral-900",
         variant === "outline" && "border-neutral-200 bg-transparent",
         className
