@@ -39,6 +39,7 @@ import {
 interface PackingListProps {
   tripId: string
   packingItems: PackingItem[]
+  onPackingItemsChange?: (items: PackingItem[]) => void
   onRefresh: () => Promise<void>
 }
 
@@ -62,7 +63,7 @@ const CATEGORY_ORDER: PackingCategory[] = [
   "misc",
 ]
 
-export function PackingList({ tripId, packingItems, onRefresh }: PackingListProps) {
+export function PackingList({ tripId, packingItems, onPackingItemsChange, onRefresh }: PackingListProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<PackingItem | null>(null)
 
@@ -132,8 +133,17 @@ export function PackingList({ tripId, packingItems, onRefresh }: PackingListProp
   }
 
   const handleTogglePacked = async (itemId: string) => {
-    await togglePackingItemPacked(tripId, itemId)
-    await onRefresh()
+    // Optimistic update - toggle UI immediately
+    const updatedItems = packingItems.map((item) =>
+      item.id === itemId ? { ...item, isPacked: !item.isPacked } : item
+    )
+    onPackingItemsChange?.(updatedItems)
+
+    // Sync with server in background
+    togglePackingItemPacked(tripId, itemId).catch(() => {
+      // Revert on error
+      onRefresh()
+    })
   }
 
   return (

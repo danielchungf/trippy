@@ -48,6 +48,33 @@ export interface PlaceSearchResult {
   photos?: string[]
 }
 
+export interface GeocodeResult {
+  address: string
+  coordinates: Coordinates
+}
+
+export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+  await loadGoogleMaps()
+  const geocoder = new google.maps.Geocoder()
+
+  try {
+    const response = await geocoder.geocode({ address })
+    if (response.results[0]?.geometry?.location) {
+      const location = response.results[0].geometry.location
+      return {
+        address: response.results[0].formatted_address || address,
+        coordinates: {
+          lat: location.lat(),
+          lng: location.lng()
+        }
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function searchPlaces(
   query: string,
   location?: Coordinates

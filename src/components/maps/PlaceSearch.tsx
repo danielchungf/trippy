@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Search, MapPin, Star, Loader2 } from "lucide-react"
+import { Search, MapPin, Star, Loader2, Navigation } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { searchPlaces, PlaceSearchResult } from "@/lib/maps"
+import { searchPlaces, geocodeAddress, PlaceSearchResult } from "@/lib/maps"
 import { Coordinates } from "@/types"
 
 interface PlaceSearchProps {
@@ -21,6 +21,7 @@ export function PlaceSearch({
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<PlaceSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isGeocoding, setIsGeocoding] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +53,8 @@ export function PlaceSearch({
     try {
       const places = await searchPlaces(searchQuery, centerLocation)
       setResults(places)
-      setIsOpen(places.length > 0)
+      // Always open dropdown if there's a query (to show "Use this address" option)
+      setIsOpen(true)
     } catch {
       setError('Search failed. Check your API key.')
       setResults([])
@@ -60,6 +62,32 @@ export function PlaceSearch({
       setIsSearching(false)
     }
   }, [centerLocation])
+
+  const handleUseTypedAddress = async () => {
+    if (!query.trim()) return
+
+    setIsGeocoding(true)
+    try {
+      const result = await geocodeAddress(query)
+      if (result) {
+        onSelect({
+          placeId: '',
+          name: query.trim(),
+          address: result.address,
+          coordinates: result.coordinates
+        })
+        setQuery("")
+        setResults([])
+        setIsOpen(false)
+      } else {
+        setError('Could not find coordinates for this address')
+      }
+    } catch {
+      setError('Failed to geocode address')
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
 
   const handleInputChange = (value: string) => {
     setQuery(value)
@@ -105,10 +133,6 @@ export function PlaceSearch({
               <div className="p-3 text-sm text-destructive text-center">
                 {error}
               </div>
-            ) : results.length === 0 ? (
-              <div className="p-3 text-sm text-muted-foreground text-center">
-                No results found
-              </div>
             ) : (
               <div className="p-1">
                 {results.map((place) => (
@@ -136,6 +160,33 @@ export function PlaceSearch({
                     </div>
                   </button>
                 ))}
+                {/* Use typed address option */}
+                {query.trim() && (
+                  <>
+                    {results.length > 0 && <div className="border-t my-1" />}
+                    <button
+                      className="w-full text-left px-3 py-2 rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                      onClick={handleUseTypedAddress}
+                      disabled={isGeocoding}
+                    >
+                      <div className="flex items-start gap-3">
+                        {isGeocoding ? (
+                          <Loader2 className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0 animate-spin" />
+                        ) : (
+                          <Navigation className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            Use "{query.trim()}"
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Enter address manually
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </ScrollArea>
