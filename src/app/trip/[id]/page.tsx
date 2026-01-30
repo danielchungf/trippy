@@ -1109,7 +1109,7 @@ function RightPanel({
                 variant="secondary"
                 size="small"
                 leftIcon={<Plus />}
-                onClick={handleOpenActivityDialog}
+                onClick={() => handleOpenActivityDialog()}
               >
                 New activity
               </Button>
