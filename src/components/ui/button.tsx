@@ -28,8 +28,8 @@ const buttonVariants = cva(
           "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        medium: "h-[36px] px-[10px] rounded-[12px] gap-[6px] text-[16px] leading-none tracking-[-0.02em]",
-        small: "h-[32px] px-[8px] py-[6px] rounded-[10px] gap-[6px] text-[14px] leading-[10px] tracking-[-0.02em]",
+        medium: "h-[36px] px-[10px] rounded-[8px] gap-[6px] text-[16px] leading-none tracking-[-0.02em]",
+        small: "h-[32px] px-[8px] py-[6px] rounded-[8px] gap-[6px] text-[14px] leading-[10px] tracking-[-0.02em]",
         // Standard shadcn sizes
         default: "h-9 px-4 py-2 rounded-md text-sm font-medium",
         sm: "h-8 rounded-md px-3 text-xs font-medium",

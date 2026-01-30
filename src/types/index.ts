@@ -236,12 +236,17 @@ export function formatDateRange(startDate: string, endDate: string): string {
 
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
+  const startYear = start.getFullYear()
+  const endYear = end.getFullYear()
 
-  if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} - ${end.getDate()}`
+  if (startYear === endYear) {
+    if (startMonth === endMonth) {
+      return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${endYear}`
+    }
+    return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${endYear}`
   }
 
-  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}`
+  return `${startMonth} ${start.getDate()}, ${startYear} - ${endMonth} ${end.getDate()}, ${endYear}`
 }
 
 // Calculate trip duration in days
