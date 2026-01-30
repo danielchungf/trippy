@@ -6,9 +6,6 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   Plus,
-  MapPin,
-  Hotel,
-  ChevronRight,
   Trash2,
   MoreHorizontal,
   Edit2,
@@ -16,21 +13,15 @@ import {
   Plane,
   User,
   LogOut,
-  Users,
-  Settings,
-  Calendar as CalendarIcon,
-  List,
   Route,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
@@ -51,7 +42,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
 import {
   Popover,
   PopoverContent,
@@ -75,7 +65,6 @@ import {
   Accommodation,
   AccommodationType,
   PlaceInfo,
-  formatDate,
   formatDateRange,
   getTripDuration,
   generateDaysFromTrip,
@@ -86,7 +75,6 @@ import {
 import {
   addLocation,
   updateLocation,
-  deleteLocation,
   addAccommodation,
   updateAccommodation,
   deleteAccommodation,
@@ -229,11 +217,6 @@ export default function TripPage() {
     }
 
     setIsLocationOpen(false)
-    await refreshTrip()
-  }
-
-  const handleDeleteLocation = async (locationId: string) => {
-    await deleteLocation(tripId, locationId)
     await refreshTrip()
   }
 

@@ -47,12 +47,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -64,7 +58,6 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Trip,
   Activity,
   PlaceInfo,
   Accommodation,
@@ -484,7 +477,6 @@ export default function DayPage() {
                             activity={activity}
                             index={index}
                             onEdit={() => handleOpenActivityDialog(activity)}
-                            onDelete={() => handleDeleteActivity(activity.id)}
                           />
                         ))}
                       </div>
@@ -785,12 +777,10 @@ function SortableActivityCard({
   activity,
   index,
   onEdit,
-  onDelete
 }: {
   activity: Activity
   index: number
   onEdit: () => void
-  onDelete: () => void
 }) {
   const {
     attributes,

@@ -177,7 +177,7 @@ export function PlaceSearch({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">
-                            Use "{query.trim()}"
+                            Use &quot;{query.trim()}&quot;
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Enter address manually
