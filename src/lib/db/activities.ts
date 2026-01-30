@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { Activity } from '@/types'
 import { getTrip } from './trips'
+import { addSavedPlace } from './saved-places'
 
 // Helper to get day_id from trip_id and date
 async function getDayId(tripId: string, date: string): Promise<string | null> {
@@ -28,6 +29,37 @@ export async function addActivity(tripId: string, date: string, data: Omit<Activ
   const dayId = await getDayId(tripId, date)
   if (!dayId) return null
 
+  // Determine savedPlaceId - either use provided one, find existing, or create new
+  let savedPlaceId = data.savedPlaceId || null
+
+  if (!savedPlaceId && data.place.googlePlaceId) {
+    // Check if a SavedPlace with this googlePlaceId already exists
+    const { data: existingPlace } = await supabase
+      .from('saved_places')
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('google_place_id', data.place.googlePlaceId)
+      .single()
+
+    if (existingPlace) {
+      // Use existing place
+      savedPlaceId = existingPlace.id
+    } else {
+      // Create a new SavedPlace
+      const newPlace = await addSavedPlace(tripId, {
+        name: data.place.name,
+        address: data.place.address,
+        coordinates: data.place.coordinates,
+        googlePlaceId: data.place.googlePlaceId,
+        category: 'other', // Default category for auto-created places
+        photos: data.place.photos, // Pass photos if available
+      })
+      if (newPlace) {
+        savedPlaceId = newPlace.id
+      }
+    }
+  }
+
   // Get max sort_order for the day
   const { data: existing } = await supabase
     .from('activities')
@@ -42,7 +74,7 @@ export async function addActivity(tripId: string, date: string, data: Omit<Activ
     .from('activities')
     .insert({
       day_id: dayId,
-      saved_place_id: data.savedPlaceId || null,
+      saved_place_id: savedPlaceId,
       title: data.title,
       time: data.time || null,
       duration: data.duration || null,

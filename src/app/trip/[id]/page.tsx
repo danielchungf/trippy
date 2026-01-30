@@ -7,11 +7,16 @@ import Link from "next/link"
 import {
   DndContext,
   closestCenter,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  useDraggable,
+  useDroppable,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -34,6 +39,7 @@ import {
   BedDouble,
   ExternalLink,
   ImageOff,
+  MapPinCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -176,6 +182,84 @@ export default function TripPage() {
   const [placeLocationId, setPlaceLocationId] = useState("")
   const [placeNotes, setPlaceNotes] = useState("")
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
+
+  // Place-to-day drag state
+  const [draggingPlace, setDraggingPlace] = useState<SavedPlace | null>(null)
+  const [assignedConfirmation, setAssignedConfirmation] = useState<{
+    placeId: string
+    dayName: string
+    dayNumber: number
+    dayDate: string
+  } | null>(null)
+
+  // Drag sensors for place-to-day
+  const placeDragSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
+
+  // Handle drag start for place-to-day
+  const handlePlaceDragStart = (event: DragStartEvent) => {
+    const placeId = event.active.id as string
+    const place = trip?.savedPlaces.find(p => p.id === placeId)
+    if (place) {
+      setDraggingPlace(place)
+    }
+  }
+
+  // Handle drag end for place-to-day
+  const handlePlaceDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    setDraggingPlace(null)
+
+    if (!over || !trip) return
+
+    const placeId = active.id as string
+    const dayDate = over.id as string
+
+    // Check if dropped on a day (day IDs are date strings like "2024-01-15")
+    if (!dayDate.match(/^\d{4}-\d{2}-\d{2}$/)) return
+
+    const place = trip.savedPlaces.find(p => p.id === placeId)
+    if (!place) return
+
+    // Find the day info for confirmation
+    const days = generateDaysFromTrip(trip)
+    const dayIndex = days.findIndex(d => d.date === dayDate)
+    const day = days[dayIndex]
+
+    if (!day) return
+
+    // Create activity from place
+    await addActivity(trip.id, dayDate, {
+      title: place.name,
+      place: {
+        name: place.name,
+        address: place.address,
+        coordinates: place.coordinates,
+        googlePlaceId: place.googlePlaceId,
+      },
+      savedPlaceId: place.id,
+    })
+
+    // Show confirmation on the place card
+    setAssignedConfirmation({
+      placeId: place.id,
+      dayName: day.name || `Day ${dayIndex + 1}`,
+      dayNumber: dayIndex + 1,
+      dayDate: dayDate,
+    })
+
+    // Clear confirmation after 2 seconds
+    setTimeout(() => {
+      setAssignedConfirmation(null)
+    }, 2000)
+
+    await refreshTrip()
+  }
 
   // Select first day by default when trip loads
   useEffect(() => {
@@ -425,11 +509,8 @@ export default function TripPage() {
 
   const duration = getTripDuration(trip)
 
-  return (
-    <div className="h-screen bg-background flex overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar onNavigateHome={() => router.push('/')} />
-
+  const mainContent = (
+    <>
       {/* Left Panel - Fixed 580px */}
       <div className="w-[580px] flex-shrink-0 border-r border-t border-neutral-200 flex flex-col overflow-hidden">
         {/* Trip Header */}
@@ -462,7 +543,13 @@ export default function TripPage() {
 
       {/* Right Panel - Remaining width */}
       <div className="flex-1 border-t border-neutral-200 flex flex-col overflow-hidden">
-        {selectedDayDate ? (
+        {activeTab === 'places' ? (
+          <PlacesRightPanel
+            trip={trip}
+            onOpenPlaceDialog={handleOpenPlaceDialog}
+            assignedConfirmation={assignedConfirmation}
+          />
+        ) : selectedDayDate ? (
           <RightPanel
             trip={trip}
             selectedDayDate={selectedDayDate}
@@ -475,6 +562,62 @@ export default function TripPage() {
           </div>
         )}
       </div>
+    </>
+  )
+
+  return (
+    <div className="h-screen bg-background flex overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar onNavigateHome={() => router.push('/')} />
+
+      {/* Main content - wrapped in DndContext when places tab is active */}
+      {activeTab === 'places' ? (
+        <DndContext
+          sensors={placeDragSensors}
+          collisionDetection={rectIntersection}
+          onDragStart={handlePlaceDragStart}
+          onDragEnd={handlePlaceDragEnd}
+        >
+          {mainContent}
+          <DragOverlay dropAnimation={null}>
+            {draggingPlace && (() => {
+              const location = draggingPlace.locationId
+                ? trip.locations.find(l => l.id === draggingPlace.locationId) ?? null
+                : null
+              const photoUrl = draggingPlace.photos?.[0]
+
+              return (
+                <div className="bg-white rounded-lg shadow-xl border border-neutral-300 w-64 overflow-hidden opacity-95">
+                  {/* Photo */}
+                  <div className="w-full aspect-video bg-neutral-100 flex items-center justify-center overflow-hidden">
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt={draggingPlace.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <ImageOff className="w-6 h-6 text-text-secondary" strokeWidth={1.5} />
+                    )}
+                  </div>
+                  {/* Content */}
+                  <div className="p-3">
+                    {location && (
+                      <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="mb-2">
+                        {location.name}
+                      </Badge>
+                    )}
+                    <p className="text-h3 text-text-primary truncate">{draggingPlace.name}</p>
+                    <p className="text-body text-text-secondary truncate">{draggingPlace.address}</p>
+                  </div>
+                </div>
+              )
+            })()}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        mainContent
+      )}
 
       {/* Location Dialog */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
@@ -1011,66 +1154,31 @@ function TabContent({
           onDeleteAccommodation={onDeleteAccommodation}
         />
       )
-    case 'places':
-      return trip.savedPlaces.length === 0 ? (
-        <div className="h-full flex items-center justify-center">
-          <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
-            New place
-          </Button>
-        </div>
-      ) : (
-        <div>
-          {trip.savedPlaces.map(place => {
-            const location = place.locationId
-              ? trip.locations.find(l => l.id === place.locationId)
-              : null
-            const photoUrl = place.photos?.[0]
-
-            // Calculate photo width based on content height (approx 100px) with 4:3 ratio
-            const photoWidth = 133 // ~100px height * 4/3
+    case 'places': {
+      const days = generateDaysFromTrip(trip)
+      return (
+        <div className="flex flex-col">
+          {/* Hint header */}
+          <div className="h-[62px] flex items-center justify-center border-b border-neutral-200 bg-neutral-50">
+            <p className="text-body text-text-secondary">Drag a place to a day to add it as an activity</p>
+          </div>
+          {days.map((day, index) => {
+            const location = trip.locations.find(loc => loc.id === day.locationId)
+            const dayNumber = index + 1
 
             return (
-              <div
-                key={place.id}
-                className="relative border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer"
-                onClick={() => onOpenPlaceDialog(place)}
-              >
-                {/* Left: Photo or placeholder (absolute positioned, 4:3 aspect ratio) */}
-                <div className="absolute left-0 top-0 bottom-0 overflow-hidden bg-neutral-100 flex items-center justify-center" style={{ width: photoWidth }}>
-                  {photoUrl ? (
-                    <img
-                      src={photoUrl}
-                      alt={place.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <ImageOff className="w-6 h-6 text-text-secondary" strokeWidth={1.8} />
-                  )}
-                </div>
-                {/* Right: Content with 16px padding */}
-                <div className="p-4" style={{ marginLeft: photoWidth }}>
-                  {/* Badge */}
-                  {location && (
-                    <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-                      {location.name}
-                    </Badge>
-                  )}
-                  {/* Title + Address (12px gap from badge) */}
-                  <div className={location ? "mt-3" : ""}>
-                    <p className="text-h3 text-text-primary">{place.name}</p>
-                    <p className="text-body text-text-secondary truncate">{place.address}</p>
-                  </div>
-                </div>
-              </div>
+              <DroppableDayRow
+                key={day.date}
+                day={day}
+                dayNumber={dayNumber}
+                location={location}
+                onSelectDay={onSelectDay}
+              />
             )
           })}
-          <div className="p-4">
-            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
-              New place
-            </Button>
-          </div>
         </div>
       )
+    }
     case 'packing':
       return (
         <div className="p-4">
@@ -1085,6 +1193,212 @@ function TabContent({
     default:
       return null
   }
+}
+
+// Droppable Day Row Component (for places tab)
+function DroppableDayRow({
+  day,
+  dayNumber,
+  location,
+  onSelectDay
+}: {
+  day: Day
+  dayNumber: number
+  location?: Location
+  onSelectDay: (date: string) => void
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: day.date,
+  })
+
+  const date = parseLocalDate(day.date)
+  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' })
+  const dayOfMonth = String(date.getDate()).padStart(2, '0')
+  const dayNumberPadded = String(dayNumber).padStart(2, '0')
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "border-b border-neutral-200 p-4 transition-colors cursor-pointer",
+        isOver ? "bg-neutral-200" : "hover:bg-neutral-100"
+      )}
+      onClick={() => onSelectDay(day.date)}
+    >
+      <div className="flex items-center justify-between">
+        <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+          {day.name || `Day ${dayNumber}`}
+        </Badge>
+        <span className="text-mono-small text-text-secondary">
+          DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// Draggable Place Card Component
+function DraggablePlaceCard({
+  place,
+  location,
+  onOpenPlaceDialog,
+  confirmation,
+  isAssigned
+}: {
+  place: SavedPlace
+  location: Location | null
+  onOpenPlaceDialog: (place: SavedPlace) => void
+  confirmation: {
+    placeId: string
+    dayName: string
+    dayNumber: number
+    dayDate: string
+  } | null
+  isAssigned: boolean
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: place.id,
+  })
+
+  const photoUrl = place.photos?.[0]
+
+  // Format confirmation date
+  const confirmationDateFormatted = confirmation ? (() => {
+    const date = parseLocalDate(confirmation.dayDate)
+    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' })
+    const dayOfMonth = String(date.getDate()).padStart(2, '0')
+    const dayNumberPadded = String(confirmation.dayNumber).padStart(2, '0')
+    return `DAY ${dayNumberPadded}, ${dayOfWeek.toUpperCase()} ${dayOfMonth}`
+  })() : null
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="border-r border-b border-neutral-200 overflow-hidden hover:bg-neutral-100 cursor-grab relative"
+      {...listeners}
+      {...attributes}
+      onClick={() => onOpenPlaceDialog(place)}
+    >
+      {/* Confirmation Overlay */}
+      {confirmation && (
+        <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-10">
+          <p className="text-body text-text-primary">Place assigned to</p>
+          <p className="text-body text-text-primary">{confirmation.dayName}</p>
+          <p className="text-mono-small text-text-secondary mt-2">{confirmationDateFormatted}</p>
+        </div>
+      )}
+
+      {/* Photo */}
+      <div className="w-full aspect-video bg-neutral-100 flex items-center justify-center overflow-hidden">
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={place.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <ImageOff className="w-8 h-8 text-text-secondary" strokeWidth={1.5} />
+        )}
+      </div>
+      {/* Content */}
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          {location ? (
+            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+              {location.name}
+            </Badge>
+          ) : (
+            <div />
+          )}
+          {isAssigned && (
+            <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
+              <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary">
+                <MapPinCheck />
+              </span>
+            </div>
+          )}
+        </div>
+        <p className="text-h3 text-text-primary line-clamp-1">{place.name}</p>
+        <p className="text-body text-text-secondary line-clamp-1">{place.address}</p>
+      </div>
+    </div>
+  )
+}
+
+// Places Right Panel Component (Grid of place cards)
+function PlacesRightPanel({
+  trip,
+  onOpenPlaceDialog,
+  assignedConfirmation
+}: {
+  trip: TripWithOwnership
+  onOpenPlaceDialog: (place?: SavedPlace) => void
+  assignedConfirmation: {
+    placeId: string
+    dayName: string
+    dayNumber: number
+    dayDate: string
+  } | null
+}) {
+  const placeCount = trip.savedPlaces.length
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
+        <div className="flex flex-col">
+          <span className="text-h2 text-text-primary">Places</span>
+          <span className="text-h3 text-text-secondary">
+            {placeCount} {placeCount === 1 ? 'place' : 'places'} saved on this trip
+          </span>
+        </div>
+        <Button
+          variant="secondary"
+          size="small"
+          leftIcon={<Plus />}
+          onClick={() => onOpenPlaceDialog()}
+        >
+          New place
+        </Button>
+      </div>
+
+      {/* Grid */}
+      {placeCount === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-text-secondary">No places saved yet</p>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto">
+          <div className="grid grid-cols-3">
+            {trip.savedPlaces.map(place => {
+              const location = place.locationId
+                ? trip.locations.find(l => l.id === place.locationId) ?? null
+                : null
+
+              const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
+
+              // Check if this place is assigned to any day
+              const days = generateDaysFromTrip(trip)
+              const isAssigned = days.some(day =>
+                day.activities.some(activity => activity.savedPlaceId === place.id)
+              )
+
+              return (
+                <DraggablePlaceCard
+                  key={place.id}
+                  place={place}
+                  location={location}
+                  onOpenPlaceDialog={onOpenPlaceDialog}
+                  confirmation={confirmation}
+                  isAssigned={isAssigned}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Right Panel Component (Map + Activities)
@@ -1304,7 +1618,8 @@ function RightPanel({
         name: searchedPlace.name,
         address: searchedPlace.address,
         coordinates: searchedPlace.coordinates,
-        googlePlaceId: searchedPlace.placeId
+        googlePlaceId: searchedPlace.placeId,
+        photos: searchedPlace.photos
       }
       if (!title) title = searchedPlace.name
     } else {
