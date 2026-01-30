@@ -141,6 +141,7 @@ export default function TripPage() {
   const [isAccommodationOpen, setIsAccommodationOpen] = useState(false)
   const [editingAccommodation, setEditingAccommodation] = useState<Accommodation | null>(null)
   const [accommodationName, setAccommodationName] = useState("")
+  const [accommodationNameTouched, setAccommodationNameTouched] = useState(false)
   const [accommodationType, setAccommodationType] = useState<AccommodationType>("hotel")
   const [accommodationAddress, setAccommodationAddress] = useState("")
   const [accommodationCoordinates, setAccommodationCoordinates] = useState<Coordinates | undefined>()
@@ -239,6 +240,7 @@ export default function TripPage() {
     if (accommodation) {
       setEditingAccommodation(accommodation)
       setAccommodationName(accommodation.name)
+      setAccommodationNameTouched(true)
       setAccommodationType(accommodation.type)
       setAccommodationAddress(accommodation.address)
       setAccommodationCoordinates(accommodation.coordinates)
@@ -249,6 +251,7 @@ export default function TripPage() {
     } else {
       setEditingAccommodation(null)
       setAccommodationName("")
+      setAccommodationNameTouched(false)
       setAccommodationType("hotel")
       setAccommodationAddress("")
       setAccommodationCoordinates(undefined)
@@ -263,10 +266,17 @@ export default function TripPage() {
   }
 
   const handleAccommodationSearchSelect = (place: PlaceSearchResult) => {
-    setAccommodationName(place.name)
+    if (!accommodationNameTouched) {
+      setAccommodationName(place.name)
+    }
     setAccommodationAddress(place.address)
     setAccommodationCoordinates(place.coordinates)
     setAccommodationGooglePlaceId(place.placeId)
+  }
+
+  const handleAccommodationNameChange = (value: string) => {
+    setAccommodationName(value)
+    setAccommodationNameTouched(true)
   }
 
   const getAccommodationSearchCenter = (): Coordinates | undefined => {
@@ -278,10 +288,13 @@ export default function TripPage() {
   }
 
   const handleSaveAccommodation = async () => {
-    if (!accommodationName || !accommodationCheckIn || !accommodationCheckOut) return
+    if (!accommodationAddress || !accommodationCheckIn || !accommodationCheckOut) return
+
+    // Use custom name if provided, otherwise fall back to the place name from search
+    const finalName = accommodationName.trim() || accommodationAddress.split(',')[0]
 
     const data = {
-      name: accommodationName,
+      name: finalName,
       type: accommodationType,
       address: accommodationAddress,
       coordinates: accommodationCoordinates,
@@ -490,54 +503,12 @@ export default function TripPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingAccommodation ? 'Edit Accommodation' : 'Add Accommodation'}
+              {editingAccommodation ? 'Edit Stay' : 'Add Stay'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                placeholder="e.g., Hotel Barcelona"
-                value={accommodationName}
-                onChange={(e) => setAccommodationName(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Type</label>
-                <Select value={accommodationType} onValueChange={(v) => setAccommodationType(v as AccommodationType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hotel">Hotel</SelectItem>
-                    <SelectItem value="airbnb">Airbnb</SelectItem>
-                    <SelectItem value="hostel">Hostel</SelectItem>
-                    <SelectItem value="family">Family</SelectItem>
-                    <SelectItem value="friend">Friend</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {trip.locations.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Location</label>
-                  <Select value={accommodationLocationId} onValueChange={setAccommodationLocationId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {trip.locations.map(loc => (
-                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Address</label>
+              <label className="text-sm font-medium">Address <span className="text-destructive">*</span></label>
               <PlaceSearch
                 onSelect={handleAccommodationSearchSelect}
                 placeholder="Search for accommodation..."
@@ -550,22 +521,42 @@ export default function TripPage() {
                 </div>
               )}
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name <span className="text-muted-foreground text-xs">(optional)</span></label>
+              <Input
+                placeholder="Defaults to location name"
+                value={accommodationName}
+                onChange={(e) => handleAccommodationNameChange(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <Select value={accommodationType} onValueChange={(v) => setAccommodationType(v as AccommodationType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hotel">Hotel</SelectItem>
+                  <SelectItem value="airbnb">Airbnb</SelectItem>
+                  <SelectItem value="hostel">Hostel</SelectItem>
+                  <SelectItem value="family">Family</SelectItem>
+                  <SelectItem value="friend">Friend</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Check-in</label>
                 <Popover open={isCheckInOpen} onOpenChange={setIsCheckInOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      type="button"
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {accommodationCheckIn ? (
-                        accommodationCheckIn.toLocaleDateString()
-                      ) : (
-                        "Select date"
-                      )}
+                      <span>{accommodationCheckIn ? accommodationCheckIn.toLocaleDateString() : "Select date"}</span>
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -589,17 +580,13 @@ export default function TripPage() {
                 <label className="text-sm font-medium">Check-out</label>
                 <Popover open={isCheckOutOpen} onOpenChange={setIsCheckOutOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      type="button"
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {accommodationCheckOut ? (
-                        accommodationCheckOut.toLocaleDateString()
-                      ) : (
-                        "Select date"
-                      )}
+                      <span>{accommodationCheckOut ? accommodationCheckOut.toLocaleDateString() : "Select date"}</span>
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -625,7 +612,7 @@ export default function TripPage() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSaveAccommodation}>
+            <Button onClick={handleSaveAccommodation} disabled={!accommodationAddress}>
               {editingAccommodation ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
@@ -801,6 +788,14 @@ function TabContent({
   onSelectDay: (date: string) => void
   selectedDayDate: string | null
 }) {
+  // Local state for optimistic updates on packing items
+  const [localPackingItems, setLocalPackingItems] = useState(trip.packingItems)
+
+  // Sync local state when trip data changes (e.g., after add/delete)
+  useEffect(() => {
+    setLocalPackingItems(trip.packingItems)
+  }, [trip.packingItems])
+
   switch (activeTab) {
     case 'itinerary':
       return <ItineraryPanel trip={trip} onRefresh={onRefresh} onSelectDay={onSelectDay} selectedDayDate={selectedDayDate} />
@@ -825,7 +820,8 @@ function TabContent({
         <div className="p-4">
           <PackingList
             tripId={tripId}
-            packingItems={trip.packingItems}
+            packingItems={localPackingItems}
+            onPackingItemsChange={setLocalPackingItems}
             onRefresh={onRefresh}
           />
         </div>
