@@ -548,6 +548,21 @@ function DesktopLayout({
 }) {
   const userName = user?.user_metadata?.name?.split(' ')[0] || 'there'
 
+  // Random greeting subtitle - selected once on mount
+  const [greeting] = useState(() => {
+    const greetings = [
+      "Ready to keep planning?",
+      "Let's pick up where you left off.",
+      "Where to next?",
+      "Good to see you again.",
+      "Let's make some plans.",
+      "Where were we?",
+      "Tick tock—adventure o'clock.",
+      "Those plans won't plan themselves.",
+    ]
+    return greetings[Math.floor(Math.random() * greetings.length)]
+  })
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Sidebar */}
@@ -559,7 +574,7 @@ function DesktopLayout({
         <header className="flex items-center justify-between p-3 border-b border-border-muted">
           <div className="flex flex-col">
             <h1 className="text-h1 text-text-primary">Welcome back, {userName}</h1>
-            <p className="text-h2 text-text-secondary">Ready to keep planning?</p>
+            <p className="text-h2 text-text-secondary">{greeting}</p>
           </div>
           <Button
             onClick={onCreateTrip}
