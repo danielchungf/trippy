@@ -131,7 +131,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'itinerary', label: 'ITINERARY' },
   { id: 'stays', label: 'STAYS' },
   { id: 'places', label: 'PLACES' },
-  { id: 'packing', label: 'PACKING' },
+  // { id: 'packing', label: 'PACKING' }, // TODO: Re-enable for post-MVP
 ]
 
 export default function TripPage() {
@@ -537,6 +537,7 @@ export default function TripPage() {
             onOpenPlaceDialog={handleOpenPlaceDialog}
             onSelectDay={setSelectedDayDate}
             selectedDayDate={selectedDayDate}
+            isDraggingPlace={!!draggingPlace}
           />
         </div>
       </div>
@@ -1123,7 +1124,8 @@ function TabContent({
   onDeleteAccommodation,
   onOpenPlaceDialog,
   onSelectDay,
-  selectedDayDate
+  selectedDayDate,
+  isDraggingPlace
 }: {
   activeTab: TabId
   trip: TripWithOwnership
@@ -1134,6 +1136,7 @@ function TabContent({
   onOpenPlaceDialog: (place?: SavedPlace) => void
   onSelectDay: (date: string) => void
   selectedDayDate: string | null
+  isDraggingPlace: boolean
 }) {
   // Local state for optimistic updates on packing items
   const [localPackingItems, setLocalPackingItems] = useState(trip.packingItems)
@@ -1173,6 +1176,7 @@ function TabContent({
                 dayNumber={dayNumber}
                 location={location}
                 onSelectDay={onSelectDay}
+                isDraggingPlace={isDraggingPlace}
               />
             )
           })}
@@ -1200,12 +1204,14 @@ function DroppableDayRow({
   day,
   dayNumber,
   location,
-  onSelectDay
+  onSelectDay,
+  isDraggingPlace
 }: {
   day: Day
   dayNumber: number
   location?: Location
   onSelectDay: (date: string) => void
+  isDraggingPlace: boolean
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: day.date,
@@ -1216,19 +1222,36 @@ function DroppableDayRow({
   const dayOfMonth = String(date.getDate()).padStart(2, '0')
   const dayNumberPadded = String(dayNumber).padStart(2, '0')
 
+  const activityCount = day.activities.length
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "border-b border-neutral-200 p-4 transition-colors cursor-pointer",
-        isOver ? "bg-neutral-200" : "hover:bg-neutral-100"
+        "border-b border-neutral-200 p-4 transition-colors",
+        isDraggingPlace && "cursor-pointer",
+        isOver ? "bg-neutral-200" : isDraggingPlace && "hover:bg-neutral-100"
       )}
       onClick={() => onSelectDay(day.date)}
     >
       <div className="flex items-center justify-between">
-        <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
-          {day.name || `Day ${dayNumber}`}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
+                  <span className="text-mono-regular text-text-primary">{activityCount}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Number of activities</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+            {day.name || `Day ${dayNumber}`}
+          </Badge>
+        </div>
         <span className="text-mono-small text-text-secondary">
           DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
         </span>
@@ -1274,7 +1297,7 @@ function DraggablePlaceCard({
   return (
     <div
       ref={setNodeRef}
-      className="border-r border-b border-neutral-200 overflow-hidden hover:bg-neutral-100 cursor-grab relative"
+      className="group/card border-r border-b border-neutral-200 overflow-hidden hover:bg-neutral-100 cursor-grab relative"
       {...listeners}
       {...attributes}
       onClick={() => onOpenPlaceDialog(place)}
@@ -1304,7 +1327,7 @@ function DraggablePlaceCard({
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
           {location ? (
-            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+            <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover/card:bg-neutral-100">
               {location.name}
             </Badge>
           ) : (
@@ -1560,7 +1583,7 @@ function RightPanel({
       setActivityNotes("")
       setSelectedPlaceId("")
       setSearchedPlace(null)
-      setAddMode(trip.savedPlaces.length ? 'saved' : 'search')
+      setAddMode('search')
     }
     setIsActivityOpen(true)
   }
@@ -2401,7 +2424,7 @@ function StaysPanel({
                   {location.name}
                 </Badge>
               )}
-              <span className="text-mono-regular text-text-secondary">{dateRange}</span>
+              <span className="text-mono-small text-text-secondary">{dateRange}</span>
             </div>
             {/* Row 2: Name + Address (12px gap from row 1) */}
             <div className="mt-3">
