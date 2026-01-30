@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Plus, MapPin, ChevronDown, ImagePlus, X, Loader2, Plane, User as UserIcon, LogOut, CircleAlert } from "lucide-react"
+import { Plus, MapPin, ChevronDown, ImagePlus, X, Loader2, Plane, User as UserIcon, LogOut, CircleAlert, Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
@@ -39,6 +39,7 @@ import { MobileNavBar, MobileNavItem } from "@/components/home/MobileNavBar"
 import { NextTripCard as NextTripCardMobile } from "@/components/home/NextTripCard"
 import { SimpleTripCard } from "@/components/home/SimpleTripCard"
 import { UserMenu } from "@/components/auth/UserMenu"
+import { CalendarView } from "@/components/home/CalendarView"
 import { createClient } from "@/lib/supabase/client"
 import { uploadTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
 import type { User } from "@supabase/supabase-js"
@@ -47,6 +48,7 @@ import logo from "@/app/logo.png"
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TripTabValue>('upcoming')
   const [mobileNavItem, setMobileNavItem] = useState<MobileNavItem>('home')
+  const [desktopView, setDesktopView] = useState<'trips' | 'calendar'>('trips')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
@@ -195,15 +197,19 @@ export default function HomePage() {
           nextTrip={nextTrip}
           upcomingTrips={otherUpcomingTrips}
           pastTrips={pastTrips}
+          allTrips={trips}
           onCreateTrip={() => setIsCreateOpen(true)}
           user={user}
           isLoading={isLoading}
+          activeView={desktopView}
+          onViewChange={setDesktopView}
         />
       ) : (
         <MobileLayout
           nextTrip={nextTrip}
           upcomingTrips={otherUpcomingTrips}
           filteredTrips={sortedFilteredTrips}
+          allTrips={trips}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           mobileNavItem={mobileNavItem}
@@ -376,6 +382,7 @@ function MobileLayout({
   nextTrip,
   upcomingTrips,
   filteredTrips,
+  allTrips,
   activeTab,
   onTabChange,
   mobileNavItem,
@@ -387,6 +394,7 @@ function MobileLayout({
   nextTrip: TripWithOwnership | undefined
   upcomingTrips: TripWithOwnership[]
   filteredTrips: TripWithOwnership[]
+  allTrips: TripWithOwnership[]
   activeTab: TripTabValue
   onTabChange: (tab: TripTabValue) => void
   mobileNavItem: MobileNavItem
@@ -417,9 +425,9 @@ function MobileLayout({
           isLoading={isLoading}
         />
       ) : (
-        // Calendar tab - placeholder
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-text-tertiary">Calendar view coming soon</p>
+        // Calendar tab
+        <div className="flex-1 flex flex-col">
+          <CalendarView trips={allTrips} />
         </div>
       )}
 
@@ -535,16 +543,22 @@ function DesktopLayout({
   nextTrip,
   upcomingTrips,
   pastTrips,
+  allTrips,
   onCreateTrip,
   user,
-  isLoading
+  isLoading,
+  activeView,
+  onViewChange
 }: {
   nextTrip: TripWithOwnership | undefined
   upcomingTrips: TripWithOwnership[]
   pastTrips: TripWithOwnership[]
+  allTrips: TripWithOwnership[]
   onCreateTrip: () => void
   user: User | null
   isLoading: boolean
+  activeView: 'trips' | 'calendar'
+  onViewChange: (view: 'trips' | 'calendar') => void
 }) {
   const userName = user?.user_metadata?.name?.split(' ')[0] || 'there'
 
@@ -564,70 +578,76 @@ function DesktopLayout({
   })
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       {/* Sidebar */}
-      <HomeSidebar />
+      <HomeSidebar activeView={activeView} onViewChange={onViewChange} />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen border-t border-neutral-200">
-        {/* Header */}
-        <header className="flex items-center justify-between p-3 border-b border-border-muted">
-          <div className="flex flex-col">
-            <h1 className="text-h1 text-text-primary">Welcome back, {userName}</h1>
-            <p className="text-h2 text-text-secondary">{greeting}</p>
-          </div>
-          <Button
-            onClick={onCreateTrip}
-            variant="primary"
-            size="small"
-            leftIcon={<Plus />}
-          >
-            New trip
-          </Button>
-        </header>
+      <div className="flex-1 flex flex-col h-full border-t border-neutral-200 overflow-hidden">
+        {activeView === 'trips' ? (
+          <>
+            {/* Header */}
+            <header className="flex items-center justify-between p-3 border-b border-border-muted">
+              <div className="flex flex-col">
+                <h1 className="text-h1 text-text-primary">Welcome back, {userName}</h1>
+                <p className="text-h2 text-text-secondary">{greeting}</p>
+              </div>
+              <Button
+                onClick={onCreateTrip}
+                variant="primary"
+                size="small"
+                leftIcon={<Plus />}
+              >
+                New trip
+              </Button>
+            </header>
 
-        {/* Content area - 3 columns with no gap */}
-        <div className="flex-1 overflow-auto">
-          {isLoading ? (
-            <LoadingSkeletonDesktop />
-          ) : (
-            <div className="flex h-full">
-              {/* Your next trip section - 580px fixed */}
-              {nextTrip && (
-                <section className="w-[580px] flex-shrink-0 flex flex-col h-full border-r border-border-muted">
-                  <SectionHeader>Your next trip</SectionHeader>
-                  <NextTripCard trip={nextTrip} />
-                </section>
+            {/* Content area - 3 columns with no gap */}
+            <div className="flex-1 overflow-auto">
+              {isLoading ? (
+                <LoadingSkeletonDesktop />
+              ) : (
+                <div className="flex h-full">
+                  {/* Your next trip section - 580px fixed */}
+                  {nextTrip && (
+                    <section className="w-[580px] flex-shrink-0 flex flex-col h-full border-r border-border-muted">
+                      <SectionHeader>Your next trip</SectionHeader>
+                      <NextTripCard trip={nextTrip} />
+                    </section>
+                  )}
+
+                  {/* Upcoming trips section */}
+                  <section className="flex-1 flex flex-col border-r border-border-muted">
+                    <SectionHeader>Upcoming trips</SectionHeader>
+                    {upcomingTrips.length > 0 ? (
+                      <div className="flex-1 overflow-auto flex flex-col">
+                        {upcomingTrips.map(trip => (
+                          <TripCard key={trip.id} trip={trip} />
+                        ))}
+                      </div>
+                    ) : !nextTrip ? (
+                      <EmptyState onCreateTrip={onCreateTrip} />
+                    ) : null}
+                  </section>
+
+                  {/* Past trips section */}
+                  <section className="flex-1 flex flex-col">
+                    <SectionHeader>Past trips</SectionHeader>
+                    {pastTrips.length > 0 ? (
+                      <div className="flex-1 overflow-auto flex flex-col">
+                        {pastTrips.map(trip => (
+                          <TripCard key={trip.id} trip={trip} />
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
               )}
-
-              {/* Upcoming trips section */}
-              <section className="flex-1 flex flex-col border-r border-border-muted">
-                <SectionHeader>Upcoming trips</SectionHeader>
-                {upcomingTrips.length > 0 ? (
-                  <div className="flex-1 overflow-auto flex flex-col">
-                    {upcomingTrips.map(trip => (
-                      <TripCard key={trip.id} trip={trip} />
-                    ))}
-                  </div>
-                ) : !nextTrip ? (
-                  <EmptyState onCreateTrip={onCreateTrip} />
-                ) : null}
-              </section>
-
-              {/* Past trips section */}
-              <section className="flex-1 flex flex-col">
-                <SectionHeader>Past trips</SectionHeader>
-                {pastTrips.length > 0 ? (
-                  <div className="flex-1 overflow-auto flex flex-col">
-                    {pastTrips.map(trip => (
-                      <TripCard key={trip.id} trip={trip} />
-                    ))}
-                  </div>
-                ) : null}
-              </section>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <CalendarView trips={allTrips} />
+        )}
       </div>
     </div>
   )
@@ -652,7 +672,13 @@ function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
   )
 }
 
-function HomeSidebar() {
+function HomeSidebar({
+  activeView,
+  onViewChange
+}: {
+  activeView: 'trips' | 'calendar'
+  onViewChange: (view: 'trips' | 'calendar') => void
+}) {
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -673,11 +699,17 @@ function HomeSidebar() {
         />
       </div>
 
-      {/* Middle: Home/Trips - selected state */}
-      <div className="flex-1 flex items-center justify-center">
+      {/* Middle: Navigation icons */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <NakedIconButton
-          icon={<Plane fill="currentColor" />}
-          selected={true}
+          icon={<Plane fill={activeView === 'trips' ? "currentColor" : "none"} />}
+          selected={activeView === 'trips'}
+          onClick={() => onViewChange('trips')}
+        />
+        <NakedIconButton
+          icon={<CalendarIcon className="w-5 h-5" />}
+          selected={activeView === 'calendar'}
+          onClick={() => onViewChange('calendar')}
         />
       </div>
 
@@ -793,7 +825,7 @@ function NextTripCard({ trip }: { trip: TripWithOwnership }) {
 
       {/* Trip Header - title and dates */}
       <div className="p-[16px] text-center flex-shrink-0">
-        <h3 className="text-h1 text-text-primary">{trip.name}</h3>
+        <h3 className="text-h2 text-text-primary">{trip.name}</h3>
         <p className="text-h2 text-text-secondary">{dateRangeText}</p>
       </div>
 
@@ -827,7 +859,7 @@ function NextTripCard({ trip }: { trip: TripWithOwnership }) {
       {/* Missing Stays Warning - conditional */}
       {missingStays > 0 && (
         <div className="py-[16px] flex items-center justify-center gap-[8px] flex-shrink-0 border-t border-border-muted">
-          <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-orange-400">
+          <span className="w-4 h-4 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-orange-400">
             <CircleAlert />
           </span>
           <span className="text-h3 text-orange-400 uppercase">
@@ -864,7 +896,7 @@ function TripCard({ trip }: { trip: TripWithOwnership }) {
 
       {/* Trip details - left aligned, same padding as NextTrip title section */}
       <div className="p-[16px]">
-        <h3 className="text-h1 text-text-primary">{trip.name}</h3>
+        <h3 className="text-h2 text-text-primary">{trip.name}</h3>
         <p className="text-h2 text-text-secondary">{dateRangeText}</p>
       </div>
     </Link>

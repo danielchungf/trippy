@@ -75,7 +75,7 @@ export function TripCard({ trip, isShared = false }: TripCardProps) {
 
         {/* Content */}
         <div className="px-[15px] pt-[10px] pb-[15px]">
-          <h3 className="text-[18px] font-semibold text-[#0a0a0a] tracking-[-0.36px] truncate">
+          <h3 className="text-h2 text-text-primary truncate">
             {trip.name}
           </h3>
           <p className="text-[14px] font-medium text-[#a1a1a1] tracking-[-0.28px] mt-[5px]">

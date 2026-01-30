@@ -177,7 +177,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
       <div className="flex-1 min-w-0 pl-[24px] pr-[20px] py-[20px] flex flex-col">
         {/* Title and date */}
         <div className="flex flex-col gap-[8px]">
-          <h3 className="text-h1 text-text-primary truncate">
+          <h3 className="text-h2 text-text-primary truncate">
             {trip.name}
           </h3>
           <p className="text-h3 text-text-secondary">
