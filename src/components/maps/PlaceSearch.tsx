@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { Search, MapPin, Star, Loader2, Navigation } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { searchPlaces, geocodeAddress, PlaceSearchResult } from "@/lib/maps"
+import { searchPlaces, geocodeAddress, getPlaceDetails, PlaceSearchResult } from "@/lib/maps"
 import { Coordinates } from "@/types"
 
 interface PlaceSearchProps {
@@ -22,6 +22,7 @@ export function PlaceSearch({
   const [results, setResults] = useState<PlaceSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,8 +103,25 @@ export function PlaceSearch({
     }, 300)
   }
 
-  const handleSelectPlace = (place: PlaceSearchResult) => {
-    onSelect(place)
+  const handleSelectPlace = async (place: PlaceSearchResult) => {
+    // Fetch full details to get photos if the place has a placeId
+    if (place.placeId) {
+      setIsFetchingDetails(true)
+      try {
+        const details = await getPlaceDetails(place.placeId)
+        if (details) {
+          onSelect(details)
+        } else {
+          onSelect(place)
+        }
+      } catch {
+        onSelect(place)
+      } finally {
+        setIsFetchingDetails(false)
+      }
+    } else {
+      onSelect(place)
+    }
     setQuery("")
     setResults([])
     setIsOpen(false)
@@ -120,7 +138,7 @@ export function PlaceSearch({
           className="pl-9 pr-9"
           onFocus={() => results.length > 0 && setIsOpen(true)}
         />
-        {isSearching && (
+        {(isSearching || isFetchingDetails) && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
         )}
       </div>

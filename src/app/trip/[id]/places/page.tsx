@@ -164,7 +164,8 @@ export default function SavedPlacesPage() {
       googlePlaceId: searchedPlace.placeId,
       category: placeCategory,
       locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
-      notes: placeNotes || undefined
+      notes: placeNotes || undefined,
+      photos: searchedPlace.photos
     }
 
     if (editingPlace) {
