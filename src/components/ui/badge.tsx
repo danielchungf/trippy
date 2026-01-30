@@ -13,7 +13,7 @@ function Badge({ className, dotColor, variant = "default", children, ...props }:
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-[10px] px-2 py-1 transition-colors ring-1 ring-inset",
+        "inline-flex items-center gap-2 rounded-[8px] px-2 py-1 transition-colors ring-1 ring-inset",
         variant === "default" && "ring-neutral-200 bg-white hover:bg-neutral-50",
         variant === "secondary" && "ring-transparent bg-neutral-100 text-neutral-900",
         variant === "outline" && "ring-neutral-200 bg-transparent",

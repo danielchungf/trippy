@@ -119,6 +119,13 @@ svg.lucide.icon-20 {
   }
 
   /* Mono text - DM Mono font */
+  .text-mono-large {
+    font-family: var(--font-dm-mono), monospace;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 24px;
+    letter-spacing: -0.02em;
+  }
   .text-mono-regular {
     font-family: var(--font-dm-mono), monospace;
     font-size: 14px;

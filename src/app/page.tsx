@@ -1,9 +1,13 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Plus, MapPin, ChevronDown, ImagePlus, X, Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import Image from "next/image"
+import { Plus, MapPin, ChevronDown, ImagePlus, X, Loader2, Plane, User as UserIcon, LogOut, CircleAlert } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
+import { NakedIconButton } from "@/components/ui/naked-icon-button"
 import {
   Dialog,
   DialogContent,
@@ -13,25 +17,32 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
-import { getTripStatus, parseLocalDate, LOCATION_COLORS } from "@/types"
+import { getTripStatus, parseLocalDate, formatDateRange, getTripDuration, LOCATION_COLORS } from "@/types"
 import { TripWithOwnership } from "@/lib/db"
 import { useTrips, useCreateTrip, tripKeys } from "@/lib/hooks/use-trips"
 import { useQueryClient } from "@tanstack/react-query"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { TripTabs, TripTabValue } from "@/components/home/TripTabs"
 import { MobileNavBar, MobileNavItem } from "@/components/home/MobileNavBar"
-import { NextTripCard } from "@/components/home/NextTripCard"
+import { NextTripCard as NextTripCardMobile } from "@/components/home/NextTripCard"
 import { SimpleTripCard } from "@/components/home/SimpleTripCard"
 import { UserMenu } from "@/components/auth/UserMenu"
 import { createClient } from "@/lib/supabase/client"
 import { uploadTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
 import type { User } from "@supabase/supabase-js"
+import logo from "@/app/logo.png"
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TripTabValue>('upcoming')
@@ -453,7 +464,7 @@ function MobileHomeView({
         ) : nextTrip ? (
           <>
             {/* Featured next trip */}
-            <NextTripCard trip={nextTrip} variant="mobile" />
+            <NextTripCardMobile trip={nextTrip} variant="mobile" />
 
             {/* Other upcoming trips */}
             {upcomingTrips.map(trip => (
@@ -535,102 +546,73 @@ function DesktopLayout({
   user: User | null
   isLoading: boolean
 }) {
-  // Check if there's only one trip (nextTrip exists but no other upcoming or past trips)
-  const hasOnlyOneTrip = nextTrip && upcomingTrips.length === 0 && pastTrips.length === 0
+  const userName = user?.user_metadata?.name?.split(' ')[0] || 'there'
 
   return (
-    <div
-      className="min-h-screen flex items-start justify-center overflow-auto rounded-[14px] px-[60px] py-[80px] bg-background"
-    >
-      <div className="w-[1000px] flex flex-col gap-[40px] pb-[80px]">
-        {isLoading ? (
-          <LoadingSkeletonDesktop />
-        ) : (
-          <>
-            {/* Your next trip section */}
-            {nextTrip && (
-              <section className="flex flex-col gap-[20px]">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-h1 text-text-primary">
-                    Your next trip
-                  </h2>
-                  <div className="flex items-center gap-[8px]">
-                    {hasOnlyOneTrip && (
-                      <Button
-                        onClick={onCreateTrip}
-                        variant="primary"
-                        size="medium"
-                        leftIcon={<Plus />}
-                      >
-                        New trip
-                      </Button>
-                    )}
-                    {user && (
-                      <UserMenu
-                        email={user.email}
-                        name={user.user_metadata?.name}
-                      />
-                    )}
-                  </div>
-                </div>
-                <NextTripCard trip={nextTrip} variant="desktop" />
-              </section>
-            )}
+    <div className="min-h-screen flex bg-background">
+      {/* Sidebar */}
+      <HomeSidebar />
 
-            {/* Upcoming section - hide if only one trip */}
-            {!hasOnlyOneTrip && (
-              <section className="flex flex-col gap-[20px]">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-h1 text-text-primary">
-                    Upcoming
-                  </h2>
-                  <div className="flex items-center gap-[12px]">
-                    <Button
-                      onClick={onCreateTrip}
-                      variant="primary"
-                      size="medium"
-                      leftIcon={<Plus />}
-                    >
-                      New trip
-                    </Button>
-                    {!nextTrip && user && (
-                      <UserMenu
-                        email={user.email}
-                        name={user.user_metadata?.name}
-                      />
-                    )}
-                  </div>
-                </div>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-h-screen border-t border-neutral-200">
+        {/* Header */}
+        <header className="flex items-center justify-between p-3 border-b border-border-muted">
+          <div className="flex flex-col">
+            <h1 className="text-h1 text-text-primary">Welcome back, {userName}</h1>
+            <p className="text-h2 text-text-secondary">Ready to keep planning?</p>
+          </div>
+          <Button
+            onClick={onCreateTrip}
+            variant="primary"
+            size="small"
+            leftIcon={<Plus />}
+          >
+            New trip
+          </Button>
+        </header>
 
+        {/* Content area - 3 columns with no gap */}
+        <div className="flex-1 overflow-auto">
+          {isLoading ? (
+            <LoadingSkeletonDesktop />
+          ) : (
+            <div className="flex h-full">
+              {/* Your next trip section - 580px fixed */}
+              {nextTrip && (
+                <section className="w-[580px] flex-shrink-0 flex flex-col h-full border-r border-border-muted">
+                  <SectionHeader>Your next trip</SectionHeader>
+                  <NextTripCard trip={nextTrip} />
+                </section>
+              )}
+
+              {/* Upcoming trips section */}
+              <section className="flex-1 flex flex-col border-r border-border-muted">
+                <SectionHeader>Upcoming trips</SectionHeader>
                 {upcomingTrips.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-[20px]">
+                  <div className="flex-1 overflow-auto flex flex-col">
                     {upcomingTrips.map(trip => (
-                      <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
+                      <TripCard key={trip.id} trip={trip} />
                     ))}
                   </div>
                 ) : !nextTrip ? (
                   <EmptyState onCreateTrip={onCreateTrip} />
-                ) : (
-                  <p className="text-text-tertiary text-center py-8">No other upcoming trips</p>
-                )}
+                ) : null}
               </section>
-            )}
 
-            {/* Past trips section */}
-            {pastTrips.length > 0 && (
-              <section className="flex flex-col gap-[20px]">
-                <h2 className="text-h1 text-text-secondary">
-                  Past trips
-                </h2>
-                <div className="grid grid-cols-3 gap-[20px]">
-                  {pastTrips.map(trip => (
-                    <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
-                  ))}
-                </div>
+              {/* Past trips section */}
+              <section className="flex-1 flex flex-col">
+                <SectionHeader>Past trips</SectionHeader>
+                {pastTrips.length > 0 ? (
+                  <div className="flex-1 overflow-auto flex flex-col">
+                    {pastTrips.map(trip => (
+                      <TripCard key={trip.id} trip={trip} />
+                    ))}
+                  </div>
+                ) : null}
               </section>
-            )}
-          </>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -652,6 +634,225 @@ function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
         Create Trip
       </button>
     </div>
+  )
+}
+
+function HomeSidebar() {
+  const router = useRouter()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
+
+  return (
+    <div className="w-[49px] flex-shrink-0 border-r border-t border-neutral-200 flex flex-col p-3 px-[10px] bg-background">
+      {/* Top: Logo */}
+      <div className="flex justify-center">
+        <NakedIconButton
+          icon={<Image src={logo} alt="Logo" width={20} height={20} />}
+        />
+      </div>
+
+      {/* Middle: Home/Trips - selected state */}
+      <div className="flex-1 flex items-center justify-center">
+        <NakedIconButton
+          icon={<Plane fill="currentColor" />}
+          selected={true}
+        />
+      </div>
+
+      {/* Bottom: User Menu */}
+      <div className="flex justify-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <NakedIconButton icon={<UserIcon />} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" className="w-48">
+            <DropdownMenuItem onClick={handleSignOut} disabled={isLoggingOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              {isLoggingOut ? "Signing out..." : "Sign out"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+function SectionHeader({
+  children,
+  variant = "primary"
+}: {
+  children: React.ReactNode
+  variant?: "primary" | "secondary"
+}) {
+  return (
+    <h2
+      className={`text-h2 px-[12px] py-[16px] ${
+        variant === "primary" ? "text-text-primary" : "text-text-secondary"
+      }`}
+    >
+      {children}
+    </h2>
+  )
+}
+
+// Get countdown text for trips (upcoming or past)
+function getCountdownText(trip: TripWithOwnership): { text: string; type: 'upcoming' | 'ongoing' | 'past' } | null {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = parseLocalDate(trip.startDate)
+  const end = parseLocalDate(trip.endDate)
+
+  // Ongoing trip
+  if (today >= start && today <= end) {
+    return { text: 'NOW', type: 'ongoing' }
+  }
+
+  // Past trip
+  if (today > end) {
+    const diffDays = Math.ceil((today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24))
+    return { text: `${diffDays} DAY${diffDays === 1 ? '' : 'S'} AGO`, type: 'past' }
+  }
+
+  // Upcoming trip
+  const diffDays = Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  return { text: `IN ${diffDays} DAY${diffDays === 1 ? '' : 'S'}`, type: 'upcoming' }
+}
+
+function CountdownBadge({ trip }: { trip: TripWithOwnership }) {
+  const countdown = getCountdownText(trip)
+  if (!countdown) return null
+
+  return (
+    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-white px-[8px] py-[4px]">
+      <span className="text-h3 font-bold text-text-primary">{countdown.text}</span>
+    </div>
+  )
+}
+
+function NextTripCard({ trip }: { trip: TripWithOwnership }) {
+  const duration = getTripDuration(trip)
+  const dateRangeText = `${formatDateRange(trip.startDate, trip.endDate)} (${duration} day${duration === 1 ? '' : 's'})`
+
+  // Calculate stats
+  const daysPlanned = trip.days?.filter(day => day.activities && day.activities.length > 0).length || 0
+  const activitiesCount = trip.days?.reduce((acc, day) => acc + (day.activities?.length || 0), 0) || 0
+  const placesSaved = trip.savedPlaces?.length || 0
+  const staysLogged = trip.accommodations?.length || 0
+
+  // Calculate missing stays (nights without accommodation)
+  const tripNights = duration - 1
+  let coveredNights = 0
+  trip.accommodations?.forEach(acc => {
+    const checkIn = parseLocalDate(acc.checkIn)
+    const checkOut = parseLocalDate(acc.checkOut)
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
+    coveredNights += nights
+  })
+  const missingStays = Math.max(0, tripNights - coveredNights)
+
+  // Format number with leading zero for single digits
+  const formatStat = (num: number) => num.toString().padStart(2, '0')
+
+  return (
+    <Link href={`/trip/${trip.id}`} className="flex flex-col h-full cursor-pointer">
+      {/* Trip Image - full width, 320px height */}
+      <div className="relative w-full h-[320px] flex-shrink-0">
+        {trip.coverImage ? (
+          <img
+            src={trip.coverImage}
+            alt={trip.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-neutral-300" />
+        )}
+        <CountdownBadge trip={trip} />
+      </div>
+
+      {/* Trip Header - title and dates */}
+      <div className="p-[16px] text-center flex-shrink-0">
+        <h3 className="text-h1 text-text-primary">{trip.name}</h3>
+        <p className="text-h2 text-text-secondary">{dateRangeText}</p>
+      </div>
+
+      {/* Stats Grid - 2x2 quadrant */}
+      <div className="flex-1 grid grid-cols-2 grid-rows-2 border-t border-border-muted">
+        {/* Days Planned */}
+        <div className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted">
+          <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
+        </div>
+
+        {/* Activities */}
+        <div className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted">
+          <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Activities</span>
+        </div>
+
+        {/* Places Saved */}
+        <div className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted">
+          <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
+        </div>
+
+        {/* Stays Logged */}
+        <div className="flex flex-col items-center justify-center gap-[8px]">
+          <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
+        </div>
+      </div>
+
+      {/* Missing Stays Warning - conditional */}
+      {missingStays > 0 && (
+        <div className="py-[16px] flex items-center justify-center gap-[8px] flex-shrink-0 border-t border-border-muted">
+          <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-orange-400">
+            <CircleAlert />
+          </span>
+          <span className="text-h3 text-orange-400 uppercase">
+            {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
+          </span>
+        </div>
+      )}
+    </Link>
+  )
+}
+
+// Trip card for upcoming/past trips sections
+// 2 TripCards stacked = NextTrip image (320px) + title section (~82px)
+// TripCard image = (320 - 82) / 2 = 119px
+function TripCard({ trip }: { trip: TripWithOwnership }) {
+  const duration = getTripDuration(trip)
+  const dateRangeText = `${formatDateRange(trip.startDate, trip.endDate)} (${duration} day${duration === 1 ? '' : 's'})`
+
+  return (
+    <Link href={`/trip/${trip.id}`} className="flex flex-col cursor-pointer flex-shrink-0 border-b border-border-muted">
+      {/* Trip Image with countdown badge - 119px height */}
+      <div className="relative w-full h-[119px]">
+        {trip.coverImage ? (
+          <img
+            src={trip.coverImage}
+            alt={trip.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-neutral-300" />
+        )}
+        <CountdownBadge trip={trip} />
+      </div>
+
+      {/* Trip details - left aligned, same padding as NextTrip title section */}
+      <div className="p-[16px]">
+        <h3 className="text-h1 text-text-primary">{trip.name}</h3>
+        <p className="text-h2 text-text-secondary">{dateRangeText}</p>
+      </div>
+    </Link>
   )
 }
 
