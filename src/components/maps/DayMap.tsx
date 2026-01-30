@@ -9,12 +9,14 @@ import { MapPin, Footprints, Car } from "lucide-react"
 
 interface DayMapProps {
   activities: Activity[]
+  hoveredIndex?: number | null
 }
 
-export function DayMap({ activities }: DayMapProps) {
+export function DayMap({ activities, hoveredIndex }: DayMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const googleMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
+  const markerContentsRef = useRef<HTMLDivElement[]>([])
   const polylineRef = useRef<google.maps.Polyline | null>(null)
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
   const isUpdatingRouteRef = useRef(false)
@@ -107,6 +109,7 @@ export function DayMap({ activities }: DayMapProps) {
       marker.map = null
     })
     markersRef.current = []
+    markerContentsRef.current = []
 
     // Add new markers
     validActivities.forEach((activity, index) => {
@@ -115,9 +118,10 @@ export function DayMap({ activities }: DayMapProps) {
         lng: activity.place.coordinates.lng
       }
 
-      // Create custom marker content
+      // Create custom marker content - matches ActivityCard number circle
       const markerContent = document.createElement('div')
-      markerContent.className = 'flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-medium text-sm shadow-lg'
+      markerContent.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background-color: rgb(38, 38, 38); color: white; font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: -0.02em; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: background-color 0.15s ease;'
+      markerContent.style.fontFamily = 'var(--font-dm-mono), ui-monospace, monospace'
       markerContent.textContent = (index + 1).toString()
 
       const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -128,6 +132,7 @@ export function DayMap({ activities }: DayMapProps) {
       })
 
       markersRef.current.push(marker)
+      markerContentsRef.current.push(markerContent)
     })
 
     // Update bounds
@@ -184,7 +189,7 @@ export function DayMap({ activities }: DayMapProps) {
       polylineRef.current = new google.maps.Polyline({
         path,
         geodesic: true,
-        strokeColor: '#3b82f6',
+        strokeColor: '#FF591E',
         strokeOpacity: 0.8,
         strokeWeight: 3,
         map: googleMapRef.current
@@ -205,9 +210,9 @@ export function DayMap({ activities }: DayMapProps) {
             directions: result.directionsResult,
             suppressMarkers: true,
             polylineOptions: {
-              strokeColor: '#3b82f6',
+              strokeColor: '#FF591E',
               strokeOpacity: 0.8,
-              strokeWeight: 4
+              strokeWeight: 3
             }
           })
 
@@ -225,6 +230,17 @@ export function DayMap({ activities }: DayMapProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activitiesKey, routeMode, travelMode, isLoading])
+
+  // Update marker highlighting when hoveredIndex changes
+  useEffect(() => {
+    markerContentsRef.current.forEach((content, index) => {
+      if (index === hoveredIndex) {
+        content.style.backgroundColor = '#FF591E'
+      } else {
+        content.style.backgroundColor = 'rgb(38, 38, 38)'
+      }
+    })
+  }, [hoveredIndex])
 
   return (
     <div className="relative w-full h-full">
@@ -317,14 +333,6 @@ export function DayMap({ activities }: DayMapProps) {
         </div>
       )}
 
-      {/* Activity count */}
-      {!isLoading && !error && validActivities.length > 0 && (
-        <div className="absolute bottom-4 left-4 bg-background rounded-lg shadow-lg px-3 py-2">
-          <p className="text-sm text-muted-foreground">
-            {validActivities.length} {validActivities.length === 1 ? 'location' : 'locations'}
-          </p>
-        </div>
-      )}
     </div>
   )
 }
