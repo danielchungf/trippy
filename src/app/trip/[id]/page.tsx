@@ -33,6 +33,7 @@ import {
   GripVertical,
   BedDouble,
   ExternalLink,
+  ImageOff,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -84,6 +85,8 @@ import {
   Accommodation,
   AccommodationType,
   PlaceInfo,
+  SavedPlace,
+  PlaceCategory,
   formatDateRange,
   getTripDuration,
   generateDaysFromTrip,
@@ -97,6 +100,9 @@ import {
   addAccommodation,
   updateAccommodation,
   deleteAccommodation,
+  addSavedPlace,
+  updateSavedPlace,
+  deleteSavedPlace,
   updateDayName,
   addActivity,
   updateActivity,
@@ -160,6 +166,16 @@ export default function TripPage() {
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
+
+  // Place dialog state
+  const [isPlaceOpen, setIsPlaceOpen] = useState(false)
+  const [editingPlace, setEditingPlace] = useState<SavedPlace | null>(null)
+  const [placeName, setPlaceName] = useState("")
+  const [placeNameTouched, setPlaceNameTouched] = useState(false)
+  const [placeCategory, setPlaceCategory] = useState<PlaceCategory>("food")
+  const [placeLocationId, setPlaceLocationId] = useState("")
+  const [placeNotes, setPlaceNotes] = useState("")
+  const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
 
   // Select first day by default when trip loads
   useEffect(() => {
@@ -305,7 +321,7 @@ export default function TripPage() {
       googlePlaceId: accommodationGooglePlaceId,
       checkIn: formatLocalDate(accommodationCheckIn),
       checkOut: formatLocalDate(accommodationCheckOut),
-      locationId: accommodationLocationId && accommodationLocationId !== 'none' ? accommodationLocationId : undefined
+      locationId: accommodationLocationId || undefined
     }
 
     if (editingAccommodation) {
@@ -321,6 +337,86 @@ export default function TripPage() {
   const handleDeleteAccommodation = async (accommodationId: string) => {
     await deleteAccommodation(tripId, accommodationId)
     await refreshTrip()
+  }
+
+  // Place handlers
+  const handleOpenPlaceDialog = (place?: SavedPlace) => {
+    if (place) {
+      setEditingPlace(place)
+      setPlaceName(place.name)
+      setPlaceNameTouched(true)
+      setPlaceCategory(place.category as PlaceCategory)
+      setPlaceLocationId(place.locationId || "")
+      setPlaceNotes(place.notes || "")
+      setSearchedPlace(place.googlePlaceId ? {
+        placeId: place.googlePlaceId,
+        name: place.name,
+        address: place.address,
+        coordinates: place.coordinates,
+        photos: place.photos
+      } : null)
+    } else {
+      setEditingPlace(null)
+      setPlaceName("")
+      setPlaceNameTouched(false)
+      setPlaceCategory("food")
+      setPlaceLocationId("")
+      setPlaceNotes("")
+      setSearchedPlace(null)
+    }
+    setIsPlaceOpen(true)
+  }
+
+  const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
+    setSearchedPlace(place)
+    if (!placeNameTouched) {
+      setPlaceName(place.name)
+    }
+  }
+
+  const handlePlaceNameChange = (value: string) => {
+    setPlaceName(value)
+    setPlaceNameTouched(true)
+  }
+
+  const handleSavePlace = async () => {
+    if (!searchedPlace) return
+
+    const name = placeName || searchedPlace.name
+
+    const data = {
+      name,
+      address: searchedPlace.address,
+      coordinates: searchedPlace.coordinates,
+      googlePlaceId: searchedPlace.placeId,
+      category: placeCategory,
+      locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
+      notes: placeNotes || undefined,
+      photos: searchedPlace.photos
+    }
+
+    if (editingPlace) {
+      await updateSavedPlace(tripId, editingPlace.id, data)
+    } else {
+      await addSavedPlace(tripId, data)
+    }
+
+    setIsPlaceOpen(false)
+    setSearchedPlace(null)
+    await refreshTrip()
+  }
+
+  const handleDeletePlace = async () => {
+    if (!editingPlace) return
+    await deleteSavedPlace(tripId, editingPlace.id)
+    setIsPlaceOpen(false)
+    setEditingPlace(null)
+    await refreshTrip()
+  }
+
+  // Get center location for biasing place search results
+  const getPlaceSearchCenter = (): Coordinates | undefined => {
+    return trip?.locations.find(l => l.coordinates)?.coordinates
   }
 
   if (!trip) {
@@ -357,6 +453,7 @@ export default function TripPage() {
             onRefresh={refreshTrip}
             onOpenAccommodationDialog={handleOpenAccommodationDialog}
             onDeleteAccommodation={handleDeleteAccommodation}
+            onOpenPlaceDialog={handleOpenPlaceDialog}
             onSelectDay={setSelectedDayDate}
             selectedDayDate={selectedDayDate}
           />
@@ -511,7 +608,7 @@ export default function TripPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Address <span className="text-destructive">*</span></label>
+              <label className="text-sm font-medium">Place <span className="text-destructive">*</span></label>
               <PlaceSearch
                 onSelect={handleAccommodationSearchSelect}
                 placeholder="Search for accommodation..."
@@ -525,7 +622,7 @@ export default function TripPage() {
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name <span className="text-muted-foreground text-xs">(optional)</span></label>
+              <label className="text-sm font-medium">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
               <Input
                 placeholder="Defaults to location name"
                 value={accommodationName}
@@ -533,18 +630,15 @@ export default function TripPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Type</label>
-              <Select value={accommodationType} onValueChange={(v) => setAccommodationType(v as AccommodationType)}>
+              <label className="text-sm font-medium">Location <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Select value={accommodationLocationId} onValueChange={setAccommodationLocationId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select a location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hotel">Hotel</SelectItem>
-                  <SelectItem value="airbnb">Airbnb</SelectItem>
-                  <SelectItem value="hostel">Hostel</SelectItem>
-                  <SelectItem value="family">Family</SelectItem>
-                  <SelectItem value="friend">Friend</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {trip.locations.map(loc => (
+                    <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -626,6 +720,103 @@ export default function TripPage() {
             <Button variant="primary" size="small" onClick={handleSaveAccommodation} disabled={!accommodationAddress}>
               {editingAccommodation ? 'Save' : 'Add'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Place Dialog */}
+      <Dialog open={isPlaceOpen} onOpenChange={setIsPlaceOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingPlace ? 'Edit Place' : 'New Place'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Place <span className="text-destructive">*</span></label>
+              <PlaceSearch
+                onSelect={handlePlaceSearchSelect}
+                placeholder="Search for a place..."
+                centerLocation={getPlaceSearchCenter()}
+              />
+              {searchedPlace && (
+                <div className="mt-2 p-2 rounded-md bg-muted">
+                  <p className="font-medium text-sm">{searchedPlace.name}</p>
+                  <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input
+                placeholder="Defaults to place name"
+                value={placeName}
+                onChange={(e) => handlePlaceNameChange(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <Select value={placeCategory} onValueChange={(v) => setPlaceCategory(v as PlaceCategory)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="food">Food</SelectItem>
+                  <SelectItem value="see">See</SelectItem>
+                  <SelectItem value="do">Do</SelectItem>
+                  <SelectItem value="stay">Stay</SelectItem>
+                  <SelectItem value="shop">Shop</SelectItem>
+                  <SelectItem value="nightlife">Nightlife</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {trip.locations.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Location <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <Select value={placeLocationId} onValueChange={setPlaceLocationId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {trip.locations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input
+                placeholder="Any notes..."
+                value={placeNotes}
+                onChange={(e) => setPlaceNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex justify-between">
+            {editingPlace ? (
+              <Button variant="ghost" size="small" className="text-destructive hover:text-destructive" onClick={handleDeletePlace}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="secondary" size="small">Cancel</Button>
+              </DialogClose>
+              <Button variant="primary" size="small" onClick={handleSavePlace} disabled={!searchedPlace}>
+                {editingPlace ? 'Save' : 'Add'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -787,6 +978,7 @@ function TabContent({
   onRefresh,
   onOpenAccommodationDialog,
   onDeleteAccommodation,
+  onOpenPlaceDialog,
   onSelectDay,
   selectedDayDate
 }: {
@@ -796,6 +988,7 @@ function TabContent({
   onRefresh: () => Promise<void>
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   onDeleteAccommodation: (id: string) => Promise<void>
+  onOpenPlaceDialog: (place?: SavedPlace) => void
   onSelectDay: (date: string) => void
   selectedDayDate: string | null
 }) {
@@ -819,11 +1012,63 @@ function TabContent({
         />
       )
     case 'places':
-      return (
-        <div className="p-4 text-text-secondary">
-          <Link href={`/trip/${tripId}/places`} className="text-blue-500 hover:underline">
-            View {trip.savedPlaces.length} saved places →
-          </Link>
+      return trip.savedPlaces.length === 0 ? (
+        <div className="h-full flex items-center justify-center">
+          <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+            New place
+          </Button>
+        </div>
+      ) : (
+        <div>
+          {trip.savedPlaces.map(place => {
+            const location = place.locationId
+              ? trip.locations.find(l => l.id === place.locationId)
+              : null
+            const photoUrl = place.photos?.[0]
+
+            // Calculate photo width based on content height (approx 100px) with 4:3 ratio
+            const photoWidth = 133 // ~100px height * 4/3
+
+            return (
+              <div
+                key={place.id}
+                className="relative border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer"
+                onClick={() => onOpenPlaceDialog(place)}
+              >
+                {/* Left: Photo or placeholder (absolute positioned, 4:3 aspect ratio) */}
+                <div className="absolute left-0 top-0 bottom-0 overflow-hidden bg-neutral-100 flex items-center justify-center" style={{ width: photoWidth }}>
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt={place.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff className="w-6 h-6 text-text-secondary" strokeWidth={1.8} />
+                  )}
+                </div>
+                {/* Right: Content with 16px padding */}
+                <div className="p-4" style={{ marginLeft: photoWidth }}>
+                  {/* Badge */}
+                  {location && (
+                    <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+                      {location.name}
+                    </Badge>
+                  )}
+                  {/* Title + Address (12px gap from badge) */}
+                  <div className={location ? "mt-3" : ""}>
+                    <p className="text-h3 text-text-primary">{place.name}</p>
+                    <p className="text-body text-text-secondary truncate">{place.address}</p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <div className="p-4">
+            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+              New place
+            </Button>
+          </div>
         </div>
       )
     case 'packing':
@@ -958,11 +1203,15 @@ function RightPanel({
   const displayName = day.name || location?.name || `Day ${dayNumber}`
   const dayInfo = `Day ${dayNumberPadded}: ${dayOfWeek}, ${monthDay}`
 
-  // Current accommodation for route optimization
-  const currentAccommodation = trip.accommodations.find(a => {
+  // Departing accommodation (checking out this day) - shown at top
+  const departingAccommodation = trip.accommodations.find(a => a.checkOut === selectedDayDate)
+  // Staying accommodation (checking in or staying that night) - shown at bottom
+  const stayingAccommodation = trip.accommodations.find(a => {
     return selectedDayDate >= a.checkIn && selectedDayDate < a.checkOut
   })
-  const hasAccommodationWithCoords = !!currentAccommodation?.coordinates
+  // For route optimization, prefer departing accommodation as starting point
+  const routeStartAccommodation = departingAccommodation || stayingAccommodation
+  const hasAccommodationWithCoords = !!routeStartAccommodation?.coordinates
   const canOptimize = (hasAccommodationWithCoords && day.activities.length >= 2) || day.activities.length >= 3
 
   const presetDurations = ['15', '30', '45', '60', '90', '120', '180', '240']
@@ -1084,7 +1333,7 @@ function RightPanel({
   const handleOptimizeRoute = async () => {
     if (!day || !canOptimize) return
 
-    const startingLocation = currentAccommodation?.coordinates
+    const startingLocation = routeStartAccommodation?.coordinates
 
     setIsOptimizing(true)
     try {
@@ -1162,22 +1411,22 @@ function RightPanel({
 
           {/* Activities List */}
           <div className="flex-1 overflow-auto">
-            {/* Accommodation Row */}
-            {currentAccommodation && (
+            {/* Departing Accommodation Row (checking out today) */}
+            {departingAccommodation && (
               <div className="group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
                 {/* Left: Bed icon + Name */}
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-text-secondary">
                     <BedDouble />
                   </span>
-                  <span className="text-h3 text-text-secondary">{currentAccommodation.name}</span>
+                  <span className="text-h3 text-text-secondary">{departingAccommodation.name}</span>
                 </div>
                 {/* Right: Date range + External link */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-mono-regular text-text-secondary">
                     {(() => {
-                      const checkIn = parseLocalDate(currentAccommodation.checkIn)
-                      const checkOut = parseLocalDate(currentAccommodation.checkOut)
+                      const checkIn = parseLocalDate(departingAccommodation.checkIn)
+                      const checkOut = parseLocalDate(departingAccommodation.checkOut)
                       const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
                       const inMonth = monthFormat.format(checkIn).toUpperCase()
                       const outMonth = monthFormat.format(checkOut).toUpperCase()
@@ -1189,13 +1438,13 @@ function RightPanel({
                       return `${inMonth} ${inDay}—${outMonth} ${outDay}`
                     })()}
                   </span>
-                  {currentAccommodation.googlePlaceId && (
+                  {departingAccommodation.googlePlaceId && (
                     <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 transition-all duration-200">
                       <NakedIconButton
                         icon={<ExternalLink />}
                         onClick={(e) => {
                           e.stopPropagation()
-                          window.open(`https://www.google.com/maps/place/?q=place_id:${currentAccommodation.googlePlaceId}`, '_blank')
+                          window.open(`https://www.google.com/maps/place/?q=place_id:${departingAccommodation.googlePlaceId}`, '_blank')
                         }}
                       />
                     </div>
@@ -1231,6 +1480,48 @@ function RightPanel({
             ) : (
               <div className="p-4 text-body text-text-secondary">
                 No activities planned for this day
+              </div>
+            )}
+
+            {/* Staying Accommodation Row (checking in or staying tonight) */}
+            {stayingAccommodation && (
+              <div className="group py-3 px-4 border-t border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
+                {/* Left: Bed icon + Name */}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-text-secondary">
+                    <BedDouble />
+                  </span>
+                  <span className="text-h3 text-text-secondary">{stayingAccommodation.name}</span>
+                </div>
+                {/* Right: Date range + External link */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-mono-regular text-text-secondary">
+                    {(() => {
+                      const checkIn = parseLocalDate(stayingAccommodation.checkIn)
+                      const checkOut = parseLocalDate(stayingAccommodation.checkOut)
+                      const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+                      const inMonth = monthFormat.format(checkIn).toUpperCase()
+                      const outMonth = monthFormat.format(checkOut).toUpperCase()
+                      const inDay = checkIn.getDate()
+                      const outDay = checkOut.getDate()
+                      if (inMonth === outMonth) {
+                        return `${inMonth} ${inDay}—${outDay}`
+                      }
+                      return `${inMonth} ${inDay}—${outMonth} ${outDay}`
+                    })()}
+                  </span>
+                  {stayingAccommodation.googlePlaceId && (
+                    <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 transition-all duration-200">
+                      <NakedIconButton
+                        icon={<ExternalLink />}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`https://www.google.com/maps/place/?q=place_id:${stayingAccommodation.googlePlaceId}`, '_blank')
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1452,7 +1743,7 @@ function SortableActivityCard({
       {/* Left: Drag handle + Number + Details */}
       <div className="flex items-start">
         {/* Drag handle */}
-        <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 group-hover:mr-2 transition-all duration-200 flex-shrink-0 -mt-1">
+        <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 group-hover:mr-2 transition-all duration-200 flex-shrink-0 -mt-1 -ml-1">
           <div {...attributes} {...listeners}>
             <NakedIconButton
               icon={<GripVertical />}
@@ -1757,61 +2048,59 @@ function StaysPanel({
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   onDeleteAccommodation: (id: string) => Promise<void>
 }) {
-  return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-h3">Accommodations</h3>
-        <Button variant="ghost" size="sm" onClick={() => onOpenAccommodationDialog()}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add
+  if (trip.accommodations.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+          New stay
         </Button>
       </div>
+    )
+  }
 
-      {trip.accommodations.length === 0 ? (
-        <p className="text-sm text-text-secondary text-center py-8">
-          No accommodations added yet
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {trip.accommodations.map(accommodation => {
-            const location = trip.locations.find(l => l.id === accommodation.locationId)
-            return (
-              <div
-                key={accommodation.id}
-                className="flex items-center justify-between p-3 rounded-lg border hover:bg-neutral-50 group"
-              >
-                <div>
-                  <p className="font-medium">{accommodation.name}</p>
-                  <p className="text-xs text-text-secondary">
-                    {accommodation.type} · {formatDateRange(accommodation.checkIn, accommodation.checkOut)}
-                    {location && ` · ${location.name}`}
-                  </p>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onOpenAccommodationDialog(accommodation)}>
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => onDeleteAccommodation(accommodation.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )
-          })}
-        </div>
-      )}
+  return (
+    <div>
+      {trip.accommodations.map(accommodation => {
+        const location = trip.locations.find(l => l.id === accommodation.locationId)
+        const checkIn = parseLocalDate(accommodation.checkIn)
+        const checkOut = parseLocalDate(accommodation.checkOut)
+        const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+        const inMonth = monthFormat.format(checkIn).toUpperCase()
+        const outMonth = monthFormat.format(checkOut).toUpperCase()
+        const inDay = checkIn.getDate()
+        const outDay = checkOut.getDate()
+        const dateRange = inMonth === outMonth
+          ? `${inMonth} ${inDay}—${outDay}`
+          : `${inMonth} ${inDay}—${outMonth} ${outDay}`
+
+        return (
+          <div
+            key={accommodation.id}
+            className="p-4 border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer"
+            onClick={() => onOpenAccommodationDialog(accommodation)}
+          >
+            {/* Row 1: Location badge + Date range */}
+            <div className="flex items-center justify-between">
+              {location && (
+                <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+                  {location.name}
+                </Badge>
+              )}
+              <span className="text-mono-regular text-text-secondary">{dateRange}</span>
+            </div>
+            {/* Row 2: Name + Address (12px gap from row 1) */}
+            <div className="mt-3">
+              <p className="text-h3 text-text-primary">{accommodation.name}</p>
+              <p className="text-body text-text-secondary">{accommodation.address}</p>
+            </div>
+          </div>
+        )
+      })}
+      <div className="p-4">
+        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+          New stay
+        </Button>
+      </div>
     </div>
   )
 }
