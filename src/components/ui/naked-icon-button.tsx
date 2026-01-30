@@ -24,7 +24,7 @@ const NakedIconButton = React.forwardRef<HTMLButtonElement, NakedIconButtonProps
         ref={ref}
         {...props}
       >
-        <span className="w-[20px] h-[20px] flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.5px]">
+        <span className="w-[20px] h-[20px] flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2]">
           {icon}
         </span>
       </button>

@@ -44,7 +44,7 @@ const buttonVariants = cva(
   }
 )
 
-const iconClasses = "w-[16px] h-[16px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.33px]"
+const iconClasses = "w-[16px] h-[16px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2]"
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,

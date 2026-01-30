@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -20,7 +20,9 @@ import {
   Settings,
   Calendar as CalendarIcon,
   List,
+  Route,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -47,7 +49,8 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import {
   Popover,
@@ -56,8 +59,14 @@ import {
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
-import { PlaceSearchResult } from "@/lib/maps"
+import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
 import { Coordinates } from "@/types"
 import {
   Day,
@@ -65,6 +74,7 @@ import {
   Location,
   Accommodation,
   AccommodationType,
+  PlaceInfo,
   formatDate,
   formatDateRange,
   getTripDuration,
@@ -81,6 +91,8 @@ import {
   updateAccommodation,
   deleteAccommodation,
   updateDayName,
+  addActivity,
+  reorderActivities,
   TripWithOwnership,
 } from "@/lib/db"
 import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
@@ -88,6 +100,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
+import { DayMap } from "@/components/maps/DayMap"
 import logo from "@/app/logo.png"
 
 // Tab types
@@ -110,6 +123,7 @@ export default function TripPage() {
   const refreshTrip = useRefreshTrip(tripId)
 
   const [activeTab, setActiveTab] = useState<TabId>('itinerary')
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
 
   // Location dialog state
   const [isLocationOpen, setIsLocationOpen] = useState(false)
@@ -136,6 +150,16 @@ export default function TripPage() {
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
+
+  // Select first day by default when trip loads
+  useEffect(() => {
+    if (trip && !selectedDayDate) {
+      const days = generateDaysFromTrip(trip)
+      if (days.length > 0) {
+        setSelectedDayDate(days[0].date)
+      }
+    }
+  }, [trip, selectedDayDate])
 
   // Redirect if trip not found (after loading completes)
   if (!isLoading && !trip) {
@@ -316,16 +340,25 @@ export default function TripPage() {
             onRefresh={refreshTrip}
             onOpenAccommodationDialog={handleOpenAccommodationDialog}
             onDeleteAccommodation={handleDeleteAccommodation}
+            onSelectDay={setSelectedDayDate}
+            selectedDayDate={selectedDayDate}
           />
         </div>
       </div>
 
       {/* Right Panel - Remaining width */}
-      <div className="flex-1 border-t border-neutral-200">
-        {/* Placeholder for map/activity details */}
-        <div className="h-full flex items-center justify-center text-text-secondary">
-          Right panel (map + activity details)
-        </div>
+      <div className="flex-1 border-t border-neutral-200 flex flex-col overflow-hidden">
+        {selectedDayDate ? (
+          <RightPanel
+            trip={trip}
+            selectedDayDate={selectedDayDate}
+            onRefresh={refreshTrip}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center text-text-secondary">
+            Select a day to view the map
+          </div>
+        )}
       </div>
 
       {/* Location Dialog */}
@@ -755,7 +788,9 @@ function TabContent({
   tripId,
   onRefresh,
   onOpenAccommodationDialog,
-  onDeleteAccommodation
+  onDeleteAccommodation,
+  onSelectDay,
+  selectedDayDate
 }: {
   activeTab: TabId
   trip: TripWithOwnership
@@ -763,10 +798,12 @@ function TabContent({
   onRefresh: () => Promise<void>
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   onDeleteAccommodation: (id: string) => Promise<void>
+  onSelectDay: (date: string) => void
+  selectedDayDate: string | null
 }) {
   switch (activeTab) {
     case 'itinerary':
-      return <ItineraryPanel trip={trip} onRefresh={onRefresh} />
+      return <ItineraryPanel trip={trip} onRefresh={onRefresh} onSelectDay={onSelectDay} selectedDayDate={selectedDayDate} />
     case 'stays':
       return (
         <StaysPanel
@@ -798,8 +835,472 @@ function TabContent({
   }
 }
 
+// Right Panel Component (Map + Activities)
+function RightPanel({
+  trip,
+  selectedDayDate,
+  onRefresh
+}: {
+  trip: TripWithOwnership
+  selectedDayDate: string
+  onRefresh: () => Promise<void>
+}) {
+  const days = generateDaysFromTrip(trip)
+  const dayIndex = days.findIndex(d => d.date === selectedDayDate)
+  const day = days[dayIndex]
+  const dayNumber = dayIndex + 1
+
+  // Resizable map state
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [mapHeight, setMapHeight] = useState(500) // Default 500px
+  const [isResizing, setIsResizing] = useState(false)
+
+  // Activity dialog state
+  const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isOptimizing, setIsOptimizing] = useState(false)
+  const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
+
+  // Handle resize drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const newHeight = e.clientY - containerRect.top
+      // Clamp between 200px and 500px
+      setMapHeight(Math.min(500, Math.max(200, newHeight)))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
+
+  // Activity form state
+  const [activityTitle, setActivityTitle] = useState("")
+  const [activityTitleTouched, setActivityTitleTouched] = useState(false)
+  const [activityTime, setActivityTime] = useState("09:00")
+  const [hasTime, setHasTime] = useState(false)
+  const [activityDuration, setActivityDuration] = useState("")
+  const [isCustomDuration, setIsCustomDuration] = useState(false)
+  const [activityNotes, setActivityNotes] = useState("")
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string>("")
+  const [addMode, setAddMode] = useState<'saved' | 'search'>('search')
+  const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
+
+  if (!day) return null
+
+  const location = day.locationId
+    ? trip.locations.find(l => l.id === day.locationId)
+    : null
+
+  const date = parseLocalDate(day.date)
+  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' })
+  const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  const dayNumberPadded = String(dayNumber).padStart(2, '0')
+
+  // Display name: use day name if set, otherwise location name, otherwise "Day X"
+  const displayName = day.name || location?.name || `Day ${dayNumber}`
+  const dayInfo = `Day ${dayNumberPadded}: ${dayOfWeek}, ${monthDay}`
+
+  // Current accommodation for route optimization
+  const currentAccommodation = trip.accommodations.find(a => {
+    return selectedDayDate >= a.checkIn && selectedDayDate < a.checkOut
+  })
+  const hasAccommodationWithCoords = !!currentAccommodation?.coordinates
+  const canOptimize = (hasAccommodationWithCoords && day.activities.length >= 2) || day.activities.length >= 3
+
+  const handleOpenActivityDialog = () => {
+    setActivityTitle("")
+    setActivityTitleTouched(false)
+    setActivityTime("09:00")
+    setHasTime(false)
+    setActivityDuration("")
+    setIsCustomDuration(false)
+    setActivityNotes("")
+    setSelectedPlaceId("")
+    setSearchedPlace(null)
+    setAddMode(trip.savedPlaces.length ? 'saved' : 'search')
+    setIsActivityOpen(true)
+  }
+
+  const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
+    setSearchedPlace(place)
+    if (!activityTitleTouched) {
+      setActivityTitle(place.name)
+    }
+  }
+
+  const handleSavedPlaceSelect = (placeId: string) => {
+    setSelectedPlaceId(placeId)
+    const savedPlace = trip.savedPlaces.find(p => p.id === placeId)
+    if (savedPlace && !activityTitleTouched) {
+      setActivityTitle(savedPlace.name)
+    }
+  }
+
+  const handleActivityTitleChange = (value: string) => {
+    setActivityTitle(value)
+    setActivityTitleTouched(true)
+  }
+
+  const handleSaveActivity = async () => {
+    let place: PlaceInfo
+    let title = activityTitle
+
+    if (addMode === 'saved' && selectedPlaceId) {
+      const savedPlace = trip.savedPlaces.find(p => p.id === selectedPlaceId)
+      if (!savedPlace) return
+      place = {
+        name: savedPlace.name,
+        address: savedPlace.address,
+        coordinates: savedPlace.coordinates,
+        googlePlaceId: savedPlace.googlePlaceId
+      }
+      if (!title) title = savedPlace.name
+    } else if (addMode === 'search' && searchedPlace) {
+      place = {
+        name: searchedPlace.name,
+        address: searchedPlace.address,
+        coordinates: searchedPlace.coordinates,
+        googlePlaceId: searchedPlace.placeId
+      }
+      if (!title) title = searchedPlace.name
+    } else {
+      return
+    }
+
+    const data = {
+      title,
+      time: hasTime ? activityTime : undefined,
+      duration: hasTime && activityDuration ? parseInt(activityDuration) : undefined,
+      notes: activityNotes || undefined,
+      savedPlaceId: addMode === 'saved' ? selectedPlaceId : undefined,
+      place
+    }
+
+    await addActivity(trip.id, selectedDayDate, data)
+    setIsActivityOpen(false)
+    setSearchedPlace(null)
+    await onRefresh()
+  }
+
+  const handleOptimizeRoute = async () => {
+    if (!day || !canOptimize) return
+
+    const startingLocation = currentAccommodation?.coordinates
+
+    setIsOptimizing(true)
+    try {
+      const optimizedOrder = await optimizeRoute(day.activities, startingLocation)
+      if (optimizedOrder) {
+        const reorderedIds = optimizedOrder.map(i => day.activities[i].id)
+        await reorderActivities(trip.id, selectedDayDate, reorderedIds)
+        await onRefresh()
+      }
+    } finally {
+      setIsOptimizing(false)
+    }
+  }
+
+  return (
+    <>
+      <div ref={containerRef} className="flex flex-col h-full">
+        {/* Map Panel - Resizable height */}
+        <div
+          className="flex-shrink-0"
+          style={{ height: mapHeight }}
+        >
+          <DayMap activities={day.activities} hoveredIndex={hoveredActivityIndex} />
+        </div>
+
+        {/* Activities Panel - Takes remaining space */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Activities Header with Resize Handle */}
+          <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
+            {/* Resize Handle - pill at top of header */}
+            <div
+              className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
+              onMouseDown={handleMouseDown}
+            >
+              <div className={cn(
+                "w-8 h-1 rounded-full bg-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity",
+                isResizing && "opacity-100"
+              )} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-h2 text-text-primary">{displayName}</span>
+              <span className="text-h3 text-text-secondary">{dayInfo}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {canOptimize && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        leftIcon={<Route />}
+                        onClick={handleOptimizeRoute}
+                        disabled={isOptimizing}
+                      >
+                        {isOptimizing ? 'Optimizing...' : 'Optimize'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Optimize activities to minimize travel distance</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button
+                variant="secondary"
+                size="small"
+                leftIcon={<Plus />}
+                onClick={handleOpenActivityDialog}
+              >
+                New activity
+              </Button>
+            </div>
+          </div>
+
+          {/* Activities List */}
+          <div className="flex-1 overflow-auto">
+            {day.activities.length > 0 ? (
+              day.activities.map((activity, index) => (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  number={index + 1}
+                  onMouseEnter={() => setHoveredActivityIndex(index)}
+                  onMouseLeave={() => setHoveredActivityIndex(null)}
+                />
+              ))
+            ) : (
+              <div className="p-4 text-body text-text-secondary">
+                No activities planned for this day
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Activity Dialog */}
+      <Dialog open={isActivityOpen} onOpenChange={setIsActivityOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Activity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Location <span className="text-destructive">*</span></label>
+              {trip.savedPlaces.length > 0 ? (
+                <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
+                    <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="search" className="mt-2">
+                    <PlaceSearch
+                      onSelect={handlePlaceSearchSelect}
+                      placeholder="Search Google Maps..."
+                      centerLocation={location?.coordinates}
+                    />
+                    {searchedPlace && (
+                      <div className="mt-2 p-2 rounded-md bg-muted">
+                        <p className="font-medium text-sm">{searchedPlace.name}</p>
+                        <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="saved" className="mt-2">
+                    <Select value={selectedPlaceId} onValueChange={handleSavedPlaceSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a saved place" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trip.savedPlaces.map(place => (
+                          <SelectItem key={place.id} value={place.id}>
+                            {place.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <>
+                  <PlaceSearch
+                    onSelect={handlePlaceSearchSelect}
+                    placeholder="Search Google Maps..."
+                    centerLocation={location?.coordinates}
+                  />
+                  {searchedPlace && (
+                    <div className="mt-2 p-2 rounded-md bg-muted">
+                      <p className="font-medium text-sm">{searchedPlace.name}</p>
+                      <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Activity Name <span className="text-muted-foreground text-xs">(optional)</span></label>
+              <Input
+                placeholder="Defaults to location name"
+                value={activityTitle}
+                onChange={(e) => handleActivityTitleChange(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Time & Duration</label>
+                <Switch
+                  checked={hasTime}
+                  onCheckedChange={setHasTime}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="time"
+                  value={activityTime}
+                  onChange={(e) => setActivityTime(e.target.value)}
+                  disabled={!hasTime}
+                  className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}
+                />
+                <Select
+                  value={isCustomDuration ? 'custom' : activityDuration}
+                  onValueChange={(val) => {
+                    if (val === 'custom') {
+                      setIsCustomDuration(true)
+                      setActivityDuration('')
+                    } else {
+                      setIsCustomDuration(false)
+                      setActivityDuration(val)
+                    }
+                  }}
+                  disabled={!hasTime}
+                >
+                  <SelectTrigger className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}>
+                    <SelectValue placeholder="Duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="90">1.5 hours</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                    <SelectItem value="180">3 hours</SelectItem>
+                    <SelectItem value="240">4 hours</SelectItem>
+                    <SelectItem value="custom">Custom...</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {hasTime && isCustomDuration && (
+                <Input
+                  type="number"
+                  placeholder="Enter duration in minutes"
+                  value={activityDuration}
+                  onChange={(e) => setActivityDuration(e.target.value)}
+                  autoFocus
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes</label>
+              <Input
+                placeholder="Any additional notes..."
+                value={activityNotes}
+                onChange={(e) => setActivityNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={handleSaveActivity}
+              disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
+            >
+              Add Activity
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// Activity Card Component
+function ActivityCard({
+  activity,
+  number,
+  onMouseEnter,
+  onMouseLeave
+}: {
+  activity: Activity
+  number: number
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+}) {
+  // Format time as XX:XX
+  const formattedTime = activity.time || 'NO TIME'
+
+  return (
+    <div
+      className="py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Left: Number + Details */}
+      <div className="flex items-start gap-2">
+        {/* Numbered circle matching map markers */}
+        <div className="w-5 h-5 rounded-full bg-neutral-800 text-white flex items-center justify-center text-mono-small font-medium flex-shrink-0">
+          {number}
+        </div>
+        {/* Activity details */}
+        <div className="flex flex-col">
+          <span className="text-h3 text-text-primary">{activity.title}</span>
+          <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
+        </div>
+      </div>
+      {/* Right: Time */}
+      <span className="text-mono-regular text-text-secondary flex-shrink-0">{formattedTime}</span>
+    </div>
+  )
+}
+
 // Itinerary Panel Component
-function ItineraryPanel({ trip, onRefresh }: { trip: TripWithOwnership; onRefresh: () => Promise<void> }) {
+function ItineraryPanel({
+  trip,
+  onRefresh,
+  onSelectDay,
+  selectedDayDate
+}: {
+  trip: TripWithOwnership
+  onRefresh: () => Promise<void>
+  onSelectDay: (date: string) => void
+  selectedDayDate: string | null
+}) {
   const days = generateDaysFromTrip(trip)
 
   const getLocationForDay = (day: Day): Location | undefined => {
@@ -819,6 +1320,8 @@ function ItineraryPanel({ trip, onRefresh }: { trip: TripWithOwnership; onRefres
             location={location}
             tripId={trip.id}
             onRefresh={onRefresh}
+            onSelect={() => onSelectDay(day.date)}
+            isSelected={day.date === selectedDayDate}
           />
         )
       })}
@@ -832,13 +1335,17 @@ function DayCard({
   dayNumber,
   location,
   tripId,
-  onRefresh
+  onRefresh,
+  onSelect,
+  isSelected
 }: {
   day: Day
   dayNumber: number
   location?: Location
   tripId: string
   onRefresh: () => Promise<void>
+  onSelect: () => void
+  isSelected: boolean
 }) {
   const [isEditNameOpen, setIsEditNameOpen] = useState(false)
   const [dayName, setDayName] = useState(day.name || '')
@@ -864,36 +1371,40 @@ function DayCard({
 
   return (
     <>
-      <Link href={`/trip/${tripId}/day/${day.date}`} className="block">
-        <div className="border-b border-neutral-200 p-4 hover:bg-neutral-50 transition-colors flex flex-col gap-3">
-          {/* Row 1: Badge + Day/Date */}
-          <div className="flex items-center justify-between">
-            {/* Left: Day Name Badge */}
-            <button onClick={handleBadgeClick}>
-              <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
-                {day.name || `Day ${dayNumber}`}
-              </Badge>
-            </button>
-            {/* Right: Day/Date combo */}
-            <span className="text-mono-small text-text-secondary">
-              DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
-            </span>
-          </div>
-
-          {/* Row 2: Activities or Empty State */}
-          {hasActivities ? (
-            <div className="flex flex-col gap-1.5">
-              {day.activities.map((activity) => (
-                <ActivityRow key={activity.id} activity={activity} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-body text-text-secondary">
-              No activities planned
-            </p>
-          )}
+      <div
+        className={cn(
+          "border-b border-neutral-200 p-4 hover:bg-neutral-100 transition-colors flex flex-col gap-3 cursor-pointer",
+          isSelected && "bg-neutral-100"
+        )}
+        onClick={onSelect}
+      >
+        {/* Row 1: Badge + Day/Date */}
+        <div className="flex items-center justify-between">
+          {/* Left: Day Name Badge */}
+          <button onClick={handleBadgeClick}>
+            <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+              {day.name || `Day ${dayNumber}`}
+            </Badge>
+          </button>
+          {/* Right: Day/Date combo */}
+          <span className="text-mono-small text-text-secondary">
+            DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
+          </span>
         </div>
-      </Link>
+
+        {/* Row 2: Activities or Empty State */}
+        {hasActivities ? (
+          <div className="flex flex-col gap-1.5">
+            {day.activities.map((activity) => (
+              <ActivityRow key={activity.id} activity={activity} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-body text-text-secondary">
+            No activities planned
+          </p>
+        )}
+      </div>
 
       {/* Edit Day Name Dialog */}
       <Dialog open={isEditNameOpen} onOpenChange={setIsEditNameOpen}>
