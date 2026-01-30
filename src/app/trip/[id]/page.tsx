@@ -92,6 +92,8 @@ import {
   deleteAccommodation,
   updateDayName,
   addActivity,
+  updateActivity,
+  deleteActivity,
   reorderActivities,
   TripWithOwnership,
 } from "@/lib/db"
@@ -421,17 +423,16 @@ export default function TripPage() {
                 <label className="text-sm font-medium">Start Date</label>
                 <Popover open={isLocationStartOpen} onOpenChange={setIsLocationStartOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {locationStartDate ? (
                         locationStartDate.toLocaleDateString()
                       ) : (
-                        "Select date"
+                        <span className="text-muted-foreground">Select date</span>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -455,17 +456,16 @@ export default function TripPage() {
                 <label className="text-sm font-medium">End Date</label>
                 <Popover open={isLocationEndOpen} onOpenChange={setIsLocationEndOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
+                    <button
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {locationEndDate ? (
                         locationEndDate.toLocaleDateString()
                       ) : (
-                        "Select date"
+                        <span className="text-muted-foreground">Select date</span>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
@@ -489,9 +489,9 @@ export default function TripPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary" size="small">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSaveLocation}>
+            <Button variant="primary" size="small" onClick={handleSaveLocation}>
               {editingLocation ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
@@ -554,7 +554,11 @@ export default function TripPage() {
                       type="button"
                       className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span>{accommodationCheckIn ? accommodationCheckIn.toLocaleDateString() : "Select date"}</span>
+                      {accommodationCheckIn ? (
+                        accommodationCheckIn.toLocaleDateString()
+                      ) : (
+                        <span className="text-muted-foreground">Select date</span>
+                      )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </button>
                   </PopoverTrigger>
@@ -584,7 +588,11 @@ export default function TripPage() {
                       type="button"
                       className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span>{accommodationCheckOut ? accommodationCheckOut.toLocaleDateString() : "Select date"}</span>
+                      {accommodationCheckOut ? (
+                        accommodationCheckOut.toLocaleDateString()
+                      ) : (
+                        <span className="text-muted-foreground">Select date</span>
+                      )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </button>
                   </PopoverTrigger>
@@ -610,9 +618,9 @@ export default function TripPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary" size="small">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSaveAccommodation} disabled={!accommodationAddress}>
+            <Button variant="primary" size="small" onClick={handleSaveAccommodation} disabled={!accommodationAddress}>
               {editingAccommodation ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
@@ -853,6 +861,7 @@ function RightPanel({
 
   // Activity dialog state
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
 
@@ -920,18 +929,47 @@ function RightPanel({
   const hasAccommodationWithCoords = !!currentAccommodation?.coordinates
   const canOptimize = (hasAccommodationWithCoords && day.activities.length >= 2) || day.activities.length >= 3
 
-  const handleOpenActivityDialog = () => {
-    setActivityTitle("")
-    setActivityTitleTouched(false)
-    setActivityTime("09:00")
-    setHasTime(false)
-    setActivityDuration("")
-    setIsCustomDuration(false)
-    setActivityNotes("")
-    setSelectedPlaceId("")
-    setSearchedPlace(null)
-    setAddMode(trip.savedPlaces.length ? 'saved' : 'search')
+  const presetDurations = ['15', '30', '45', '60', '90', '120', '180', '240']
+
+  const handleOpenActivityDialog = (activity?: Activity) => {
+    if (activity) {
+      setEditingActivity(activity)
+      setActivityTitle(activity.title)
+      setActivityTitleTouched(true)
+      setActivityTime(activity.time || "09:00")
+      setHasTime(!!activity.time)
+      const durationStr = activity.duration?.toString() || ""
+      setActivityDuration(durationStr)
+      setIsCustomDuration(durationStr !== "" && !presetDurations.includes(durationStr))
+      setActivityNotes(activity.notes || "")
+      setSelectedPlaceId(activity.savedPlaceId || "")
+      setSearchedPlace(activity.place.googlePlaceId ? {
+        placeId: activity.place.googlePlaceId,
+        name: activity.place.name,
+        address: activity.place.address,
+        coordinates: activity.place.coordinates
+      } : null)
+      setAddMode(activity.savedPlaceId ? 'saved' : 'search')
+    } else {
+      setEditingActivity(null)
+      setActivityTitle("")
+      setActivityTitleTouched(false)
+      setActivityTime("09:00")
+      setHasTime(false)
+      setActivityDuration("")
+      setIsCustomDuration(false)
+      setActivityNotes("")
+      setSelectedPlaceId("")
+      setSearchedPlace(null)
+      setAddMode(trip.savedPlaces.length ? 'saved' : 'search')
+    }
     setIsActivityOpen(true)
+  }
+
+  const handleDeleteActivity = async (activityId: string) => {
+    await deleteActivity(trip.id, selectedDayDate, activityId)
+    setIsActivityOpen(false)
+    await onRefresh()
   }
 
   const handlePlaceSearchSelect = (place: PlaceSearchResult) => {
@@ -989,7 +1027,11 @@ function RightPanel({
       place
     }
 
-    await addActivity(trip.id, selectedDayDate, data)
+    if (editingActivity) {
+      await updateActivity(trip.id, selectedDayDate, editingActivity.id, data)
+    } else {
+      await addActivity(trip.id, selectedDayDate, data)
+    }
     setIsActivityOpen(false)
     setSearchedPlace(null)
     await onRefresh()
@@ -1034,7 +1076,7 @@ function RightPanel({
               onMouseDown={handleMouseDown}
             >
               <div className={cn(
-                "w-8 h-1 rounded-full bg-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity",
+                "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
                 isResizing && "opacity-100"
               )} />
             </div>
@@ -1084,6 +1126,7 @@ function RightPanel({
                   number={index + 1}
                   onMouseEnter={() => setHoveredActivityIndex(index)}
                   onMouseLeave={() => setHoveredActivityIndex(null)}
+                  onEdit={() => handleOpenActivityDialog(activity)}
                 />
               ))
             ) : (
@@ -1095,11 +1138,11 @@ function RightPanel({
         </div>
       </div>
 
-      {/* Add Activity Dialog */}
+      {/* Add/Edit Activity Dialog */}
       <Dialog open={isActivityOpen} onOpenChange={setIsActivityOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Activity</DialogTitle>
+            <DialogTitle>{editingActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1229,16 +1272,30 @@ function RightPanel({
               />
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button
-              onClick={handleSaveActivity}
-              disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
-            >
-              Add Activity
-            </Button>
+          <DialogFooter className={editingActivity ? "flex justify-between sm:justify-between" : ""}>
+            {editingActivity && (
+              <Button
+                variant="secondary"
+                size="small"
+                leftIcon={<Trash2 />}
+                onClick={() => handleDeleteActivity(editingActivity.id)}
+              >
+                Delete
+              </Button>
+            )}
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="secondary" size="small">Cancel</Button>
+              </DialogClose>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleSaveActivity}
+                disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
+              >
+                {editingActivity ? 'Save' : 'Add Activity'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1251,19 +1308,21 @@ function ActivityCard({
   activity,
   number,
   onMouseEnter,
-  onMouseLeave
+  onMouseLeave,
+  onEdit
 }: {
   activity: Activity
   number: number
   onMouseEnter?: () => void
   onMouseLeave?: () => void
+  onEdit?: () => void
 }) {
   // Format time as XX:XX
   const formattedTime = activity.time || 'NO TIME'
 
   return (
     <div
-      className="py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer"
+      className="group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -1279,8 +1338,21 @@ function ActivityCard({
           <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
         </div>
       </div>
-      {/* Right: Time */}
-      <span className="text-mono-regular text-text-secondary flex-shrink-0">{formattedTime}</span>
+      {/* Right: Time + Edit button */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-mono-regular text-text-secondary">{formattedTime}</span>
+        {onEdit && (
+          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 transition-all duration-200">
+            <NakedIconButton
+              icon={<MoreHorizontal />}
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

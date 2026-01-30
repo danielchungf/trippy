@@ -12,7 +12,7 @@ const buttonVariants = cva(
       variant: {
         // Custom design system variants
         primary:
-          "font-fustat font-bold bg-blue-400 text-white hover:[background:linear-gradient(rgba(0,0,0,0.05),rgba(0,0,0,0.05)),_rgb(96,165,250)]",
+          "font-fustat font-bold bg-neutral-800 text-white hover:[background:linear-gradient(rgba(255,255,255,0.1),rgba(255,255,255,0.1)),_rgb(38,38,38)]",
         secondary:
           "font-fustat font-bold bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
         // Standard shadcn variants for dialogs/forms
