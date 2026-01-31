@@ -122,6 +122,7 @@ import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { DayMap } from "@/components/maps/DayMap"
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import logo from "@/app/logo.png"
 
 // Tab types
@@ -510,9 +511,14 @@ export default function TripPage() {
   const duration = getTripDuration(trip)
 
   const mainContent = (
-    <>
-      {/* Left Panel - Fixed 580px */}
-      <div className="w-[580px] flex-shrink-0 border-r border-t border-neutral-200 flex flex-col overflow-hidden">
+    <ResizablePanelGroup direction="horizontal" className="flex-1">
+      {/* Left Panel - Resizable (420px min, 580px max, default 580px) */}
+      <ResizablePanel
+        defaultSize={50}
+        minSize="420px"
+        maxSize="580px"
+        className="border-r border-t border-neutral-200 flex flex-col overflow-hidden"
+      >
         {/* Trip Header */}
         <TripHeader
           trip={trip}
@@ -540,10 +546,12 @@ export default function TripPage() {
             isDraggingPlace={!!draggingPlace}
           />
         </div>
-      </div>
+      </ResizablePanel>
+
+      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
       {/* Right Panel - Remaining width */}
-      <div className="flex-1 border-t border-neutral-200 flex flex-col overflow-hidden">
+      <ResizablePanel className="border-t border-neutral-200 flex flex-col overflow-hidden">
         {activeTab === 'places' ? (
           <PlacesRightPanel
             trip={trip}
@@ -562,8 +570,8 @@ export default function TripPage() {
             Select a day to view the map
           </div>
         )}
-      </div>
-    </>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   )
 
   return (
@@ -1236,12 +1244,12 @@ function DroppableDayRow({
       )}
       onClick={() => onSelectDay(day.date)}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-2 min-w-0">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
+                <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg border border-border-muted">
                   <span className="text-mono-regular text-text-primary">{activityCount}</span>
                 </div>
               </TooltipTrigger>
@@ -1250,11 +1258,11 @@ function DroppableDayRow({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+          <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
             {day.name || `Day ${dayNumber}`}
           </Badge>
         </div>
-        <span className="text-mono-small text-text-secondary">
+        <span className="text-mono-small text-text-secondary flex-shrink-0">
           DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
         </span>
       </div>
@@ -2309,15 +2317,15 @@ function DayCard({
         onClick={onSelect}
       >
         {/* Row 1: Badge + Day/Date */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-1">
           {/* Left: Day Name Badge */}
-          <button onClick={handleBadgeClick}>
-            <Badge dotColor={location?.color || LOCATION_COLORS[0].value}>
+          <button onClick={handleBadgeClick} className="min-w-0">
+            <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
               {day.name || `Day ${dayNumber}`}
             </Badge>
           </button>
           {/* Right: Day/Date combo */}
-          <span className="text-mono-small text-text-secondary">
+          <span className="text-mono-small text-text-secondary flex-shrink-0">
             DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
           </span>
         </div>
