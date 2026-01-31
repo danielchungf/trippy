@@ -31,6 +31,7 @@ import {
   MoreHorizontal,
   Edit2,
   ChevronDown,
+  ChevronUp,
   Plane,
   User,
   LogOut,
@@ -40,6 +41,10 @@ import {
   ExternalLink,
   ImageOff,
   MapPinCheck,
+  Map,
+  List,
+  MapPin,
+  LayoutGrid,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -123,6 +128,7 @@ import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { DayMap } from "@/components/maps/DayMap"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
+import { PlacesMap } from "@/components/maps/PlacesMap"
 import logo from "@/app/logo.png"
 
 // Tab types
@@ -499,6 +505,11 @@ export default function TripPage() {
     await refreshTrip()
   }
 
+  const handleDeletePlaceById = async (placeId: string) => {
+    await deleteSavedPlace(tripId, placeId)
+    await refreshTrip()
+  }
+
   // Get center location for biasing place search results
   const getPlaceSearchCenter = (): Coordinates | undefined => {
     return trip?.locations.find(l => l.coordinates)?.coordinates
@@ -556,6 +567,7 @@ export default function TripPage() {
           <PlacesRightPanel
             trip={trip}
             onOpenPlaceDialog={handleOpenPlaceDialog}
+            onDeletePlace={handleDeletePlaceById}
             assignedConfirmation={assignedConfirmation}
           />
         ) : selectedDayDate ? (
@@ -1362,10 +1374,12 @@ function DraggablePlaceCard({
 function PlacesRightPanel({
   trip,
   onOpenPlaceDialog,
+  onDeletePlace,
   assignedConfirmation
 }: {
   trip: TripWithOwnership
   onOpenPlaceDialog: (place?: SavedPlace) => void
+  onDeletePlace: (placeId: string) => Promise<void>
   assignedConfirmation: {
     placeId: string
     dayName: string
@@ -1374,6 +1388,44 @@ function PlacesRightPanel({
   } | null
 }) {
   const placeCount = trip.savedPlaces.length
+  const [showMapView, setShowMapView] = useState(false)
+  const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
+  const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
+
+  // Resizable map state
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [mapHeight, setMapHeight] = useState(300) // Default 300px
+  const [isResizing, setIsResizing] = useState(false)
+
+  // Handle resize drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const newHeight = e.clientY - containerRect.top
+      // Clamp between 200px and 500px
+      setMapHeight(Math.min(500, Math.max(200, newHeight)))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
 
   return (
     <div className="h-full flex flex-col">
@@ -1385,22 +1437,106 @@ function PlacesRightPanel({
             {placeCount} {placeCount === 1 ? 'place' : 'places'} saved on this trip
           </span>
         </div>
-        <Button
-          variant="secondary"
-          size="small"
-          leftIcon={<Plus />}
-          onClick={() => onOpenPlaceDialog()}
-        >
-          New place
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Map/List Toggle - Segmented Control */}
+          <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 bg-neutral-100">
+            <button
+              onClick={() => setShowMapView(false)}
+              className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+                !showMapView
+                  ? "bg-white text-text-primary shadow-sm"
+                  : "bg-transparent text-text-secondary"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setShowMapView(true)}
+              className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+                showMapView
+                  ? "bg-white text-text-primary shadow-sm"
+                  : "bg-transparent text-text-secondary"
+              )}
+            >
+              <Map className="h-4 w-4" />
+            </button>
+          </div>
+          <Button
+            variant="secondary"
+            size="small"
+            leftIcon={<Plus />}
+            onClick={() => onOpenPlaceDialog()}
+          >
+            New place
+          </Button>
+        </div>
       </div>
 
-      {/* Grid */}
+      {/* Content */}
       {placeCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-text-secondary">No places saved yet</p>
         </div>
+      ) : showMapView ? (
+        /* Map View with Resizable Map */
+        <div ref={containerRef} className="flex-1 flex flex-col min-h-0">
+          {/* Map Panel - Resizable height */}
+          <div
+            className="flex-shrink-0"
+            style={{ height: mapHeight }}
+          >
+            <PlacesMap
+              places={trip.savedPlaces}
+              hoveredPlaceId={hoveredPlaceId}
+              focusedPlaceId={focusedPlaceId}
+            />
+          </div>
+
+          {/* Places List Panel - Takes remaining space */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* List Header with Resize Handle */}
+            <div className="relative p-3 flex items-center border-b border-neutral-200 flex-shrink-0 group">
+              {/* Resize Handle - pill at top of header */}
+              <div
+                className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
+                onMouseDown={handleMouseDown}
+              >
+                <div className={cn(
+                  "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
+                  isResizing && "opacity-100"
+                )} />
+              </div>
+              <span className="text-h3 text-text-secondary">
+                {placeCount} {placeCount === 1 ? 'place' : 'places'}
+              </span>
+            </div>
+
+            {/* Scrollable Places List */}
+            <div className="flex-1 overflow-auto">
+              {trip.savedPlaces.map(place => {
+                const location = place.locationId
+                  ? trip.locations.find(l => l.id === place.locationId) ?? null
+                  : null
+
+                return (
+                  <PlaceCardMapView
+                    key={place.id}
+                    place={place}
+                    location={location}
+                    onEdit={() => onOpenPlaceDialog(place)}
+                    onDelete={() => onDeletePlace(place.id)}
+                    onHover={setHoveredPlaceId}
+                    onClick={() => setFocusedPlaceId(place.id)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        </div>
       ) : (
+        /* Grid View (original) */
         <div className="flex-1 overflow-auto">
           <div className="grid grid-cols-3">
             {trip.savedPlaces.map(place => {
@@ -1430,6 +1566,129 @@ function PlacesRightPanel({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Place card for map view (horizontal layout)
+function PlaceCardMapView({
+  place,
+  location,
+  onEdit,
+  onDelete,
+  onHover,
+  onClick
+}: {
+  place: SavedPlace
+  location: Location | null
+  onEdit: () => void
+  onDelete: () => void
+  onHover: (placeId: string | null) => void
+  onClick: () => void
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
+
+  // Measure content height and calculate photo dimensions (4:3 ratio)
+  useEffect(() => {
+    if (contentRef.current) {
+      const height = contentRef.current.offsetHeight
+      setPhotoDimensions({
+        width: Math.round(height * (4 / 3)),
+        height: height
+      })
+    }
+  }, [place, location])
+
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      food: 'Food',
+      see: 'See',
+      do: 'Do',
+      stay: 'Stay',
+      shop: 'Shop',
+      nightlife: 'Nightlife'
+    }
+    return labels[category] || category
+  }
+
+  const photoUrl = place.photos?.[0]
+
+  return (
+    <div
+      className="group flex hover:bg-neutral-50 transition-colors border-b border-neutral-200 cursor-pointer"
+      onMouseEnter={() => onHover(place.id)}
+      onMouseLeave={() => onHover(null)}
+      onClick={onClick}
+    >
+      {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
+      <div
+        className="shrink-0 overflow-hidden bg-neutral-100"
+        style={{
+          width: photoDimensions?.width ?? 0,
+          height: photoDimensions?.height ?? 'auto'
+        }}
+      >
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={place.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <MapPin className="h-5 w-5 text-neutral-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Content - 16px padding, 12px gap */}
+      <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
+        {/* Badges row: Location + Category with 8px gap */}
+        <div className="flex items-center gap-2">
+          {location && (
+            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+              {location.name}
+            </Badge>
+          )}
+          <Badge>
+            {getCategoryLabel(place.category)}
+          </Badge>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-h3 text-text-primary truncate">{place.name}</span>
+          {place.address && (
+            <span className="text-body text-text-secondary truncate">
+              {place.address}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Dropdown menu - animated on hover */}
+      <div className="flex items-center pr-4">
+        <DropdownMenu>
+          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+            <DropdownMenuTrigger asChild>
+              <NakedIconButton
+                icon={<MoreHorizontal />}
+                onClick={(e) => e.stopPropagation()}
+                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
+              />
+            </DropdownMenuTrigger>
+          </div>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit() }}>
+              <Edit2 className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete() }}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   )
 }

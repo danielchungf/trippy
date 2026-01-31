@@ -17,7 +17,11 @@ import {
   Hotel,
   ShoppingBag,
   Moon,
-  Tag
+  Tag,
+  ChevronUp,
+  ChevronDown,
+  Map,
+  List
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,6 +48,8 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import {
   Trip,
   SavedPlace,
@@ -58,6 +64,7 @@ import {
 } from "@/lib/db"
 import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
+import { PlacesMap } from "@/components/maps/PlacesMap"
 import { PlaceSearchResult } from "@/lib/maps"
 
 const CATEGORIES: { value: PlaceCategory; label: string; icon: React.ReactNode }[] = [
@@ -81,6 +88,9 @@ export default function SavedPlacesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterLocation, setFilterLocation] = useState<string>("all")
+  const [showMapView, setShowMapView] = useState(false)
+  const [isMapExpanded, setIsMapExpanded] = useState(false)
+  const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
 
   // Add/Edit place dialog
   const [isPlaceOpen, setIsPlaceOpen] = useState(false)
@@ -255,10 +265,21 @@ export default function SavedPlacesPage() {
                 {trip.savedPlaces.length} places saved
               </p>
             </div>
-            <Button onClick={() => handleOpenPlaceDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Place
-            </Button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md border bg-muted/50">
+                <List className="h-4 w-4 text-muted-foreground" />
+                <Switch
+                  id="map-view-toggle"
+                  checked={showMapView}
+                  onCheckedChange={setShowMapView}
+                />
+                <Map className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <Button onClick={() => handleOpenPlaceDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Place
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -323,7 +344,55 @@ export default function SavedPlacesPage() {
               Add Place
             </Button>
           </div>
+        ) : showMapView ? (
+          /* Map View */
+          <div className="space-y-4">
+            {/* Collapsible Map */}
+            <div className="relative">
+              <div
+                className={`rounded-lg overflow-hidden border transition-all duration-300 ${
+                  isMapExpanded ? 'h-[600px]' : 'h-[300px]'
+                }`}
+              >
+                <PlacesMap
+                  places={filteredPlaces}
+                  hoveredPlaceId={hoveredPlaceId}
+                  locationName={filterLocation !== 'all'
+                    ? trip.locations.find(l => l.id === filterLocation)?.name
+                    : undefined
+                  }
+                />
+              </div>
+              {/* Expand/Collapse button */}
+              <button
+                onClick={() => setIsMapExpanded(!isMapExpanded)}
+                className="absolute bottom-3 right-3 bg-background/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-background transition-colors"
+              >
+                {isMapExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Places List (vertical stack) */}
+            <div className="space-y-3">
+              {filteredPlaces.map(place => (
+                <PlaceCardMapView
+                  key={place.id}
+                  place={place}
+                  trip={trip}
+                  onEdit={() => handleOpenPlaceDialog(place)}
+                  onDelete={() => handleDeletePlace(place.id)}
+                  onAssign={() => handleOpenAssignDialog(place)}
+                  onHover={setHoveredPlaceId}
+                />
+              ))}
+            </div>
+          </div>
         ) : (
+          /* List View (original grid layout) */
           <div className="space-y-8">
             {Object.entries(placesByCategory).map(([category, places]) => (
               <section key={category}>
@@ -554,6 +623,102 @@ function PlaceCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PlaceCardMapView({
+  place,
+  trip,
+  onEdit,
+  onDelete,
+  onAssign,
+  onHover
+}: {
+  place: SavedPlace
+  trip: Trip
+  onEdit: () => void
+  onDelete: () => void
+  onAssign: () => void
+  onHover: (placeId: string | null) => void
+}) {
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      food: 'Food',
+      see: 'See',
+      do: 'Do',
+      stay: 'Stay',
+      shop: 'Shop',
+      nightlife: 'Nightlife'
+    }
+    return labels[category] || category
+  }
+
+  // Get photo URL - use first photo if available
+  const photoUrl = place.photos?.[0]
+
+  return (
+    <Card
+      className="group hover:bg-muted/50 transition-colors"
+      onMouseEnter={() => onHover(place.id)}
+      onMouseLeave={() => onHover(null)}
+    >
+      <CardContent className="p-3">
+        <div className="flex gap-3">
+          {/* Photo - 4:3 aspect ratio, height determined by content */}
+          <div className="shrink-0 w-20 aspect-[4/3] rounded-md overflow-hidden bg-muted">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={place.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <MapPin className="h-5 w-5 text-muted-foreground/50" />
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <Badge variant="secondary" className="w-fit text-xs mb-1">
+              {getCategoryLabel(place.category)}
+            </Badge>
+            <h3 className="font-fustat font-semibold text-sm truncate">{place.name}</h3>
+            {place.address && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {place.address}
+              </p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="shrink-0 flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onAssign}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Day
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </CardContent>
     </Card>
