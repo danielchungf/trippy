@@ -53,6 +53,7 @@ export function TripCard({ trip, isShared = false }: TripCardProps) {
               src={trip.coverImage || placeholderImage.src}
               alt={trip.name}
               className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
             />
 
             {/* Countdown badge */}

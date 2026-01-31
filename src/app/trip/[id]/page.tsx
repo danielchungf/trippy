@@ -1051,6 +1051,8 @@ function TripHeader({
             tripName={trip.name}
             tripColor={trip.color}
             tripCoverImage={trip.coverImage}
+            tripCoverImageFocusX={trip.coverImageFocusX}
+            tripCoverImageFocusY={trip.coverImageFocusY}
             tripStartDate={trip.startDate}
             tripEndDate={trip.endDate}
             isOwner={trip.isOwner}

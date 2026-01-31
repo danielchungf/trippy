@@ -10,6 +10,8 @@ interface TripRow {
   start_date: string
   end_date: string
   cover_image: string | null
+  cover_image_focus_x: number | null
+  cover_image_focus_y: number | null
   color: string | null
   created_at: string
   updated_at: string
@@ -252,6 +254,8 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
       startDate: tripRow.start_date,
       endDate: tripRow.end_date,
       coverImage: tripRow.cover_image || undefined,
+      coverImageFocusX: tripRow.cover_image_focus_x ?? 0.5,
+      coverImageFocusY: tripRow.cover_image_focus_y ?? 0.5,
       color: tripRow.color || undefined,
       locations,
       accommodations,
@@ -343,6 +347,8 @@ export async function getTrip(id: string): Promise<TripWithOwnership | undefined
     startDate: tripRow.start_date,
     endDate: tripRow.end_date,
     coverImage: tripRow.cover_image || undefined,
+    coverImageFocusX: tripRow.cover_image_focus_x ?? 0.5,
+    coverImageFocusY: tripRow.cover_image_focus_y ?? 0.5,
     color: tripRow.color || undefined,
     locations,
     accommodations,
@@ -366,6 +372,8 @@ export async function createTrip(data: {
   startDate: string
   endDate: string
   coverImage?: string
+  coverImageFocusX?: number
+  coverImageFocusY?: number
   color?: string
 }): Promise<Trip | null> {
   const supabase = createClient()
@@ -381,6 +389,8 @@ export async function createTrip(data: {
       start_date: data.startDate,
       end_date: data.endDate,
       cover_image: data.coverImage || null,
+      cover_image_focus_x: data.coverImageFocusX ?? 0.5,
+      cover_image_focus_y: data.coverImageFocusY ?? 0.5,
       color: data.color || null,
     })
     .select()
@@ -397,6 +407,8 @@ export async function createTrip(data: {
     startDate: tripRow.start_date,
     endDate: tripRow.end_date,
     coverImage: tripRow.cover_image || undefined,
+    coverImageFocusX: tripRow.cover_image_focus_x ?? 0.5,
+    coverImageFocusY: tripRow.cover_image_focus_y ?? 0.5,
     color: tripRow.color || undefined,
     locations: [],
     accommodations: [],
@@ -427,11 +439,20 @@ export async function createTrip(data: {
 export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | null> {
   const supabase = createClient()
 
+  // Get current trip to check if dates actually changed
+  const { data: currentTrip } = await supabase
+    .from('trips')
+    .select('start_date, end_date')
+    .eq('id', id)
+    .single()
+
   const updateData: Record<string, unknown> = {}
   if (data.name !== undefined) updateData.name = data.name
   if (data.startDate !== undefined) updateData.start_date = data.startDate
   if (data.endDate !== undefined) updateData.end_date = data.endDate
   if (data.coverImage !== undefined) updateData.cover_image = data.coverImage || null
+  if (data.coverImageFocusX !== undefined) updateData.cover_image_focus_x = data.coverImageFocusX
+  if (data.coverImageFocusY !== undefined) updateData.cover_image_focus_y = data.coverImageFocusY
   if (data.color !== undefined) updateData.color = data.color || null
 
   const { data: tripRow, error } = await supabase
@@ -446,8 +467,13 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
     return null
   }
 
-  // If dates changed, regenerate days
-  if (data.startDate || data.endDate) {
+  // Only regenerate days if dates actually changed
+  const datesChanged = currentTrip && (
+    (data.startDate && data.startDate !== currentTrip.start_date) ||
+    (data.endDate && data.endDate !== currentTrip.end_date)
+  )
+
+  if (datesChanged) {
     const trip = await getTrip(id)
     if (trip) {
       const newDays = generateDaysFromTrip(trip)

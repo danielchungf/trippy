@@ -42,6 +42,7 @@ import { UserMenu } from "@/components/auth/UserMenu"
 import { CalendarView } from "@/components/home/CalendarView"
 import { createClient } from "@/lib/supabase/client"
 import { uploadTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
+import { FocalPointPicker } from "@/components/ui/FocalPointPicker"
 import type { User } from "@supabase/supabase-js"
 import logo from "@/app/logo.png"
 
@@ -60,6 +61,8 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [coverImageFocusX, setCoverImageFocusX] = useState(0.5)
+  const [coverImageFocusY, setCoverImageFocusY] = useState(0.5)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isDesktop = useMediaQuery("(min-width: 1024px)")
 
@@ -95,6 +98,9 @@ export default function HomePage() {
     const objectUrl = URL.createObjectURL(file)
     setCoverImagePreview(objectUrl)
     setCoverImageFile(file)
+    // Reset focal point to center for new images
+    setCoverImageFocusX(0.5)
+    setCoverImageFocusY(0.5)
   }
 
   const handleRemoveCoverImage = () => {
@@ -124,9 +130,13 @@ export default function HomePage() {
       if (coverImageFile && newTrip) {
         try {
           const coverImageUrl = await uploadTripCoverImage(coverImageFile, newTrip.id)
-          // Update trip with cover image URL
+          // Update trip with cover image URL and focal point
           const { updateTrip } = await import("@/lib/db")
-          await updateTrip(newTrip.id, { coverImage: coverImageUrl })
+          await updateTrip(newTrip.id, {
+            coverImage: coverImageUrl,
+            coverImageFocusX,
+            coverImageFocusY,
+          })
           // Invalidate the trips cache so home page shows updated cover image
           await queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
         } catch (err) {
@@ -140,6 +150,8 @@ export default function HomePage() {
       setTripColor(undefined)
       setCoverImageFile(null)
       setCoverImagePreview(undefined)
+      setCoverImageFocusX(0.5)
+      setCoverImageFocusY(0.5)
       setIsCreateOpen(false)
     } catch (err) {
       if (err instanceof ImageUploadError) {
@@ -229,6 +241,8 @@ export default function HomePage() {
           setTripColor(undefined)
           setCoverImageFile(null)
           setCoverImagePreview(undefined)
+          setCoverImageFocusX(0.5)
+          setCoverImageFocusY(0.5)
           setUploadError(null)
         }
       }}>
@@ -295,42 +309,39 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Cover Image Upload */}
+            {/* Cover Image */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 Cover Image <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
-              <div
-                className={`relative rounded-lg border-2 border-dashed transition-colors ${
-                  isDragging
-                    ? "border-primary bg-primary/5"
-                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                }`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setIsDragging(false)
-                  const file = e.dataTransfer.files?.[0]
-                  if (file) handleFileSelect(file)
-                }}
-              >
-                {coverImagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={coverImagePreview}
-                      alt="Cover preview"
-                      className="w-full h-[120px] object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoverImage}
-                      className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
+              {coverImagePreview ? (
+                <FocalPointPicker
+                  imageUrl={coverImagePreview}
+                  focusX={coverImageFocusX}
+                  focusY={coverImageFocusY}
+                  onChange={(x, y) => {
+                    setCoverImageFocusX(x)
+                    setCoverImageFocusY(y)
+                  }}
+                  onRemove={handleRemoveCoverImage}
+                  onReplace={() => fileInputRef.current?.click()}
+                />
+              ) : (
+                <div
+                  className={`relative rounded-lg border-2 border-dashed transition-colors ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                  onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setIsDragging(false)
+                    const file = e.dataTransfer.files?.[0]
+                    if (file) handleFileSelect(file)
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -340,18 +351,18 @@ export default function HomePage() {
                     <span className="text-sm">Click or drag to upload</span>
                     <span className="text-xs text-muted-foreground">JPEG, PNG, WebP (max 5MB)</span>
                   </button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleFileSelect(file)
-                  }}
-                  className="hidden"
-                />
-              </div>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFileSelect(file)
+                }}
+                className="hidden"
+              />
               {uploadError && (
                 <p className="text-sm text-destructive">{uploadError}</p>
               )}
@@ -816,6 +827,7 @@ function NextTripCard({ trip }: { trip: TripWithOwnership }) {
             src={trip.coverImage}
             alt={trip.name}
             className="w-full h-full object-cover"
+            style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
           />
         ) : (
           <div className="w-full h-full bg-neutral-300" />
@@ -887,6 +899,7 @@ function TripCard({ trip }: { trip: TripWithOwnership }) {
             src={trip.coverImage}
             alt={trip.name}
             className="w-full h-full object-cover"
+            style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
           />
         ) : (
           <div className="w-full h-full bg-neutral-300" />
