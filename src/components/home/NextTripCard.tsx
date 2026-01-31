@@ -77,6 +77,7 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
                 src={trip.coverImage || placeholderImage.src}
                 alt={trip.name}
                 className="absolute inset-0 w-full h-full object-cover"
+                style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
               />
               {countdown && (
                 <div className="absolute top-[10px] left-[10px] bg-white rounded-full px-[10px] py-[5px]">
@@ -162,7 +163,8 @@ export function NextTripCard({ trip, variant = 'desktop' }: NextTripCardProps) {
         <img
           src={trip.coverImage || placeholderImage.src}
           alt={trip.name}
-          className="w-[464px] aspect-[4/3] object-cover object-center rounded-[12px]"
+          className="w-[464px] aspect-[4/3] object-cover rounded-[12px]"
+          style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
         />
         {countdown && (
           <div className="absolute top-[10px] left-[10px] bg-white rounded-[10px] h-[24px] px-[10px] flex items-center">

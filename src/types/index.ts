@@ -128,6 +128,8 @@ export interface Trip {
   startDate: string // ISO date
   endDate: string // ISO date
   coverImage?: string
+  coverImageFocusX?: number // 0-1, focal point X (default 0.5 = center)
+  coverImageFocusY?: number // 0-1, focal point Y (default 0.5 = center)
   color?: string // hex color for calendar view
   locations: Location[]
   accommodations: Accommodation[]

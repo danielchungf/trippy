@@ -34,12 +34,15 @@ import { Input } from "@/components/ui/input"
 import { LOCATION_COLORS, parseLocalDate, formatLocalDate } from "@/types"
 import { updateTrip, deleteTrip } from "@/lib/db"
 import { uploadTripCoverImage, deleteTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
+import { FocalPointPicker } from "@/components/ui/FocalPointPicker"
 
 interface EditTripDialogProps {
   tripId: string
   tripName: string
   tripColor?: string
   tripCoverImage?: string
+  tripCoverImageFocusX?: number
+  tripCoverImageFocusY?: number
   tripStartDate: string
   tripEndDate: string
   isOwner: boolean
@@ -51,6 +54,8 @@ export function EditTripDialog({
   tripName,
   tripColor,
   tripCoverImage,
+  tripCoverImageFocusX,
+  tripCoverImageFocusY,
   tripStartDate,
   tripEndDate,
   isOwner,
@@ -60,6 +65,7 @@ export function EditTripDialog({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
+  const [showDateShortenAlert, setShowDateShortenAlert] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -75,6 +81,8 @@ export function EditTripDialog({
   const [isStartDateOpen, setIsStartDateOpen] = useState(false)
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [focusX, setFocusX] = useState(tripCoverImageFocusX ?? 0.5)
+  const [focusY, setFocusY] = useState(tripCoverImageFocusY ?? 0.5)
 
   // Reset form when dialog opens
   const handleOpenChange = (isOpen: boolean) => {
@@ -87,6 +95,8 @@ export function EditTripDialog({
       setStartDate(parseLocalDate(tripStartDate))
       setEndDate(parseLocalDate(tripEndDate))
       setUploadError(null)
+      setFocusX(tripCoverImageFocusX ?? 0.5)
+      setFocusY(tripCoverImageFocusY ?? 0.5)
     }
     setOpen(isOpen)
   }
@@ -111,6 +121,9 @@ export function EditTripDialog({
     const objectUrl = URL.createObjectURL(file)
     setPreviewUrl(objectUrl)
     setPendingFile(file)
+    // Reset focal point to center for new images
+    setFocusX(0.5)
+    setFocusY(0.5)
   }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,7 +162,18 @@ export function EditTripDialog({
     }
   }
 
-  const handleSave = async () => {
+  // Check if new dates would shorten the trip
+  const wouldShortenTrip = () => {
+    if (!startDate || !endDate) return false
+    const originalStart = parseLocalDate(tripStartDate)
+    const originalEnd = parseLocalDate(tripEndDate)
+    if (!originalStart || !originalEnd) return false
+
+    // Trip is shortened if new start is after original start OR new end is before original end
+    return startDate > originalStart || endDate < originalEnd
+  }
+
+  const performSave = async () => {
     if (!name.trim() || !startDate || !endDate) return
 
     setLoading(true)
@@ -189,17 +213,32 @@ export function EditTripDialog({
         name: name.trim(),
         color,
         coverImage: newCoverImageUrl,
+        coverImageFocusX: focusX,
+        coverImageFocusY: focusY,
         startDate: formatLocalDate(startDate),
         endDate: formatLocalDate(endDate),
       })
 
       setLoading(false)
       setOpen(false)
+      setShowDateShortenAlert(false)
       await onUpdate()
     } catch {
       setUploadError("Failed to save trip. Please try again.")
       setLoading(false)
     }
+  }
+
+  const handleSave = async () => {
+    if (!name.trim() || !startDate || !endDate) return
+
+    // Check if dates are being shortened - warn user about potential activity loss
+    if (wouldShortenTrip()) {
+      setShowDateShortenAlert(true)
+      return
+    }
+
+    await performSave()
   }
 
   const handleDelete = async () => {
@@ -329,42 +368,39 @@ export function EditTripDialog({
               </div>
             </div>
 
-            {/* Cover Image Upload */}
+            {/* Cover Image */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 Cover Image <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
-              <div
-                className={`relative rounded-lg border-2 border-dashed transition-colors ${
-                  isDragging
-                    ? "border-primary bg-primary/5"
-                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {previewUrl ? (
-                  <div className="relative">
-                    <img
-                      src={previewUrl}
-                      alt="Cover preview"
-                      className="w-full h-[120px] object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                    {isUploading && (
-                      <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                        <Loader2 className="h-6 w-6 text-white animate-spin" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
+              {previewUrl ? (
+                <>
+                  <FocalPointPicker
+                    imageUrl={previewUrl}
+                    focusX={focusX}
+                    focusY={focusY}
+                    onChange={(x, y) => {
+                      setFocusX(x)
+                      setFocusY(y)
+                    }}
+                    onRemove={handleRemoveImage}
+                    onReplace={() => fileInputRef.current?.click()}
+                  />
+                  {isUploading && (
+                    <div className="text-sm text-muted-foreground">Uploading...</div>
+                  )}
+                </>
+              ) : (
+                <div
+                  className={`relative rounded-lg border-2 border-dashed transition-colors ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -374,15 +410,15 @@ export function EditTripDialog({
                     <span className="text-sm">Click or drag to upload</span>
                     <span className="text-xs text-muted-foreground">JPEG, PNG, WebP (max 5MB)</span>
                   </button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                />
-              </div>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
               {uploadError && (
                 <p className="text-sm text-destructive">{uploadError}</p>
               )}
@@ -433,6 +469,28 @@ export function EditTripDialog({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {loading ? "Deleting..." : "Delete Trip"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Date Shortening Warning Dialog */}
+      <AlertDialog open={showDateShortenAlert} onOpenChange={setShowDateShortenAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Shorten Trip Dates?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are shortening the trip dates. Activities on removed days will be
+              permanently deleted. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={performSave}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? "Saving..." : "Continue"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
