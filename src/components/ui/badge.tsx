@@ -7,9 +7,11 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   dotColor?: string
   /** Variant for different surface contexts */
   variant?: "default" | "secondary" | "outline"
+  /** Truncate text to single line with ellipsis */
+  truncate?: boolean
 }
 
-function Badge({ className, dotColor, variant = "default", children, ...props }: BadgeProps) {
+function Badge({ className, dotColor, variant = "default", truncate, children, ...props }: BadgeProps) {
   return (
     <div
       className={cn(
@@ -17,6 +19,7 @@ function Badge({ className, dotColor, variant = "default", children, ...props }:
         variant === "default" && "ring-neutral-200 bg-white hover:bg-neutral-50",
         variant === "secondary" && "ring-transparent bg-neutral-100 text-neutral-900",
         variant === "outline" && "ring-neutral-200 bg-transparent",
+        truncate && "max-w-full",
         className
       )}
       {...props}
@@ -26,7 +29,7 @@ function Badge({ className, dotColor, variant = "default", children, ...props }:
           className={cn("w-3 h-3 shrink-0 rounded-full", dotColor)}
         />
       )}
-      <span className="text-h3 text-text-primary">{children}</span>
+      <span className={`text-h3 text-text-primary${truncate ? " truncate" : ""}`}>{children}</span>
     </div>
   )
 }
