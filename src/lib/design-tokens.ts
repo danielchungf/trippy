@@ -30,7 +30,7 @@
  * - text-text-secondary (neutral-500) - Supporting text, icons
  * - text-text-tertiary (neutral-400) - Disabled, placeholder, subtle text
  * - text-text-inverse (#ffffff) - Text on dark backgrounds
- * - text-text-accent (blue-400) - Accent/link text
+ * - text-text-accent (#FF591E) - Accent/link text
  *
  * Border colors:
  * - border-border-muted (neutral-200) - Subtle borders, dividers
@@ -55,7 +55,7 @@ export const tokens = {
       secondary: 'neutral-500', // rgb(115 115 115)
       tertiary: 'neutral-400',  // rgb(163 163 163)
       inverse: '#ffffff',
-      accent: 'blue-400',       // rgb(96 165 250)
+      accent: '#FF591E',        // orange accent
     },
     border: {
       muted: 'neutral-200',     // rgb(229 229 229)

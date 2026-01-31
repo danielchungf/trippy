@@ -82,7 +82,7 @@ const config: Config = {
           secondary: 'rgb(115 115 115 / <alpha-value>)', // neutral-500
           tertiary: 'rgb(163 163 163 / <alpha-value>)', // neutral-400
           inverse: '#ffffff',
-          accent: 'rgb(96 165 250 / <alpha-value>)',    // blue-400
+          accent: '#FF591E',    // orange accent
         },
         // Border colors
         'border-muted': 'rgb(229 229 229 / <alpha-value>)', // neutral-200

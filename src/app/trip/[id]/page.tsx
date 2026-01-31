@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -45,6 +45,18 @@ import {
   List,
   MapPin,
   LayoutGrid,
+  // Category icons
+  Soup,
+  Coffee,
+  ShoppingBag,
+  Castle,
+  Amphora,
+  Shrub,
+  Wine,
+  Drama,
+  Bubbles,
+  Flower,
+  type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -73,6 +85,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Popover,
   PopoverContent,
@@ -140,6 +153,25 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'places', label: 'PLACES' },
   // { id: 'packing', label: 'PACKING' }, // TODO: Re-enable for post-MVP
 ]
+
+// Category configuration with icons
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
+  food: { label: 'Food', icon: Soup },
+  coffee: { label: 'Coffee', icon: Coffee },
+  shopping: { label: 'Shopping', icon: ShoppingBag },
+  sights: { label: 'Sights', icon: Castle },
+  museums: { label: 'Museums', icon: Amphora },
+  nature: { label: 'Nature', icon: Shrub },
+  nightlife: { label: 'Nightlife', icon: Wine },
+  entertainment: { label: 'Entertainment', icon: Drama },
+  wellness: { label: 'Wellness', icon: Bubbles },
+  other: { label: 'Other', icon: Flower },
+  // Legacy categories for backwards compatibility
+  see: { label: 'See', icon: Castle },
+  do: { label: 'Do', icon: Drama },
+  stay: { label: 'Stay', icon: BedDouble },
+  shop: { label: 'Shop', icon: ShoppingBag },
+}
 
 export default function TripPage() {
   const params = useParams()
@@ -525,7 +557,7 @@ export default function TripPage() {
     <ResizablePanelGroup direction="horizontal" className="flex-1">
       {/* Left Panel - Resizable (420px min, 580px max, default 580px) */}
       <ResizablePanel
-        defaultSize={50}
+        defaultSize="500px"
         minSize="420px"
         maxSize="580px"
         className="border-r border-t border-neutral-200 flex flex-col overflow-hidden"
@@ -929,11 +961,15 @@ export default function TripPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="see">See</SelectItem>
-                  <SelectItem value="do">Do</SelectItem>
-                  <SelectItem value="stay">Stay</SelectItem>
-                  <SelectItem value="shop">Shop</SelectItem>
+                  <SelectItem value="coffee">Coffee</SelectItem>
+                  <SelectItem value="shopping">Shopping</SelectItem>
+                  <SelectItem value="sights">Sights</SelectItem>
+                  <SelectItem value="museums">Museums</SelectItem>
+                  <SelectItem value="nature">Nature</SelectItem>
                   <SelectItem value="nightlife">Nightlife</SelectItem>
+                  <SelectItem value="entertainment">Entertainment</SelectItem>
+                  <SelectItem value="wellness">Wellness</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1306,6 +1342,8 @@ function DraggablePlaceCard({
   })
 
   const photoUrl = place.photos?.[0]
+  const categoryConfig = CATEGORY_CONFIG[place.category] || { label: place.category, icon: Flower }
+  const CategoryIcon = categoryConfig.icon
 
   // Format confirmation date
   const confirmationDateFormatted = confirmation ? (() => {
@@ -1348,16 +1386,19 @@ function DraggablePlaceCard({
       {/* Content */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
-          {location ? (
-            <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover/card:bg-neutral-100">
-              {location.name}
+          <div className="flex items-center gap-2">
+            {location && (
+              <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover/card:bg-neutral-100">
+                {location.name}
+              </Badge>
+            )}
+            <Badge icon={<CategoryIcon />} className="group-hover/card:bg-neutral-100">
+              {categoryConfig.label}
             </Badge>
-          ) : (
-            <div />
-          )}
+          </div>
           {isAssigned && (
             <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
-              <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary">
+              <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-text-secondary">
                 <MapPinCheck />
               </span>
             </div>
@@ -1387,10 +1428,108 @@ function PlacesRightPanel({
     dayDate: string
   } | null
 }) {
-  const placeCount = trip.savedPlaces.length
   const [showMapView, setShowMapView] = useState(false)
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
+
+  // Location filter state - null means "all locations" (including places with no location)
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string | null> | null>(null)
+
+  // Assignment filter state
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'assigned' | 'not_assigned'>('all')
+
+  // Get unique locations from places (including null for places without a location)
+  const locationsInPlaces = useMemo(() => {
+    const locationIds = new Set<string | null>()
+    trip.savedPlaces.forEach(place => {
+      locationIds.add(place.locationId ?? null)
+    })
+    return trip.locations.filter(loc => locationIds.has(loc.id))
+  }, [trip.savedPlaces, trip.locations])
+
+  // Check if any places have no location assigned
+  const hasUnassignedPlaces = useMemo(() => {
+    return trip.savedPlaces.some(place => !place.locationId)
+  }, [trip.savedPlaces])
+
+  // Category filter state - null means "all categories", otherwise single category selected
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  // Get unique categories from places
+  const categoriesInPlaces = useMemo(() => {
+    const categories = new Set<string>()
+    trip.savedPlaces.forEach(place => {
+      categories.add(place.category)
+    })
+    return Array.from(categories).sort()
+  }, [trip.savedPlaces])
+
+  // Get days to check assignment status
+  const days = useMemo(() => generateDaysFromTrip(trip), [trip])
+
+  // Check if a place is assigned to any day
+  const isPlaceAssigned = useCallback((placeId: string) => {
+    return days.some(day =>
+      day.activities.some(activity => activity.savedPlaceId === placeId)
+    )
+  }, [days])
+
+  // Filter places based on selected locations, categories, and assignment status
+  const filteredPlaces = useMemo(() => {
+    return trip.savedPlaces.filter(place => {
+      // Location filter
+      if (selectedLocationIds !== null) {
+        const placeLocationId = place.locationId ?? null
+        if (!selectedLocationIds.has(placeLocationId)) return false
+      }
+      // Category filter
+      if (selectedCategory !== null) {
+        if (place.category !== selectedCategory) return false
+      }
+      // Assignment filter
+      if (assignmentFilter !== 'all') {
+        const assigned = isPlaceAssigned(place.id)
+        if (assignmentFilter === 'assigned' && !assigned) return false
+        if (assignmentFilter === 'not_assigned' && assigned) return false
+      }
+      return true
+    })
+  }, [trip.savedPlaces, selectedLocationIds, selectedCategory, assignmentFilter, isPlaceAssigned])
+
+  const filteredPlaceCount = filteredPlaces.length
+  const totalPlaceCount = trip.savedPlaces.length
+
+  // Toggle a location in the filter
+  const toggleLocation = (locationId: string | null) => {
+    setSelectedLocationIds(prev => {
+      // If currently showing all, create a new set with all locations except the toggled one
+      if (prev === null) {
+        const allIds = new Set<string | null>(locationsInPlaces.map(l => l.id))
+        if (hasUnassignedPlaces) allIds.add(null)
+        allIds.delete(locationId)
+        return allIds
+      }
+      // Toggle the location in the existing set
+      const newSet = new Set(prev)
+      if (newSet.has(locationId)) {
+        newSet.delete(locationId)
+      } else {
+        newSet.add(locationId)
+      }
+      // If all are selected again, return null to indicate "all"
+      const allCount = locationsInPlaces.length + (hasUnassignedPlaces ? 1 : 0)
+      if (newSet.size === allCount) {
+        return null
+      }
+      return newSet
+    })
+  }
+
+  // Check if a location is selected
+  const isLocationSelected = (locationId: string | null) => {
+    if (selectedLocationIds === null) return true
+    return selectedLocationIds.has(locationId)
+  }
 
   // Resizable map state
   const containerRef = useRef<HTMLDivElement>(null)
@@ -1434,7 +1573,7 @@ function PlacesRightPanel({
         <div className="flex flex-col">
           <span className="text-h2 text-text-primary">Places</span>
           <span className="text-h3 text-text-secondary">
-            {placeCount} {placeCount === 1 ? 'place' : 'places'} saved on this trip
+            {totalPlaceCount} {totalPlaceCount === 1 ? 'place' : 'places'} saved on this trip
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -1475,7 +1614,7 @@ function PlacesRightPanel({
       </div>
 
       {/* Content */}
-      {placeCount === 0 ? (
+      {totalPlaceCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-text-secondary">No places saved yet</p>
         </div>
@@ -1488,7 +1627,7 @@ function PlacesRightPanel({
             style={{ height: mapHeight }}
           >
             <PlacesMap
-              places={trip.savedPlaces}
+              places={filteredPlaces}
               hoveredPlaceId={hoveredPlaceId}
               focusedPlaceId={focusedPlaceId}
             />
@@ -1497,7 +1636,7 @@ function PlacesRightPanel({
           {/* Places List Panel - Takes remaining space */}
           <div className="flex-1 flex flex-col min-h-0">
             {/* List Header with Resize Handle */}
-            <div className="relative p-3 flex items-center border-b border-neutral-200 flex-shrink-0 group">
+            <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
               {/* Resize Handle - pill at top of header */}
               <div
                 className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
@@ -1508,14 +1647,127 @@ function PlacesRightPanel({
                   isResizing && "opacity-100"
                 )} />
               </div>
-              <span className="text-h3 text-text-secondary">
-                {placeCount} {placeCount === 1 ? 'place' : 'places'}
+              <div className="flex items-center gap-2">
+              {/* Location Filter Dropdown */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
+                    <span className="px-[2px]">Location</span>
+                    <span className="w-[16px] h-[16px] flex-shrink-0">
+                      <ChevronDown className="w-full h-full stroke-[2]" />
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-56 p-2">
+                  {/* Location checkboxes */}
+                  <div className="flex flex-col gap-1">
+                    {locationsInPlaces.map(location => (
+                      <label
+                        key={location.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={isLocationSelected(location.id)}
+                          onCheckedChange={() => toggleLocation(location.id)}
+                        />
+                        <span className="text-sm text-text-primary">{location.name}</span>
+                      </label>
+                    ))}
+                    {hasUnassignedPlaces && (
+                      <label
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={isLocationSelected(null)}
+                          onCheckedChange={() => toggleLocation(null)}
+                        />
+                        <span className="text-sm text-text-secondary italic">No location</span>
+                      </label>
+                    )}
+                  </div>
+                  {/* Divider */}
+                  <div className="my-2 h-px bg-neutral-200" />
+                  {/* Assignment radio options */}
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                      onClick={() => setAssignmentFilter('all')}
+                    >
+                      <span className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                        assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
+                      )}>
+                        {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                      </span>
+                      <span className="text-sm text-text-primary">All</span>
+                    </label>
+                    <label
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                      onClick={() => setAssignmentFilter('assigned')}
+                    >
+                      <span className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                        assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
+                      )}>
+                        {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                      </span>
+                      <span className="text-sm text-text-primary">Assigned</span>
+                    </label>
+                    <label
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                      onClick={() => setAssignmentFilter('not_assigned')}
+                    >
+                      <span className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                        assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
+                      )}>
+                        {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                      </span>
+                      <span className="text-sm text-text-primary">Not assigned</span>
+                    </label>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {/* Category Filter Dropdown */}
+              <Select
+                value={selectedCategory ?? "_all"}
+                onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
+                    selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
+                  )}
+                  style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
+                >
+                  <span>
+                    {selectedCategory !== null
+                      ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
+                      : "Category"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Categories</SelectItem>
+                  {categoriesInPlaces.map(category => {
+                    const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
+                    return (
+                      <SelectItem key={category} value={category}>
+                        {config.label}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+              </div>
+              {/* Places count */}
+              <span className="text-mono-small text-text-secondary">
+                {filteredPlaceCount}/{totalPlaceCount} PLACES
               </span>
             </div>
 
             {/* Scrollable Places List */}
             <div className="flex-1 overflow-auto">
-              {trip.savedPlaces.map(place => {
+              {filteredPlaces.map(place => {
                 const location = place.locationId
                   ? trip.locations.find(l => l.id === place.locationId) ?? null
                   : null
@@ -1537,32 +1789,148 @@ function PlacesRightPanel({
         </div>
       ) : (
         /* Grid View (original) */
-        <div className="flex-1 overflow-auto">
-          <div className="grid grid-cols-3">
-            {trip.savedPlaces.map(place => {
-              const location = place.locationId
-                ? trip.locations.find(l => l.id === place.locationId) ?? null
-                : null
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Filter Header */}
+          <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
+            <div className="flex items-center gap-2">
+            {/* Location Filter Dropdown */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
+                  <span className="px-[2px]">Location</span>
+                  <span className="w-[16px] h-[16px] flex-shrink-0">
+                    <ChevronDown className="w-full h-full stroke-[2]" />
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-2">
+                {/* Location checkboxes */}
+                <div className="flex flex-col gap-1">
+                  {locationsInPlaces.map(location => (
+                    <label
+                      key={location.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={isLocationSelected(location.id)}
+                        onCheckedChange={() => toggleLocation(location.id)}
+                      />
+                      <span className="text-sm text-text-primary">{location.name}</span>
+                    </label>
+                  ))}
+                  {hasUnassignedPlaces && (
+                    <label
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={isLocationSelected(null)}
+                        onCheckedChange={() => toggleLocation(null)}
+                      />
+                      <span className="text-sm text-text-secondary italic">No location</span>
+                    </label>
+                  )}
+                </div>
+                {/* Divider */}
+                <div className="my-2 h-px bg-neutral-200" />
+                {/* Assignment radio options */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                    onClick={() => setAssignmentFilter('all')}
+                  >
+                    <span className={cn(
+                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                      assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
+                    )}>
+                      {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                    </span>
+                    <span className="text-sm text-text-primary">All</span>
+                  </label>
+                  <label
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                    onClick={() => setAssignmentFilter('assigned')}
+                  >
+                    <span className={cn(
+                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                      assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
+                    )}>
+                      {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                    </span>
+                    <span className="text-sm text-text-primary">Assigned</span>
+                  </label>
+                  <label
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                    onClick={() => setAssignmentFilter('not_assigned')}
+                  >
+                    <span className={cn(
+                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                      assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
+                    )}>
+                      {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                    </span>
+                    <span className="text-sm text-text-primary">Not assigned</span>
+                  </label>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {/* Category Filter Dropdown */}
+            <Select
+              value={selectedCategory ?? "_all"}
+              onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
+            >
+              <SelectTrigger
+                className={cn(
+                  "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
+                  selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
+                )}
+                style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
+              >
+                <span>
+                  {selectedCategory !== null
+                    ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
+                    : "Category"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Categories</SelectItem>
+                {categoriesInPlaces.map(category => {
+                  const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
+                  return (
+                    <SelectItem key={category} value={category}>
+                      {config.label}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            </div>
+            {/* Places count */}
+            <span className="text-mono-small text-text-secondary">
+              {filteredPlaceCount}/{totalPlaceCount} PLACES
+            </span>
+          </div>
+          {/* Grid */}
+          <div className="flex-1 overflow-auto">
+            <div className="grid grid-cols-3">
+              {filteredPlaces.map(place => {
+                const location = place.locationId
+                  ? trip.locations.find(l => l.id === place.locationId) ?? null
+                  : null
 
-              const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
+                const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
 
-              // Check if this place is assigned to any day
-              const days = generateDaysFromTrip(trip)
-              const isAssigned = days.some(day =>
-                day.activities.some(activity => activity.savedPlaceId === place.id)
-              )
-
-              return (
-                <DraggablePlaceCard
-                  key={place.id}
-                  place={place}
-                  location={location}
-                  onOpenPlaceDialog={onOpenPlaceDialog}
-                  confirmation={confirmation}
-                  isAssigned={isAssigned}
-                />
-              )
-            })}
+                return (
+                  <DraggablePlaceCard
+                    key={place.id}
+                    place={place}
+                    location={location}
+                    onOpenPlaceDialog={onOpenPlaceDialog}
+                    confirmation={confirmation}
+                    isAssigned={isPlaceAssigned(place.id)}
+                  />
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -1600,17 +1968,8 @@ function PlaceCardMapView({
     }
   }, [place, location])
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      food: 'Food',
-      see: 'See',
-      do: 'Do',
-      stay: 'Stay',
-      shop: 'Shop',
-      nightlife: 'Nightlife'
-    }
-    return labels[category] || category
-  }
+  const categoryConfig = CATEGORY_CONFIG[place.category] || { label: place.category, icon: Flower }
+  const CategoryIcon = categoryConfig.icon
 
   const photoUrl = place.photos?.[0]
 
@@ -1651,8 +2010,8 @@ function PlaceCardMapView({
               {location.name}
             </Badge>
           )}
-          <Badge>
-            {getCategoryLabel(place.category)}
+          <Badge icon={<CategoryIcon />}>
+            {categoryConfig.label}
           </Badge>
         </div>
         <div className="flex flex-col">

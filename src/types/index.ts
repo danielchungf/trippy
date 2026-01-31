@@ -1,5 +1,5 @@
 // Place categories
-export type PlaceCategory = 'food' | 'see' | 'do' | 'stay' | 'shop' | 'nightlife'
+export type PlaceCategory = 'food' | 'coffee' | 'shopping' | 'sights' | 'museums' | 'nature' | 'nightlife' | 'entertainment' | 'wellness' | 'other'
 
 // Coordinates
 export interface Coordinates {
