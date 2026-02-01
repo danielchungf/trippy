@@ -30,8 +30,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
 import { getTripStatus, parseLocalDate, formatDateRange, getTripDuration, LOCATION_COLORS } from "@/types"
-import { TripWithOwnership } from "@/lib/db"
+import { TripWithOwnership, acceptPendingInvites } from "@/lib/db"
 import { useTrips, useCreateTrip, tripKeys } from "@/lib/hooks/use-trips"
+import { useRealtimeInvites } from "@/lib/hooks/use-realtime-invites"
 import { useQueryClient } from "@tanstack/react-query"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { TripTabs, TripTabValue } from "@/components/home/TripTabs"
@@ -42,6 +43,7 @@ import { UserMenu } from "@/components/auth/UserMenu"
 import { CalendarView } from "@/components/home/CalendarView"
 import { createClient } from "@/lib/supabase/client"
 import { uploadTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
+import { toast } from "sonner"
 import { FocalPointPicker } from "@/components/ui/FocalPointPicker"
 import type { User } from "@supabase/supabase-js"
 import logo from "@/app/logo.png"
@@ -71,6 +73,9 @@ export default function HomePage() {
   const { data: trips = [], isLoading } = useTrips()
   const createTripMutation = useCreateTrip()
 
+  // Subscribe to real-time invite notifications
+  useRealtimeInvites(user?.email)
+
   useEffect(() => {
     async function loadUser() {
       const supabase = createClient()
@@ -80,6 +85,26 @@ export default function HomePage() {
 
     loadUser()
   }, [])
+
+  // Check and accept any pending trip invites when user loads
+  useEffect(() => {
+    async function checkPendingInvites() {
+      if (!user) return
+      const acceptedCount = await acceptPendingInvites()
+      if (acceptedCount > 0) {
+        // Refetch trips to include newly accepted shared trips
+        queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+        // Notify user about the new shared trip(s)
+        toast.success(
+          acceptedCount === 1
+            ? "You were added to a shared trip!"
+            : `You were added to ${acceptedCount} shared trips!`
+        )
+      }
+    }
+
+    checkPendingInvites()
+  }, [user, queryClient])
 
   const handleFileSelect = (file: File) => {
     setUploadError(null)

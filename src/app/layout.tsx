@@ -3,6 +3,7 @@ import localFont from "next/font/local"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { QueryProvider } from "@/components/providers/QueryProvider"
+import { Toaster } from "@/components/ui/sonner"
 import { Agentation } from "agentation"
 
 const inter = Inter({
@@ -54,6 +55,7 @@ export default function RootLayout({
         <QueryProvider>
           {children}
         </QueryProvider>
+        <Toaster />
         {process.env.NODE_ENV === "development" && <Agentation />}
       </body>
     </html>
