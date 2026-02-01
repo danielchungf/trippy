@@ -16,6 +16,8 @@ export {
   removeMember,
   acceptPendingInvites,
   isOwnerOfTrip,
+  searchUsers,
+  type UserSearchResult,
 } from './sharing'
 
 export {

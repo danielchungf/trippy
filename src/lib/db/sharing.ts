@@ -159,6 +159,29 @@ export async function acceptPendingInvites(): Promise<number> {
   return data?.length || 0
 }
 
+// Search for users by name or email
+export interface UserSearchResult {
+  id: string
+  email: string
+  name: string | null
+}
+
+export async function searchUsers(query: string): Promise<UserSearchResult[]> {
+  if (!query || query.length < 2) return []
+
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .rpc('search_users', { search_query: query })
+
+  if (error) {
+    console.error('Error searching users:', error)
+    return []
+  }
+
+  return data || []
+}
+
 // Check if current user is the owner of a trip
 export async function isOwnerOfTrip(tripId: string): Promise<boolean> {
   const supabase = createClient()
