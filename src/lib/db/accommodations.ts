@@ -24,6 +24,7 @@ export async function addAccommodation(tripId: string, data: Omit<Accommodation,
       cost: data.cost || null,
       contact: data.contact || null,
       booking_url: data.bookingUrl || null,
+      selected_photo_index: data.selectedPhotoIndex ?? null,
     })
     .select()
     .single()
@@ -49,6 +50,7 @@ export async function addAccommodation(tripId: string, data: Omit<Accommodation,
     contact: row.contact || undefined,
     bookingUrl: row.booking_url || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 
@@ -74,6 +76,7 @@ export async function updateAccommodation(tripId: string, accommodationId: strin
   if (data.contact !== undefined) updateData.contact = data.contact || null
   if (data.bookingUrl !== undefined) updateData.booking_url = data.bookingUrl || null
   if (data.locationId !== undefined) updateData.location_id = data.locationId || null
+  if (data.selectedPhotoIndex !== undefined) updateData.selected_photo_index = data.selectedPhotoIndex ?? null
 
   const { data: row, error } = await supabase
     .from('accommodations')
@@ -104,6 +107,7 @@ export async function updateAccommodation(tripId: string, accommodationId: strin
     contact: row.contact || undefined,
     bookingUrl: row.booking_url || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 

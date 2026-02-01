@@ -18,6 +18,7 @@ export async function addSavedPlace(tripId: string, data: Omit<SavedPlace, 'id'>
       category: data.category,
       notes: data.notes || null,
       photos: data.photos || null,
+      selected_photo_index: data.selectedPhotoIndex ?? null,
     })
     .select()
     .single()
@@ -37,6 +38,7 @@ export async function addSavedPlace(tripId: string, data: Omit<SavedPlace, 'id'>
     notes: row.notes || undefined,
     photos: row.photos || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 
@@ -56,6 +58,7 @@ export async function updateSavedPlace(tripId: string, placeId: string, data: Pa
   if (data.notes !== undefined) updateData.notes = data.notes || null
   if (data.photos !== undefined) updateData.photos = data.photos || null
   if (data.locationId !== undefined) updateData.location_id = data.locationId || null
+  if (data.selectedPhotoIndex !== undefined) updateData.selected_photo_index = data.selectedPhotoIndex ?? null
 
   const { data: row, error } = await supabase
     .from('saved_places')
@@ -80,6 +83,7 @@ export async function updateSavedPlace(tripId: string, placeId: string, data: Pa
     notes: row.notes || undefined,
     photos: row.photos || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 

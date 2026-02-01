@@ -69,6 +69,7 @@ import {
 import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
 import { PlacesMap } from "@/components/maps/PlacesMap"
+import { PlacePhoto } from "@/components/PlacePhoto"
 import { PlaceSearchResult } from "@/lib/maps"
 
 const CATEGORIES: { value: PlaceCategory; label: string; icon: React.ReactNode }[] = [
@@ -395,6 +396,7 @@ export default function SavedPlacesPage() {
                   onDelete={() => handleDeletePlace(place.id)}
                   onAssign={() => handleOpenAssignDialog(place)}
                   onHover={setHoveredPlaceId}
+                  onRefresh={refreshTrip}
                 />
               ))}
             </div>
@@ -643,7 +645,8 @@ function PlaceCardMapView({
   onEdit,
   onDelete,
   onAssign,
-  onHover
+  onHover,
+  onRefresh
 }: {
   place: SavedPlace
   trip: Trip
@@ -651,6 +654,7 @@ function PlaceCardMapView({
   onDelete: () => void
   onAssign: () => void
   onHover: (placeId: string | null) => void
+  onRefresh: () => Promise<void>
 }) {
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -664,9 +668,6 @@ function PlaceCardMapView({
     return labels[category] || category
   }
 
-  // Get photo URL - use first photo if available
-  const photoUrl = place.photos?.[0]
-
   return (
     <Card
       className="group hover:bg-muted/50 transition-colors"
@@ -676,19 +677,19 @@ function PlaceCardMapView({
       <CardContent className="p-3">
         <div className="flex gap-3">
           {/* Photo - 4:3 aspect ratio, height determined by content */}
-          <div className="shrink-0 w-20 aspect-[4/3] rounded-md overflow-hidden bg-muted">
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={place.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <MapPin className="h-5 w-5 text-muted-foreground/50" />
-              </div>
-            )}
-          </div>
+          <PlacePhoto
+            googlePlaceId={place.googlePlaceId}
+            photos={place.photos}
+            selectedPhotoIndex={place.selectedPhotoIndex}
+            alt={place.name}
+            className="w-20 aspect-[4/3] rounded-md"
+            editable={{
+              tripId: trip.id,
+              entityId: place.id,
+              entityType: 'savedPlace',
+              onRefresh
+            }}
+          />
 
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">

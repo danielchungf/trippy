@@ -24,6 +24,7 @@ export async function addLocation(tripId: string, data: {
       lat: data.coordinates?.lat || null,
       lng: data.coordinates?.lng || null,
       google_place_id: data.googlePlaceId || null,
+      selected_photo_index: null,
     })
     .select()
     .single()
@@ -66,6 +67,7 @@ export async function addLocation(tripId: string, data: {
       ? { lat: locationRow.lat, lng: locationRow.lng }
       : undefined,
     googlePlaceId: locationRow.google_place_id || undefined,
+    selectedPhotoIndex: locationRow.selected_photo_index ?? undefined,
   }
 }
 
@@ -83,6 +85,7 @@ export async function updateLocation(tripId: string, locationId: string, data: P
     updateData.lng = data.coordinates?.lng || null
   }
   if (data.googlePlaceId !== undefined) updateData.google_place_id = data.googlePlaceId || null
+  if (data.selectedPhotoIndex !== undefined) updateData.selected_photo_index = data.selectedPhotoIndex ?? null
 
   const { data: locationRow, error } = await supabase
     .from('locations')
@@ -122,6 +125,7 @@ export async function updateLocation(tripId: string, locationId: string, data: P
       ? { lat: locationRow.lat, lng: locationRow.lng }
       : undefined,
     googlePlaceId: locationRow.google_place_id || undefined,
+    selectedPhotoIndex: locationRow.selected_photo_index ?? undefined,
   }
 }
 

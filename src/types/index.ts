@@ -27,6 +27,7 @@ export interface SavedPlace {
   notes?: string
   photos?: string[]
   locationId?: string
+  selectedPhotoIndex?: number
 }
 
 // Activity (core entity - lives inside a Day)
@@ -88,6 +89,7 @@ export interface Accommodation {
   contact?: string
   bookingUrl?: string
   locationId?: string
+  selectedPhotoIndex?: number
 }
 
 // Location colors - Tailwind 400 level colors
@@ -119,6 +121,7 @@ export interface Location {
   googlePlaceId?: string
   startDate: string // ISO date
   endDate: string // ISO date
+  selectedPhotoIndex?: number
 }
 
 // Trip (top-level container)
