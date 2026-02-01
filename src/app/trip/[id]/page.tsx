@@ -47,6 +47,7 @@ import {
   LayoutGrid,
   ListOrdered,
   ScrollText,
+  CalendarClock,
   // Category icons
   Soup,
   Coffee,
@@ -142,6 +143,7 @@ import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { DayMap } from "@/components/maps/DayMap"
+import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { PlacesMap } from "@/components/maps/PlacesMap"
 import logo from "@/app/logo.png"
@@ -605,15 +607,13 @@ export default function TripPage() {
       </ResizablePanel>
     </ResizablePanelGroup>
   ) : (
-    // Overview tab: Single panel with location badges + stays
-    <div className="flex-1 overflow-auto">
-      <OverviewPanel
-        trip={trip}
-        onOpenLocationDialog={handleOpenLocationDialog}
-        onOpenAccommodationDialog={handleOpenAccommodationDialog}
-        onDeleteAccommodation={handleDeleteAccommodation}
-      />
-    </div>
+    // Overview tab: Two-panel layout with destinations + map
+    <OverviewPanel
+      trip={trip}
+      onOpenLocationDialog={handleOpenLocationDialog}
+      onOpenAccommodationDialog={handleOpenAccommodationDialog}
+      onDeleteAccommodation={handleDeleteAccommodation}
+    />
   )
 
   const mainContent = (
@@ -1917,6 +1917,10 @@ function RightPanel({
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
 
+  // Edit day name state
+  const [isEditNameOpen, setIsEditNameOpen] = useState(false)
+  const [dayName, setDayName] = useState("")
+
   // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -2003,7 +2007,7 @@ function RightPanel({
 
   // Display name: use day name if set, otherwise location name, otherwise "Day X"
   const displayName = day.name || location?.name || `Day ${dayNumber}`
-  const dayInfo = `Day ${dayNumberPadded}: ${dayOfWeek}, ${monthDay}`
+  const dayInfo = `${dayOfWeek}, ${monthDay}`
 
   // Departing accommodation (checking out this day) - shown at top
   const departingAccommodation = trip.accommodations.find(a => a.checkOut === selectedDayDate)
@@ -2151,6 +2155,19 @@ function RightPanel({
     }
   }
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDayName(day.name || '')
+    setIsEditNameOpen(true)
+  }
+
+  const handleSaveDayName = async () => {
+    await updateDayName(trip.id, day.date, dayName || undefined)
+    setIsEditNameOpen(false)
+    await onRefresh()
+  }
+
   return (
     <>
       <div ref={containerRef} className="flex flex-col h-full">
@@ -2177,7 +2194,15 @@ function RightPanel({
               )} />
             </div>
             <div className="flex flex-col">
-              <span className="text-h2 text-text-primary">{displayName}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-h2 text-text-primary">{displayName}</span>
+                <button
+                  onClick={handleEditClick}
+                  className="w-4 h-4 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Edit2 className="w-3 h-3 stroke-[2]" />
+                </button>
+              </div>
               <span className="text-h3 text-text-secondary">{dayInfo}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -2281,8 +2306,15 @@ function RightPanel({
                 </SortableContext>
               </DndContext>
             ) : (
-              <div className="p-4 text-body text-text-secondary">
-                No activities planned for this day
+              <div className="h-full flex items-center justify-center">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  leftIcon={<Plus />}
+                  onClick={() => handleOpenActivityDialog()}
+                >
+                  New activity
+                </Button>
               </div>
             )}
 
@@ -2489,6 +2521,29 @@ function RightPanel({
                 {editingActivity ? 'Save' : 'Add Activity'}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Day Name Dialog */}
+      <Dialog open={isEditNameOpen} onOpenChange={setIsEditNameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change Day Name</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="e.g., Beach Day, Museum Tour"
+              value={dayName}
+              onChange={(e) => setDayName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSaveDayName}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2912,7 +2967,7 @@ function ActivityRow({ activity }: { activity: Activity }) {
   )
 }
 
-// Overview Panel Component (wraps location badges + stays)
+// Overview Panel Component (two-panel layout with destinations + map)
 function OverviewPanel({
   trip,
   onOpenLocationDialog,
@@ -2924,36 +2979,253 @@ function OverviewPanel({
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   onDeleteAccommodation: (id: string) => Promise<void>
 }) {
+  const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
+
+  // Calculate days away
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tripStart = parseLocalDate(trip.startDate)
+  const tripEnd = parseLocalDate(trip.endDate)
+
+  const getDaysAwayInfo = () => {
+    if (today >= tripStart && today <= tripEnd) {
+      return { text: 'NOW', type: 'ongoing' as const }
+    }
+    if (today > tripEnd) {
+      const diffDays = Math.ceil((today.getTime() - tripEnd.getTime()) / (1000 * 60 * 60 * 24))
+      return { text: `${diffDays} DAY${diffDays === 1 ? '' : 'S'} AGO`, type: 'past' as const }
+    }
+    const diffDays = Math.ceil((tripStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    return { text: `${diffDays} DAY${diffDays === 1 ? '' : 'S'} AWAY`, type: 'upcoming' as const }
+  }
+
+  const daysAwayInfo = getDaysAwayInfo()
+
+  // Calculate stats
+  const duration = getTripDuration(trip)
+  const days = generateDaysFromTrip(trip)
+  const daysPlanned = days.filter(day => day.activities && day.activities.length > 0).length
+  const activitiesCount = days.reduce((acc, day) => acc + (day.activities?.length || 0), 0)
+  const placesSaved = trip.savedPlaces?.length || 0
+  const staysLogged = trip.accommodations?.length || 0
+
+  // Format stat numbers with leading zeros
+  const formatStat = (num: number) => String(num).padStart(2, '0')
+
+  // Sort locations by startDate
+  const sortedLocations = useMemo(() =>
+    [...trip.locations].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [trip.locations]
+  )
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Location Badges */}
-      <div className="p-3 border-b border-neutral-200">
-        <div className="flex items-center gap-2 flex-wrap">
-          {trip.locations.map((location) => (
-            <button
-              key={location.id}
-              onClick={() => onOpenLocationDialog(location)}
-              className="cursor-pointer"
-            >
-              <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-                {location.name}
-              </Badge>
-            </button>
-          ))}
-          <NakedIconButton
-            icon={<Plus />}
-            onClick={() => onOpenLocationDialog()}
+    <ResizablePanelGroup direction="horizontal" className="flex-1">
+      {/* Left Panel */}
+      <ResizablePanel
+        defaultSize="500px"
+        minSize="420px"
+        maxSize="580px"
+        className="border-r border-neutral-200 flex flex-col overflow-hidden"
+      >
+        {/* Days Away Banner */}
+        <div className="py-3 px-4 bg-white border-b border-border-muted flex items-center justify-center gap-2 flex-shrink-0">
+          <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-[#FF591E]">
+            <CalendarClock />
+          </span>
+          <span className="text-[14px] leading-[18px] tracking-[-0.02em] font-semibold text-[#FF591E] uppercase">{daysAwayInfo.text}</span>
+        </div>
+
+        {/* Stats Grid - 2x2 */}
+        <div className="h-[200px] grid grid-cols-2 grid-rows-2 border-b border-border-muted flex-shrink-0">
+          {/* Days Planned */}
+          <div className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted">
+            <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
+            <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
+          </div>
+
+          {/* Activities */}
+          <div className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted">
+            <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
+            <span className="text-h3 text-text-secondary uppercase">Activities</span>
+          </div>
+
+          {/* Places Saved */}
+          <div className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted">
+            <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
+            <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
+          </div>
+
+          {/* Stays Logged */}
+          <div className="flex flex-col items-center justify-center gap-[8px]">
+            <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
+            <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
+          </div>
+        </div>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-auto">
+          {/* Destinations Header */}
+          <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <span className="text-h2 text-text-primary">Destinations</span>
+            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+              New destination
+            </Button>
+          </div>
+
+          {/* Destinations List */}
+          {sortedLocations.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center">
+              <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+                Add your first destination
+              </Button>
+            </div>
+          ) : (
+            <div>
+              {sortedLocations.map((location, index) => (
+                <DestinationCard
+                  key={location.id}
+                  location={location}
+                  index={index}
+                  onEdit={() => onOpenLocationDialog(location)}
+                  onHover={() => setHoveredLocationIndex(index)}
+                  onLeave={() => setHoveredLocationIndex(null)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Stays Header */}
+          <div className="p-3 border-b border-t border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <span className="text-h2 text-text-primary">Stays</span>
+            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+              New stay
+            </Button>
+          </div>
+
+          {/* Stays List */}
+          <StaysPanel
+            trip={trip}
+            onOpenAccommodationDialog={onOpenAccommodationDialog}
+            onDeleteAccommodation={onDeleteAccommodation}
           />
         </div>
+      </ResizablePanel>
+
+      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+
+      {/* Right Panel - Destinations Map */}
+      <ResizablePanel className="flex flex-col overflow-hidden">
+        <DestinationsMap
+          locations={trip.locations}
+          hoveredIndex={hoveredLocationIndex}
+        />
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  )
+}
+
+// Destination Card Component
+function DestinationCard({
+  location,
+  index,
+  onEdit,
+  onHover,
+  onLeave
+}: {
+  location: Location
+  index: number
+  onEdit: () => void
+  onHover: () => void
+  onLeave: () => void
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
+
+  // Measure content height and calculate photo dimensions (4:3 ratio)
+  useEffect(() => {
+    if (contentRef.current) {
+      const height = contentRef.current.offsetHeight
+      setPhotoDimensions({
+        width: Math.round(height * (4 / 3)),
+        height: height
+      })
+    }
+  }, [location])
+
+  // Fetch photo from Google Places API
+  useEffect(() => {
+    if (location.googlePlaceId) {
+      import('@/lib/maps').then(({ getPlaceDetails }) => {
+        getPlaceDetails(location.googlePlaceId!).then(details => {
+          if (details?.photos?.[0]) {
+            setPhotoUrl(details.photos[0])
+          }
+        })
+      })
+    }
+  }, [location.googlePlaceId])
+
+  // Calculate nights
+  const startDate = parseLocalDate(location.startDate)
+  const endDate = parseLocalDate(location.endDate)
+  const nights = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  // Format dates: "MAR 20 — MAR 25"
+  const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+  const startMonth = monthFormat.format(startDate).toUpperCase()
+  const endMonth = monthFormat.format(endDate).toUpperCase()
+  const startDay = startDate.getDate()
+  const endDay = endDate.getDate()
+  const dateRange = startMonth === endMonth
+    ? `${startMonth} ${startDay} — ${endDay}`
+    : `${startMonth} ${startDay} — ${endMonth} ${endDay}`
+
+  return (
+    <div
+      className="group flex hover:bg-neutral-50 transition-colors border-b border-neutral-200 cursor-pointer"
+      onClick={onEdit}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
+      {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
+      <div
+        className="shrink-0 overflow-hidden bg-neutral-100"
+        style={{
+          width: photoDimensions?.width ?? 0,
+          height: photoDimensions?.height ?? 'auto'
+        }}
+      >
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={location.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <MapPin className="h-5 w-5 text-neutral-300" />
+          </div>
+        )}
       </div>
 
-      {/* Stays Content */}
-      <div className="flex-1 overflow-auto">
-        <StaysPanel
-          trip={trip}
-          onOpenAccommodationDialog={onOpenAccommodationDialog}
-          onDeleteAccommodation={onDeleteAccommodation}
-        />
+      {/* Content - 16px padding, 12px gap */}
+      <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
+        {/* Badge row */}
+        <div className="flex items-center">
+          <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+            {location.name}
+          </Badge>
+        </div>
+        {/* Nights text */}
+        <span className="text-body text-text-secondary">
+          {nights} {nights === 1 ? 'night' : 'nights'}
+        </span>
+      </div>
+
+      {/* Date Range */}
+      <div className="flex items-center pr-4 flex-shrink-0">
+        <span className="text-mono-regular text-text-secondary">{dateRange}</span>
       </div>
     </div>
   )
@@ -2971,10 +3243,8 @@ function StaysPanel({
 }) {
   if (trip.accommodations.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
-          New stay
-        </Button>
+      <div className="py-8 flex items-center justify-center">
+        <span className="text-body text-text-secondary">No stays logged yet</span>
       </div>
     )
   }
@@ -3017,11 +3287,6 @@ function StaysPanel({
           </div>
         )
       })}
-      <div className="p-4">
-        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
-          New stay
-        </Button>
-      </div>
     </div>
   )
 }
