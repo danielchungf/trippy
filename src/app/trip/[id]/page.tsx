@@ -144,6 +144,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
+import { StayDrawer } from "@/components/trip/StayDrawer"
 import { DayMap } from "@/components/maps/DayMap"
 import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { PlacePhoto } from "@/components/PlacePhoto"
@@ -218,6 +219,10 @@ export default function TripPage() {
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
+
+  // Stay drawer state
+  const [selectedStay, setSelectedStay] = useState<Accommodation | null>(null)
+  const [isStayDrawerOpen, setIsStayDrawerOpen] = useState(false)
 
   // Place dialog state
   const [isPlaceOpen, setIsPlaceOpen] = useState(false)
@@ -413,6 +418,12 @@ export default function TripPage() {
     setIsCheckInOpen(false)
     setIsCheckOutOpen(false)
     setIsAccommodationOpen(true)
+  }
+
+  // Handler for opening stay drawer (for viewing existing stays)
+  const handleOpenStayDrawer = (accommodation: Accommodation) => {
+    setSelectedStay(accommodation)
+    setIsStayDrawerOpen(true)
   }
 
   const handleAccommodationSearchSelect = (place: PlaceSearchResult) => {
@@ -616,6 +627,7 @@ export default function TripPage() {
       trip={trip}
       onOpenLocationDialog={handleOpenLocationDialog}
       onOpenAccommodationDialog={handleOpenAccommodationDialog}
+      onOpenStayDrawer={handleOpenStayDrawer}
       onRefresh={refreshTrip}
     />
   )
@@ -938,6 +950,16 @@ export default function TripPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Stay Drawer */}
+      <StayDrawer
+        open={isStayDrawerOpen}
+        onOpenChange={setIsStayDrawerOpen}
+        tripId={tripId}
+        accommodation={selectedStay}
+        locations={trip.locations}
+        onRefresh={refreshTrip}
+      />
 
       {/* Place Dialog */}
       <Dialog open={isPlaceOpen} onOpenChange={setIsPlaceOpen}>
@@ -2985,11 +3007,13 @@ function OverviewPanel({
   trip,
   onOpenLocationDialog,
   onOpenAccommodationDialog,
+  onOpenStayDrawer,
   onRefresh
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  onOpenStayDrawer: (accommodation: Accommodation) => void
   onRefresh: () => Promise<void>
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
@@ -3217,7 +3241,7 @@ function OverviewPanel({
                 <div className="flex-1 overflow-auto">
                   <OverviewStaysList
                     trip={trip}
-                    onOpenAccommodationDialog={onOpenAccommodationDialog}
+                    onOpenStayDrawer={onOpenStayDrawer}
                     onRefresh={onRefresh}
                   />
                 </div>
@@ -3382,11 +3406,11 @@ function StaysPanel({
 // Overview Stays List Component (for right panel)
 function OverviewStaysList({
   trip,
-  onOpenAccommodationDialog,
+  onOpenStayDrawer,
   onRefresh
 }: {
   trip: TripWithOwnership
-  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  onOpenStayDrawer: (accommodation: Accommodation) => void
   onRefresh: () => Promise<void>
 }) {
   return (
@@ -3399,7 +3423,7 @@ function OverviewStaysList({
             tripId={trip.id}
             accommodation={accommodation}
             location={location}
-            onClick={() => onOpenAccommodationDialog(accommodation)}
+            onClick={() => onOpenStayDrawer(accommodation)}
             onRefresh={onRefresh}
           />
         )

@@ -48,6 +48,23 @@ export interface PlaceSearchResult {
   photos?: string[]
 }
 
+export interface PlaceReview {
+  authorName: string
+  rating: number
+  text: string
+  relativeTimeDescription: string
+}
+
+export interface PlaceDetailsExtended extends PlaceSearchResult {
+  website?: string
+  phoneNumber?: string
+  openingHours?: string[]
+  isOpenNow?: boolean
+  priceLevel?: number
+  reviewCount?: number
+  reviews?: PlaceReview[]
+}
+
 export interface GeocodeResult {
   address: string
   coordinates: Coordinates
@@ -141,6 +158,66 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
             rating: place.rating,
             types: place.types,
             photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
+          })
+        } else {
+          resolve(null)
+        }
+      }
+    )
+  })
+}
+
+export async function getPlaceDetailsExtended(placeId: string): Promise<PlaceDetailsExtended | null> {
+  await loadGoogleMaps()
+  const places = await loadPlacesLibrary()
+
+  return new Promise((resolve) => {
+    const service = new places.PlacesService(document.createElement('div'))
+
+    service.getDetails(
+      {
+        placeId,
+        fields: [
+          'place_id',
+          'name',
+          'formatted_address',
+          'geometry',
+          'rating',
+          'photos',
+          'types',
+          'website',
+          'formatted_phone_number',
+          'opening_hours',
+          'price_level',
+          'reviews',
+          'user_ratings_total'
+        ]
+      },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          resolve({
+            placeId: place.place_id || '',
+            name: place.name || '',
+            address: place.formatted_address || '',
+            coordinates: {
+              lat: place.geometry?.location?.lat() || 0,
+              lng: place.geometry?.location?.lng() || 0
+            },
+            rating: place.rating,
+            types: place.types,
+            photos: place.photos?.slice(0, 5).map(p => p.getUrl({ maxWidth: 800 })),
+            website: place.website,
+            phoneNumber: place.formatted_phone_number,
+            openingHours: place.opening_hours?.weekday_text,
+            isOpenNow: place.opening_hours?.isOpen?.(),
+            priceLevel: place.price_level,
+            reviewCount: place.user_ratings_total,
+            reviews: place.reviews?.slice(0, 3).map(review => ({
+              authorName: review.author_name || 'Anonymous',
+              rating: review.rating || 0,
+              text: review.text || '',
+              relativeTimeDescription: review.relative_time_description || ''
+            }))
           })
         } else {
           resolve(null)
