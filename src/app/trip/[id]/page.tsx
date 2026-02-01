@@ -32,6 +32,8 @@ import {
   Edit2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Plane,
   User,
   LogOut,
@@ -144,6 +146,7 @@ import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { DayMap } from "@/components/maps/DayMap"
 import { DestinationsMap } from "@/components/maps/DestinationsMap"
+import { PlacePhoto } from "@/components/PlacePhoto"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { PlacesMap } from "@/components/maps/PlacesMap"
 import logo from "@/app/logo.png"
@@ -565,6 +568,7 @@ export default function TripPage() {
         trip={trip}
         onOpenPlaceDialog={handleOpenPlaceDialog}
         onDeletePlace={handleDeletePlaceById}
+        onRefresh={refreshTrip}
         assignedConfirmation={assignedConfirmation}
       />
     </div>
@@ -612,7 +616,7 @@ export default function TripPage() {
       trip={trip}
       onOpenLocationDialog={handleOpenLocationDialog}
       onOpenAccommodationDialog={handleOpenAccommodationDialog}
-      onDeleteAccommodation={handleDeleteAccommodation}
+      onRefresh={refreshTrip}
     />
   )
 
@@ -1179,13 +1183,17 @@ function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (ta
 function DraggablePlaceCard({
   place,
   location,
+  tripId,
   onOpenPlaceDialog,
+  onRefresh,
   confirmation,
   isAssigned
 }: {
   place: SavedPlace
   location: Location | null
+  tripId: string
   onOpenPlaceDialog: (place: SavedPlace) => void
+  onRefresh: () => Promise<void>
   confirmation: {
     placeId: string
     dayName: string
@@ -1198,7 +1206,6 @@ function DraggablePlaceCard({
     id: place.id,
   })
 
-  const photoUrl = place.photos?.[0]
   const categoryConfig = CATEGORY_CONFIG[place.category] || { label: place.category, icon: Flower }
   const CategoryIcon = categoryConfig.icon
 
@@ -1229,17 +1236,20 @@ function DraggablePlaceCard({
       )}
 
       {/* Photo */}
-      <div className="w-full aspect-video bg-neutral-100 flex items-center justify-center overflow-hidden">
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={place.name}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <ImageOff className="w-8 h-8 text-text-secondary" strokeWidth={1.5} />
-        )}
-      </div>
+      <PlacePhoto
+        googlePlaceId={place.googlePlaceId}
+        photos={place.photos}
+        selectedPhotoIndex={place.selectedPhotoIndex}
+        alt={place.name}
+        className="w-full aspect-video"
+        placeholderIcon={<ImageOff className="w-8 h-8 text-text-secondary" strokeWidth={1.5} />}
+        editable={{
+          tripId,
+          entityId: place.id,
+          entityType: 'savedPlace',
+          onRefresh
+        }}
+      />
       {/* Content */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
@@ -1273,11 +1283,13 @@ function PlacesRightPanel({
   trip,
   onOpenPlaceDialog,
   onDeletePlace,
+  onRefresh,
   assignedConfirmation
 }: {
   trip: TripWithOwnership
   onOpenPlaceDialog: (place?: SavedPlace) => void
   onDeletePlace: (placeId: string) => Promise<void>
+  onRefresh: () => Promise<void>
   assignedConfirmation: {
     placeId: string
     dayName: string
@@ -1585,10 +1597,12 @@ function PlacesRightPanel({
                       key={place.id}
                       place={place}
                       location={location}
+                      tripId={trip.id}
                       onEdit={() => onOpenPlaceDialog(place)}
                       onDelete={() => onDeletePlace(place.id)}
                       onHover={setHoveredPlaceId}
                       onClick={() => setFocusedPlaceId(place.id)}
+                      onRefresh={onRefresh}
                     />
                   )
                 })
@@ -1760,7 +1774,9 @@ function PlacesRightPanel({
                       key={place.id}
                       place={place}
                       location={location}
+                      tripId={trip.id}
                       onOpenPlaceDialog={onOpenPlaceDialog}
+                      onRefresh={onRefresh}
                       confirmation={confirmation}
                       isAssigned={isPlaceAssigned(place.id)}
                     />
@@ -1779,17 +1795,21 @@ function PlacesRightPanel({
 function PlaceCardMapView({
   place,
   location,
+  tripId,
   onEdit,
   onDelete,
   onHover,
-  onClick
+  onClick,
+  onRefresh
 }: {
   place: SavedPlace
   location: Location | null
+  tripId: string
   onEdit: () => void
   onDelete: () => void
   onHover: (placeId: string | null) => void
   onClick: () => void
+  onRefresh: () => Promise<void>
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
@@ -1808,8 +1828,6 @@ function PlaceCardMapView({
   const categoryConfig = CATEGORY_CONFIG[place.category] || { label: place.category, icon: Flower }
   const CategoryIcon = categoryConfig.icon
 
-  const photoUrl = place.photos?.[0]
-
   return (
     <div
       className="group flex hover:bg-neutral-50 transition-colors border-b border-neutral-200 cursor-pointer"
@@ -1818,25 +1836,20 @@ function PlaceCardMapView({
       onClick={onClick}
     >
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
-      <div
-        className="shrink-0 overflow-hidden bg-neutral-100"
-        style={{
-          width: photoDimensions?.width ?? 0,
-          height: photoDimensions?.height ?? 'auto'
+      <PlacePhoto
+        googlePlaceId={place.googlePlaceId}
+        photos={place.photos}
+        selectedPhotoIndex={place.selectedPhotoIndex}
+        alt={place.name}
+        width={photoDimensions?.width ?? 0}
+        height={photoDimensions?.height ?? 'auto'}
+        editable={{
+          tripId,
+          entityId: place.id,
+          entityType: 'savedPlace',
+          onRefresh
         }}
-      >
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={place.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <MapPin className="h-5 w-5 text-neutral-300" />
-          </div>
-        )}
-      </div>
+      />
 
       {/* Content - 16px padding, 12px gap */}
       <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
@@ -2972,14 +2985,49 @@ function OverviewPanel({
   trip,
   onOpenLocationDialog,
   onOpenAccommodationDialog,
-  onDeleteAccommodation
+  onRefresh
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
-  onDeleteAccommodation: (id: string) => Promise<void>
+  onRefresh: () => Promise<void>
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
+
+  // Resizable map state for right panel
+  const rightPanelRef = useRef<HTMLDivElement>(null)
+  const [mapHeight, setMapHeight] = useState(500)
+  const [isResizing, setIsResizing] = useState(false)
+
+  // Handle resize drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!rightPanelRef.current) return
+      const containerRect = rightPanelRef.current.getBoundingClientRect()
+      const newHeight = e.clientY - containerRect.top
+      // Clamp between 200px and 500px
+      setMapHeight(Math.min(500, Math.max(200, newHeight)))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
 
   // Calculate days away
   const today = new Date()
@@ -3084,41 +3132,99 @@ function OverviewPanel({
               {sortedLocations.map((location, index) => (
                 <DestinationCard
                   key={location.id}
+                  tripId={trip.id}
                   location={location}
                   index={index}
                   onEdit={() => onOpenLocationDialog(location)}
                   onHover={() => setHoveredLocationIndex(index)}
                   onLeave={() => setHoveredLocationIndex(null)}
+                  onRefresh={onRefresh}
                 />
               ))}
             </div>
           )}
-
-          {/* Stays Header */}
-          <div className="p-3 border-b border-t border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
-            <span className="text-h2 text-text-primary">Stays</span>
-            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
-              New stay
-            </Button>
-          </div>
-
-          {/* Stays List */}
-          <StaysPanel
-            trip={trip}
-            onOpenAccommodationDialog={onOpenAccommodationDialog}
-            onDeleteAccommodation={onDeleteAccommodation}
-          />
         </div>
       </ResizablePanel>
 
       <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
-      {/* Right Panel - Destinations Map */}
+      {/* Right Panel - Map + Stays */}
       <ResizablePanel className="flex flex-col overflow-hidden">
-        <DestinationsMap
-          locations={trip.locations}
-          hoveredIndex={hoveredLocationIndex}
-        />
+        <div ref={rightPanelRef} className="flex flex-col h-full">
+          {/* Map Panel - Resizable height */}
+          <div
+            className="flex-shrink-0"
+            style={{ height: mapHeight }}
+          >
+            <DestinationsMap
+              locations={trip.locations}
+              hoveredIndex={hoveredLocationIndex}
+            />
+          </div>
+
+          {/* Stays Panel - Takes remaining space */}
+          <div className="flex-1 flex flex-col min-h-0 bg-white">
+            {trip.accommodations.length === 0 ? (
+              /* Empty State - No header, just centered content with resize handle */
+              <div className="flex-1 flex flex-col relative group">
+                {/* Resize Handle - pill at top */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center z-10"
+                  onMouseDown={handleMouseDown}
+                >
+                  <div className={cn(
+                    "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
+                    isResizing && "opacity-100"
+                  )} />
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white">
+                  <div className="text-center">
+                    <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
+                    <p className="text-body text-text-secondary mt-1">Add your hotels, Airbnbs, or other accommodations</p>
+                  </div>
+                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+                    New stay
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Non-empty State - Header + List */
+              <>
+                {/* Stays Header with Resize Handle */}
+                <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
+                  {/* Resize Handle - pill at top of header */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
+                    onMouseDown={handleMouseDown}
+                  >
+                    <div className={cn(
+                      "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
+                      isResizing && "opacity-100"
+                    )} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-h2 text-text-primary">Stays</span>
+                    <span className="text-body text-text-secondary">
+                      {trip.accommodations.length} {trip.accommodations.length === 1 ? 'stay' : 'stays'} across {new Set(trip.accommodations.map(a => a.locationId)).size} {new Set(trip.accommodations.map(a => a.locationId)).size === 1 ? 'destination' : 'destinations'}
+                    </span>
+                  </div>
+                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+                    New stay
+                  </Button>
+                </div>
+
+                {/* Stays List */}
+                <div className="flex-1 overflow-auto">
+                  <OverviewStaysList
+                    trip={trip}
+                    onOpenAccommodationDialog={onOpenAccommodationDialog}
+                    onRefresh={onRefresh}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   )
@@ -3126,20 +3232,23 @@ function OverviewPanel({
 
 // Destination Card Component
 function DestinationCard({
+  tripId,
   location,
   index,
   onEdit,
   onHover,
-  onLeave
+  onLeave,
+  onRefresh
 }: {
+  tripId: string
   location: Location
   index: number
   onEdit: () => void
   onHover: () => void
   onLeave: () => void
+  onRefresh: () => Promise<void>
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
 
   // Measure content height and calculate photo dimensions (4:3 ratio)
@@ -3153,33 +3262,18 @@ function DestinationCard({
     }
   }, [location])
 
-  // Fetch photo from Google Places API
-  useEffect(() => {
-    if (location.googlePlaceId) {
-      import('@/lib/maps').then(({ getPlaceDetails }) => {
-        getPlaceDetails(location.googlePlaceId!).then(details => {
-          if (details?.photos?.[0]) {
-            setPhotoUrl(details.photos[0])
-          }
-        })
-      })
-    }
-  }, [location.googlePlaceId])
-
   // Calculate nights
   const startDate = parseLocalDate(location.startDate)
   const endDate = parseLocalDate(location.endDate)
   const nights = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
 
-  // Format dates: "MAR 20 — MAR 25"
+  // Format dates: "APR 06 — APR 08" or "MAR 25 — APR 02"
   const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
   const startMonth = monthFormat.format(startDate).toUpperCase()
   const endMonth = monthFormat.format(endDate).toUpperCase()
-  const startDay = startDate.getDate()
-  const endDay = endDate.getDate()
-  const dateRange = startMonth === endMonth
-    ? `${startMonth} ${startDay} — ${endDay}`
-    : `${startMonth} ${startDay} — ${endMonth} ${endDay}`
+  const startDay = String(startDate.getDate()).padStart(2, '0')
+  const endDay = String(endDate.getDate()).padStart(2, '0')
+  const dateRange = `${startMonth} ${startDay} — ${endMonth} ${endDay}`
 
   return (
     <div
@@ -3189,25 +3283,19 @@ function DestinationCard({
       onMouseLeave={onLeave}
     >
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
-      <div
-        className="shrink-0 overflow-hidden bg-neutral-100"
-        style={{
-          width: photoDimensions?.width ?? 0,
-          height: photoDimensions?.height ?? 'auto'
+      <PlacePhoto
+        googlePlaceId={location.googlePlaceId}
+        selectedPhotoIndex={location.selectedPhotoIndex}
+        alt={location.name}
+        width={photoDimensions?.width ?? 0}
+        height={photoDimensions?.height ?? 'auto'}
+        editable={{
+          tripId,
+          entityId: location.id,
+          entityType: 'location',
+          onRefresh
         }}
-      >
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={location.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <MapPin className="h-5 w-5 text-neutral-300" />
-          </div>
-        )}
-      </div>
+      />
 
       {/* Content - 16px padding, 12px gap */}
       <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
@@ -3287,6 +3375,115 @@ function StaysPanel({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Overview Stays List Component (for right panel)
+function OverviewStaysList({
+  trip,
+  onOpenAccommodationDialog,
+  onRefresh
+}: {
+  trip: TripWithOwnership
+  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  onRefresh: () => Promise<void>
+}) {
+  return (
+    <div>
+      {trip.accommodations.map(accommodation => {
+        const location = trip.locations.find(l => l.id === accommodation.locationId)
+        return (
+          <StayCard
+            key={accommodation.id}
+            tripId={trip.id}
+            accommodation={accommodation}
+            location={location}
+            onClick={() => onOpenAccommodationDialog(accommodation)}
+            onRefresh={onRefresh}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+// Stay Card Component (for Overview right panel)
+function StayCard({
+  tripId,
+  accommodation,
+  location,
+  onClick,
+  onRefresh
+}: {
+  tripId: string
+  accommodation: Accommodation
+  location?: Location
+  onClick: () => void
+  onRefresh: () => Promise<void>
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
+
+  // Measure content height and calculate photo dimensions (4:3 ratio)
+  useEffect(() => {
+    if (contentRef.current) {
+      const height = contentRef.current.offsetHeight
+      setPhotoDimensions({
+        width: Math.round(height * (4 / 3)),
+        height: height
+      })
+    }
+  }, [accommodation])
+
+  // Format dates: "APR 06 — APR 08" or "MAR 25 — APR 02"
+  const checkIn = parseLocalDate(accommodation.checkIn)
+  const checkOut = parseLocalDate(accommodation.checkOut)
+  const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+  const inMonth = monthFormat.format(checkIn).toUpperCase()
+  const outMonth = monthFormat.format(checkOut).toUpperCase()
+  const inDay = String(checkIn.getDate()).padStart(2, '0')
+  const outDay = String(checkOut.getDate()).padStart(2, '0')
+  const dateRange = `${inMonth} ${inDay} — ${outMonth} ${outDay}`
+
+  return (
+    <div
+      className="group flex hover:bg-neutral-50 transition-colors border-b border-neutral-200 cursor-pointer"
+      onClick={onClick}
+    >
+      {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
+      <PlacePhoto
+        googlePlaceId={accommodation.googlePlaceId}
+        selectedPhotoIndex={accommodation.selectedPhotoIndex}
+        alt={accommodation.name}
+        width={photoDimensions?.width ?? 0}
+        height={photoDimensions?.height ?? 'auto'}
+        editable={{
+          tripId,
+          entityId: accommodation.id,
+          entityType: 'accommodation',
+          onRefresh
+        }}
+      />
+
+      {/* Content - 16px padding, 12px gap */}
+      <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-2">
+        {/* Badge + Date range row */}
+        <div className="flex items-center justify-between">
+          {location && (
+            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+              {location.name}
+            </Badge>
+          )}
+          <span className="text-mono-regular text-text-secondary">{dateRange}</span>
+        </div>
+        {/* Name */}
+        <h3 className="text-h3 text-text-primary truncate">{accommodation.name}</h3>
+        {/* Address */}
+        {accommodation.address && (
+          <p className="text-body text-text-secondary truncate">{accommodation.address}</p>
+        )}
+      </div>
     </div>
   )
 }

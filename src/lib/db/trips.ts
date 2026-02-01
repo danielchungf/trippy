@@ -27,6 +27,7 @@ interface LocationRow {
   lat: number | null
   lng: number | null
   google_place_id: string | null
+  selected_photo_index: number | null
 }
 
 interface AccommodationRow {
@@ -47,6 +48,7 @@ interface AccommodationRow {
   cost: number | null
   contact: string | null
   booking_url: string | null
+  selected_photo_index: number | null
 }
 
 interface SavedPlaceRow {
@@ -61,6 +63,7 @@ interface SavedPlaceRow {
   category: string
   notes: string | null
   photos: string[] | null
+  selected_photo_index: number | null
 }
 
 interface DayRow {
@@ -97,6 +100,7 @@ function rowToLocation(row: LocationRow): Location {
     endDate: row.end_date,
     coordinates: row.lat && row.lng ? { lat: row.lat, lng: row.lng } : undefined,
     googlePlaceId: row.google_place_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 
@@ -117,6 +121,7 @@ function rowToAccommodation(row: AccommodationRow): Accommodation {
     contact: row.contact || undefined,
     bookingUrl: row.booking_url || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 
@@ -131,6 +136,7 @@ function rowToSavedPlace(row: SavedPlaceRow): SavedPlace {
     notes: row.notes || undefined,
     photos: row.photos || undefined,
     locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
   }
 }
 
