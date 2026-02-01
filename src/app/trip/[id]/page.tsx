@@ -45,6 +45,8 @@ import {
   List,
   MapPin,
   LayoutGrid,
+  ListOrdered,
+  ScrollText,
   // Category icons
   Soup,
   Coffee,
@@ -145,11 +147,11 @@ import { PlacesMap } from "@/components/maps/PlacesMap"
 import logo from "@/app/logo.png"
 
 // Tab types
-type TabId = 'itinerary' | 'stays' | 'places' | 'packing'
+type TabId = 'overview' | 'itinerary' | 'places' | 'packing'
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'overview', label: 'OVERVIEW' },
   { id: 'itinerary', label: 'ITINERARY' },
-  { id: 'stays', label: 'STAYS' },
   { id: 'places', label: 'PLACES' },
   // { id: 'packing', label: 'PACKING' }, // TODO: Re-enable for post-MVP
 ]
@@ -182,7 +184,7 @@ export default function TripPage() {
   const { data: trip, isLoading } = useTrip(tripId)
   const refreshTrip = useRefreshTrip(tripId)
 
-  const [activeTab, setActiveTab] = useState<TabId>('itinerary')
+  const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
 
   // Location dialog state
@@ -553,56 +555,42 @@ export default function TripPage() {
 
   const duration = getTripDuration(trip)
 
-  const mainContent = (
+  // Content area based on active tab
+  const tabContent = activeTab === 'places' ? (
+    // Places tab: Full-width places panel
+    <div className="flex-1 overflow-hidden">
+      <PlacesRightPanel
+        trip={trip}
+        onOpenPlaceDialog={handleOpenPlaceDialog}
+        onDeletePlace={handleDeletePlaceById}
+        assignedConfirmation={assignedConfirmation}
+      />
+    </div>
+  ) : activeTab === 'itinerary' ? (
+    // Itinerary tab: Two-panel layout
     <ResizablePanelGroup direction="horizontal" className="flex-1">
-      {/* Left Panel - Resizable (420px min, 580px max, default 580px) */}
+      {/* Left Panel - Itinerary list */}
       <ResizablePanel
         defaultSize="500px"
         minSize="420px"
         maxSize="580px"
-        className="border-r border-t border-neutral-200 flex flex-col overflow-hidden"
+        className="border-r border-neutral-200 flex flex-col overflow-hidden"
       >
-        {/* Trip Header */}
-        <TripHeader
-          trip={trip}
-          tripId={tripId}
-          duration={duration}
-          onOpenLocationDialog={handleOpenLocationDialog}
-          onRefresh={refreshTrip}
-        />
-
-        {/* Tab Bar */}
-        <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
-
-        {/* Tab Content */}
         <div className="flex-1 overflow-auto">
-          <TabContent
-            activeTab={activeTab}
+          <ItineraryPanel
             trip={trip}
-            tripId={tripId}
             onRefresh={refreshTrip}
-            onOpenAccommodationDialog={handleOpenAccommodationDialog}
-            onDeleteAccommodation={handleDeleteAccommodation}
-            onOpenPlaceDialog={handleOpenPlaceDialog}
             onSelectDay={setSelectedDayDate}
             selectedDayDate={selectedDayDate}
-            isDraggingPlace={!!draggingPlace}
           />
         </div>
       </ResizablePanel>
 
       <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
-      {/* Right Panel - Remaining width */}
-      <ResizablePanel className="border-t border-neutral-200 flex flex-col overflow-hidden">
-        {activeTab === 'places' ? (
-          <PlacesRightPanel
-            trip={trip}
-            onOpenPlaceDialog={handleOpenPlaceDialog}
-            onDeletePlace={handleDeletePlaceById}
-            assignedConfirmation={assignedConfirmation}
-          />
-        ) : selectedDayDate ? (
+      {/* Right Panel - Map + day activities */}
+      <ResizablePanel className="flex flex-col overflow-hidden">
+        {selectedDayDate ? (
           <RightPanel
             trip={trip}
             selectedDayDate={selectedDayDate}
@@ -616,6 +604,33 @@ export default function TripPage() {
         )}
       </ResizablePanel>
     </ResizablePanelGroup>
+  ) : (
+    // Overview tab: Single panel with location badges + stays
+    <div className="flex-1 overflow-auto">
+      <OverviewPanel
+        trip={trip}
+        onOpenLocationDialog={handleOpenLocationDialog}
+        onOpenAccommodationDialog={handleOpenAccommodationDialog}
+        onDeleteAccommodation={handleDeleteAccommodation}
+      />
+    </div>
+  )
+
+  const mainContent = (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Trip Header with Tabs */}
+      <TripHeader
+        trip={trip}
+        tripId={tripId}
+        duration={duration}
+        onRefresh={refreshTrip}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      {/* Tab Content Area */}
+      {tabContent}
+    </div>
   )
 
   return (
@@ -1072,24 +1087,26 @@ function Sidebar({ onNavigateHome }: { onNavigateHome: () => void }) {
   )
 }
 
-// Trip Header Component
+// Trip Header Component (with tabs)
 function TripHeader({
   trip,
   tripId,
   duration,
-  onOpenLocationDialog,
-  onRefresh
+  onRefresh,
+  activeTab,
+  onTabChange
 }: {
   trip: TripWithOwnership
   tripId: string
   duration: number
-  onOpenLocationDialog: (location?: Location) => void
   onRefresh: () => Promise<void>
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
 }) {
   return (
-    <header className="p-3 flex flex-col gap-3">
-      {/* Row 1: Title + Buttons */}
-      <div className="flex items-start justify-between">
+    <header className="flex border-t border-b border-border-muted">
+      {/* Left Section: Title + Dates + Buttons (500px fixed) */}
+      <div className="w-[500px] shrink-0 p-3 flex items-center justify-between border-r border-border-muted">
         <div>
           <h1 className="text-h1">{trip.name}</h1>
           <p className="text-h2 text-text-secondary">
@@ -1117,23 +1134,9 @@ function TripHeader({
         </div>
       </div>
 
-      {/* Row 2: Location Badges */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {trip.locations.map((location) => (
-          <button
-            key={location.id}
-            onClick={() => onOpenLocationDialog(location)}
-            className="cursor-pointer"
-          >
-            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-              {location.name}
-            </Badge>
-          </button>
-        ))}
-        <NakedIconButton
-          icon={<Plus />}
-          onClick={() => onOpenLocationDialog()}
-        />
+      {/* Right Section: Tabs (fills remaining space) */}
+      <div className="flex-1 flex items-center">
+        <TabBar activeTab={activeTab} onTabChange={onTabChange} />
       </div>
     </header>
   )
@@ -1142,7 +1145,7 @@ function TripHeader({
 // Tab Bar Component
 function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (tab: TabId) => void }) {
   return (
-    <div className="flex border-y border-neutral-200">
+    <div className="flex w-full h-full">
       {TABS.map((tab, index) => {
         const isActive = activeTab === tab.id
         const prevIsActive = index > 0 && activeTab === TABS[index - 1].id
@@ -1153,7 +1156,7 @@ function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (ta
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`
-              flex-1 px-4 py-3 text-center font-inter text-[14px] font-medium leading-[18px] tracking-[-0.02em]
+              flex-1 px-4 text-center font-inter text-[14px] font-medium leading-[18px] tracking-[-0.02em]
               transition-colors relative
               ${isActive
                 ? 'bg-neutral-800 text-white'
@@ -1168,152 +1171,6 @@ function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (ta
           </button>
         )
       })}
-    </div>
-  )
-}
-
-// Tab Content Component
-function TabContent({
-  activeTab,
-  trip,
-  tripId,
-  onRefresh,
-  onOpenAccommodationDialog,
-  onDeleteAccommodation,
-  onOpenPlaceDialog,
-  onSelectDay,
-  selectedDayDate,
-  isDraggingPlace
-}: {
-  activeTab: TabId
-  trip: TripWithOwnership
-  tripId: string
-  onRefresh: () => Promise<void>
-  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
-  onDeleteAccommodation: (id: string) => Promise<void>
-  onOpenPlaceDialog: (place?: SavedPlace) => void
-  onSelectDay: (date: string) => void
-  selectedDayDate: string | null
-  isDraggingPlace: boolean
-}) {
-  // Local state for optimistic updates on packing items
-  const [localPackingItems, setLocalPackingItems] = useState(trip.packingItems)
-
-  // Sync local state when trip data changes (e.g., after add/delete)
-  useEffect(() => {
-    setLocalPackingItems(trip.packingItems)
-  }, [trip.packingItems])
-
-  switch (activeTab) {
-    case 'itinerary':
-      return <ItineraryPanel trip={trip} onRefresh={onRefresh} onSelectDay={onSelectDay} selectedDayDate={selectedDayDate} />
-    case 'stays':
-      return (
-        <StaysPanel
-          trip={trip}
-          onOpenAccommodationDialog={onOpenAccommodationDialog}
-          onDeleteAccommodation={onDeleteAccommodation}
-        />
-      )
-    case 'places': {
-      const days = generateDaysFromTrip(trip)
-      return (
-        <div className="flex flex-col">
-          {/* Hint header */}
-          <div className="h-[62px] flex items-center justify-center border-b border-neutral-200 bg-neutral-50">
-            <p className="text-body text-text-secondary">Drag a place to a day to add it as an activity</p>
-          </div>
-          {days.map((day, index) => {
-            const location = trip.locations.find(loc => loc.id === day.locationId)
-            const dayNumber = index + 1
-
-            return (
-              <DroppableDayRow
-                key={day.date}
-                day={day}
-                dayNumber={dayNumber}
-                location={location}
-                onSelectDay={onSelectDay}
-                isDraggingPlace={isDraggingPlace}
-              />
-            )
-          })}
-        </div>
-      )
-    }
-    case 'packing':
-      return (
-        <div className="p-4">
-          <PackingList
-            tripId={tripId}
-            packingItems={localPackingItems}
-            onPackingItemsChange={setLocalPackingItems}
-            onRefresh={onRefresh}
-          />
-        </div>
-      )
-    default:
-      return null
-  }
-}
-
-// Droppable Day Row Component (for places tab)
-function DroppableDayRow({
-  day,
-  dayNumber,
-  location,
-  onSelectDay,
-  isDraggingPlace
-}: {
-  day: Day
-  dayNumber: number
-  location?: Location
-  onSelectDay: (date: string) => void
-  isDraggingPlace: boolean
-}) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: day.date,
-  })
-
-  const date = parseLocalDate(day.date)
-  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' })
-  const dayOfMonth = String(date.getDate()).padStart(2, '0')
-  const dayNumberPadded = String(dayNumber).padStart(2, '0')
-
-  const activityCount = day.activities.length
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "border-b border-neutral-200 p-4 transition-colors",
-        isDraggingPlace && "cursor-pointer",
-        isOver ? "bg-neutral-200" : isDraggingPlace && "hover:bg-neutral-100"
-      )}
-      onClick={() => onSelectDay(day.date)}
-    >
-      <div className="flex items-center justify-between gap-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg border border-border-muted">
-                  <span className="text-mono-regular text-text-primary">{activityCount}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Number of activities</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
-            {day.name || `Day ${dayNumber}`}
-          </Badge>
-        </div>
-        <span className="text-mono-small text-text-secondary flex-shrink-0">
-          DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
-        </span>
-      </div>
     </div>
   )
 }
@@ -1531,41 +1388,6 @@ function PlacesRightPanel({
     return selectedLocationIds.has(locationId)
   }
 
-  // Resizable map state
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [mapHeight, setMapHeight] = useState(300) // Default 300px
-  const [isResizing, setIsResizing] = useState(false)
-
-  // Handle resize drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-  }, [])
-
-  useEffect(() => {
-    if (!isResizing) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const newHeight = e.clientY - containerRect.top
-      // Clamp between 200px and 500px
-      setMapHeight(Math.min(500, Math.max(200, newHeight)))
-    }
-
-    const handleMouseUp = () => {
-      setIsResizing(false)
-    }
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing])
-
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -1614,39 +1436,18 @@ function PlacesRightPanel({
       </div>
 
       {/* Content */}
-      {totalPlaceCount === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-text-secondary">No places saved yet</p>
-        </div>
-      ) : showMapView ? (
-        /* Map View with Resizable Map */
-        <div ref={containerRef} className="flex-1 flex flex-col min-h-0">
-          {/* Map Panel - Resizable height */}
-          <div
-            className="flex-shrink-0"
-            style={{ height: mapHeight }}
+      {showMapView ? (
+        /* Map View with horizontal ResizablePanelGroup */
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          {/* Left Panel - Filters + Places List */}
+          <ResizablePanel
+            defaultSize="500px"
+            minSize="420px"
+            maxSize="580px"
+            className="border-r border-neutral-200 flex flex-col overflow-hidden"
           >
-            <PlacesMap
-              places={filteredPlaces}
-              hoveredPlaceId={hoveredPlaceId}
-              focusedPlaceId={focusedPlaceId}
-            />
-          </div>
-
-          {/* Places List Panel - Takes remaining space */}
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* List Header with Resize Handle */}
-            <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
-              {/* Resize Handle - pill at top of header */}
-              <div
-                className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
-                onMouseDown={handleMouseDown}
-              >
-                <div className={cn(
-                  "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
-                  isResizing && "opacity-100"
-                )} />
-              </div>
+            {/* Filter Header */}
+            <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
               <div className="flex items-center gap-2">
               {/* Location Filter Dropdown */}
               <Popover>
@@ -1765,28 +1566,56 @@ function PlacesRightPanel({
               </span>
             </div>
 
-            {/* Scrollable Places List */}
+            {/* Scrollable Places List or Empty State */}
             <div className="flex-1 overflow-auto">
-              {filteredPlaces.map(place => {
-                const location = place.locationId
-                  ? trip.locations.find(l => l.id === place.locationId) ?? null
-                  : null
+              {totalPlaceCount === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+                    New place
+                  </Button>
+                </div>
+              ) : (
+                filteredPlaces.map(place => {
+                  const location = place.locationId
+                    ? trip.locations.find(l => l.id === place.locationId) ?? null
+                    : null
 
-                return (
-                  <PlaceCardMapView
-                    key={place.id}
-                    place={place}
-                    location={location}
-                    onEdit={() => onOpenPlaceDialog(place)}
-                    onDelete={() => onDeletePlace(place.id)}
-                    onHover={setHoveredPlaceId}
-                    onClick={() => setFocusedPlaceId(place.id)}
-                  />
-                )
-              })}
+                  return (
+                    <PlaceCardMapView
+                      key={place.id}
+                      place={place}
+                      location={location}
+                      onEdit={() => onOpenPlaceDialog(place)}
+                      onDelete={() => onDeletePlace(place.id)}
+                      onHover={setHoveredPlaceId}
+                      onClick={() => setFocusedPlaceId(place.id)}
+                    />
+                  )
+                })
+              )}
             </div>
-          </div>
-        </div>
+          </ResizablePanel>
+
+          <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+
+          {/* Right Panel - Map or Empty State */}
+          <ResizablePanel className="flex flex-col overflow-hidden">
+            {totalPlaceCount === 0 ? (
+              <div className="h-full bg-neutral-100 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-h2 text-text-primary">Nothing to show yet</span>
+                  <span className="text-body text-text-secondary">Add places to reveal the map</span>
+                </div>
+              </div>
+            ) : (
+              <PlacesMap
+                places={filteredPlaces}
+                hoveredPlaceId={hoveredPlaceId}
+                focusedPlaceId={focusedPlaceId}
+              />
+            )}
+          </ResizablePanel>
+        </ResizablePanelGroup>
       ) : (
         /* Grid View (original) */
         <div className="flex-1 flex flex-col min-h-0">
@@ -1909,28 +1738,36 @@ function PlacesRightPanel({
               {filteredPlaceCount}/{totalPlaceCount} PLACES
             </span>
           </div>
-          {/* Grid */}
+          {/* Grid or Empty State */}
           <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-3">
-              {filteredPlaces.map(place => {
-                const location = place.locationId
-                  ? trip.locations.find(l => l.id === place.locationId) ?? null
-                  : null
+            {totalPlaceCount === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+                  New place
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 min-[1000px]:grid-cols-4 min-[1250px]:grid-cols-5">
+                {filteredPlaces.map(place => {
+                  const location = place.locationId
+                    ? trip.locations.find(l => l.id === place.locationId) ?? null
+                    : null
 
-                const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
+                  const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
 
-                return (
-                  <DraggablePlaceCard
-                    key={place.id}
-                    place={place}
-                    location={location}
-                    onOpenPlaceDialog={onOpenPlaceDialog}
-                    confirmation={confirmation}
-                    isAssigned={isPlaceAssigned(place.id)}
-                  />
-                )
-              })}
-            </div>
+                  return (
+                    <DraggablePlaceCard
+                      key={place.id}
+                      place={place}
+                      location={location}
+                      onOpenPlaceDialog={onOpenPlaceDialog}
+                      confirmation={confirmation}
+                      isAssigned={isPlaceAssigned(place.id)}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2857,30 +2694,82 @@ function ItineraryPanel({
   onSelectDay: (date: string) => void
   selectedDayDate: string | null
 }) {
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list')
   const days = generateDaysFromTrip(trip)
 
   const getLocationForDay = (day: Day): Location | undefined => {
     return trip.locations.find(loc => loc.id === day.locationId)
   }
 
+  // Calculate total activities
+  const totalActivities = days.reduce((sum, day) => sum + day.activities.length, 0)
+  const totalDays = days.length
+
+  // When no activities, always use compact view
+  const effectiveViewMode = totalActivities === 0 ? 'list' : viewMode
+
   return (
-    <div className="flex flex-col">
-      {days.map((day, index) => {
-        const location = getLocationForDay(day)
-        const dayNumber = index + 1
-        return (
-          <DayCard
-            key={day.date}
-            day={day}
-            dayNumber={dayNumber}
-            location={location}
-            tripId={trip.id}
-            onRefresh={onRefresh}
-            onSelect={() => onSelectDay(day.date)}
-            isSelected={day.date === selectedDayDate}
-          />
-        )
-      })}
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
+        <div className="flex flex-col">
+          <span className="text-h2 text-text-primary">Itinerary</span>
+          <span className="text-h3 text-text-secondary">
+            {totalActivities} {totalActivities === 1 ? 'activity' : 'activities'} across {totalDays} {totalDays === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+        {/* Only show view toggle when there are activities */}
+        {totalActivities > 0 && (
+          <div className="flex items-center gap-3">
+            {/* View Toggle - Segmented Control */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 bg-neutral-100">
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+                  viewMode === 'list'
+                    ? "bg-white text-text-primary shadow-sm"
+                    : "bg-transparent text-text-secondary"
+                )}
+              >
+                <ListOrdered className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('timeline')}
+                className={cn(
+                  "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+                  viewMode === 'timeline'
+                    ? "bg-white text-text-primary shadow-sm"
+                    : "bg-transparent text-text-secondary"
+                )}
+              >
+                <ScrollText className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Day Cards */}
+      <div className="flex-1 overflow-auto">
+        {days.map((day, index) => {
+          const location = getLocationForDay(day)
+          const dayNumber = index + 1
+          return (
+            <DayCard
+              key={day.date}
+              day={day}
+              dayNumber={dayNumber}
+              location={location}
+              tripId={trip.id}
+              onRefresh={onRefresh}
+              onSelect={() => onSelectDay(day.date)}
+              isSelected={day.date === selectedDayDate}
+              viewMode={effectiveViewMode}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -2893,7 +2782,8 @@ function DayCard({
   tripId,
   onRefresh,
   onSelect,
-  isSelected
+  isSelected,
+  viewMode
 }: {
   day: Day
   dayNumber: number
@@ -2902,15 +2792,21 @@ function DayCard({
   onRefresh: () => Promise<void>
   onSelect: () => void
   isSelected: boolean
+  viewMode: 'list' | 'timeline'
 }) {
   const [isEditNameOpen, setIsEditNameOpen] = useState(false)
   const [dayName, setDayName] = useState(day.name || '')
 
   const date = parseLocalDate(day.date)
-  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' })
-  const dayOfMonth = String(date.getDate()).padStart(2, '0')
-  const dayNumberPadded = String(dayNumber).padStart(2, '0')
-  const hasActivities = day.activities.length > 0
+  const dayOfWeekLong = date.toLocaleDateString('en-US', { weekday: 'long' })
+  const monthName = date.toLocaleDateString('en-US', { month: 'long' })
+  const dayOfMonthNum = date.getDate()
+  const activityCount = day.activities.length
+
+  // Badge always shows date format
+  const badgeLabel = `${monthName} ${dayOfMonthNum}, ${dayOfWeekLong}`
+  // Day name shows custom name or "Day X"
+  const displayDayName = day.name || `Day ${dayNumber}`
 
   const handleSaveDayName = async () => {
     await updateDayName(tripId, day.date, dayName || undefined)
@@ -2918,7 +2814,7 @@ function DayCard({
     await onRefresh()
   }
 
-  const handleBadgeClick = (e: React.MouseEvent) => {
+  const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDayName(day.name || '')
@@ -2929,35 +2825,47 @@ function DayCard({
     <>
       <div
         className={cn(
-          "border-b border-neutral-200 p-4 hover:bg-neutral-100 transition-colors flex flex-col gap-3 cursor-pointer",
+          "group border-b border-neutral-200 p-4 hover:bg-neutral-100 transition-colors flex flex-col cursor-pointer",
           isSelected && "bg-neutral-100"
         )}
         onClick={onSelect}
       >
-        {/* Row 1: Badge + Day/Date */}
-        <div className="flex items-center justify-between gap-1">
-          {/* Left: Day Name Badge */}
-          <button onClick={handleBadgeClick} className="min-w-0">
-            <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
-              {day.name || `Day ${dayNumber}`}
-            </Badge>
-          </button>
-          {/* Right: Day/Date combo */}
-          <span className="text-mono-small text-text-secondary flex-shrink-0">
-            DAY {dayNumberPadded}, {dayOfWeek.toUpperCase()} {dayOfMonth}
-          </span>
+        {/* Row 1: Badge (date only, not editable) */}
+        <div className="flex items-center">
+          <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
+            {badgeLabel}
+          </Badge>
         </div>
 
-        {/* Row 2: Activities or Empty State */}
-        {hasActivities ? (
-          <div className="flex flex-col gap-1.5">
-            {day.activities.map((activity) => (
-              <ActivityRow key={activity.id} activity={activity} />
-            ))}
-          </div>
+        {/* Row 2: Day Name + Edit Icon */}
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-h3 text-text-primary">{displayDayName}</span>
+          <button
+            onClick={handleEditClick}
+            className="w-3 h-3 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <Edit2 className="w-3 h-3 stroke-[2]" />
+          </button>
+        </div>
+
+        {/* Row 3: Activities (detailed) or Activity Count (compact) */}
+        {viewMode === 'timeline' ? (
+          // Detailed view: show activities list
+          activityCount > 0 ? (
+            <div className="flex flex-col gap-1.5 mt-3">
+              {day.activities.map((activity) => (
+                <ActivityRow key={activity.id} activity={activity} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-body text-text-secondary mt-3">
+              No activities planned
+            </p>
+          )
         ) : (
-          <p className="text-body text-text-secondary">
-            No activities planned
+          // Compact view: show activity count
+          <p className="text-body text-text-secondary mt-2">
+            {activityCount} {activityCount === 1 ? 'activity' : 'activities'}
           </p>
         )}
       </div>
@@ -2966,7 +2874,7 @@ function DayCard({
       <Dialog open={isEditNameOpen} onOpenChange={setIsEditNameOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Day Name</DialogTitle>
+            <DialogTitle>Change Day Name</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -3000,6 +2908,53 @@ function ActivityRow({ activity }: { activity: Activity }) {
       <span className="text-body text-text-primary truncate">
         {activity.title}
       </span>
+    </div>
+  )
+}
+
+// Overview Panel Component (wraps location badges + stays)
+function OverviewPanel({
+  trip,
+  onOpenLocationDialog,
+  onOpenAccommodationDialog,
+  onDeleteAccommodation
+}: {
+  trip: TripWithOwnership
+  onOpenLocationDialog: (location?: Location) => void
+  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  onDeleteAccommodation: (id: string) => Promise<void>
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      {/* Location Badges */}
+      <div className="p-3 border-b border-neutral-200">
+        <div className="flex items-center gap-2 flex-wrap">
+          {trip.locations.map((location) => (
+            <button
+              key={location.id}
+              onClick={() => onOpenLocationDialog(location)}
+              className="cursor-pointer"
+            >
+              <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
+                {location.name}
+              </Badge>
+            </button>
+          ))}
+          <NakedIconButton
+            icon={<Plus />}
+            onClick={() => onOpenLocationDialog()}
+          />
+        </div>
+      </div>
+
+      {/* Stays Content */}
+      <div className="flex-1 overflow-auto">
+        <StaysPanel
+          trip={trip}
+          onOpenAccommodationDialog={onOpenAccommodationDialog}
+          onDeleteAccommodation={onDeleteAccommodation}
+        />
+      </div>
     </div>
   )
 }
