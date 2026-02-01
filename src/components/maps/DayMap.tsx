@@ -273,13 +273,10 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
 
       {/* Empty state overlay */}
       {!error && !isLoading && validActivities.length === 0 && (
-        <div className="absolute inset-0 bg-muted flex items-center justify-center">
-          <div className="text-center p-4">
-            <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">No activities with locations yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add activities to see them on the map
-            </p>
+        <div className="absolute inset-0 bg-neutral-100 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-h2 text-text-primary">Nothing to show yet</span>
+            <span className="text-body text-text-secondary">Add activities to reveal the map</span>
           </div>
         </div>
       )}

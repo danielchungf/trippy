@@ -46,6 +46,49 @@
  *
  * - font-fustat - Headings, buttons, labels (loaded from local files)
  * - font-inter - Body text (loaded from Google Fonts, default)
+ *
+ * =====================================================================
+ * ICON STYLING PATTERNS (Lucide React icons)
+ * =====================================================================
+ *
+ * CRITICAL: Use consistent stroke weights based on context.
+ *
+ * 1. Button Icons (leftIcon/rightIcon in Button component):
+ *    - Size: 16px
+ *    - Stroke: stroke-[2]
+ *    - Pattern: Handled automatically by Button component
+ *    - Reference: src/components/ui/button.tsx
+ *
+ * 2. NakedIconButton Icons:
+ *    - Container: 28x28px button, 20x20px icon area
+ *    - Stroke: stroke-[1.8]
+ *    - Pattern: Handled automatically by NakedIconButton
+ *    - Reference: src/components/ui/naked-icon-button.tsx
+ *
+ * 3. View Toggle Icons (Grid/Map, List/Timeline switches):
+ *    - Container: w-7 h-7 (28px)
+ *    - Icon: h-4 w-4 (16px)
+ *    - Stroke: stroke-[2.25] on parent button
+ *    - Pattern:
+ *      <button className="... [&>svg]:stroke-[2.25]">
+ *        <IconName className="h-4 w-4" />
+ *      </button>
+ *
+ * 4. Standalone Indicator Icons (badges, informational):
+ *    - Size: w-4 h-4 (16px)
+ *    - Stroke: stroke-[2.25]
+ *    - Pattern:
+ *      <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-[color]">
+ *        <IconName />
+ *      </span>
+ *
+ * Quick Reference:
+ * | Context              | Size | Stroke |
+ * |----------------------|------|--------|
+ * | Button leftIcon      | 16px | 2      |
+ * | NakedIconButton      | 20px | 1.8    |
+ * | View toggle buttons  | 16px | 2.25   |
+ * | Standalone/indicator | 16px | 2.25   |
  */
 
 export const tokens = {
