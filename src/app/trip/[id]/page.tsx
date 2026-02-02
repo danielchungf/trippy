@@ -126,6 +126,7 @@ import {
 import {
   addLocation,
   updateLocation,
+  deleteLocation,
   addAccommodation,
   updateAccommodation,
   deleteAccommodation,
@@ -204,6 +205,7 @@ export default function TripPage() {
   const [locationEndDate, setLocationEndDate] = useState<Date | undefined>()
   const [isLocationStartOpen, setIsLocationStartOpen] = useState(false)
   const [isLocationEndOpen, setIsLocationEndOpen] = useState(false)
+  const [isSavingLocation, setIsSavingLocation] = useState(false)
 
   // Accommodation dialog state
   const [isAccommodationOpen, setIsAccommodationOpen] = useState(false)
@@ -219,6 +221,7 @@ export default function TripPage() {
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
+  const [isSavingAccommodation, setIsSavingAccommodation] = useState(false)
 
   // Stay drawer state
   const [selectedStay, setSelectedStay] = useState<Accommodation | null>(null)
@@ -233,6 +236,7 @@ export default function TripPage() {
   const [placeLocationId, setPlaceLocationId] = useState("")
   const [placeNotes, setPlaceNotes] = useState("")
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
+  const [isSavingPlace, setIsSavingPlace] = useState(false)
 
   // Place-to-day drag state
   const [draggingPlace, setDraggingPlace] = useState<SavedPlace | null>(null)
@@ -361,31 +365,44 @@ export default function TripPage() {
   }
 
   const handleSaveLocation = async () => {
-    if (!locationName || !locationStartDate || !locationEndDate) return
+    if (!locationName || !locationStartDate || !locationEndDate || isSavingLocation) return
 
-    const startDateStr = formatLocalDate(locationStartDate)
-    const endDateStr = formatLocalDate(locationEndDate)
+    setIsSavingLocation(true)
+    try {
+      const startDateStr = formatLocalDate(locationStartDate)
+      const endDateStr = formatLocalDate(locationEndDate)
 
-    if (editingLocation) {
-      await updateLocation(tripId, editingLocation.id, {
-        name: locationName,
-        color: locationColor,
-        coordinates: locationCoordinates,
-        googlePlaceId: locationGooglePlaceId,
-        startDate: startDateStr,
-        endDate: endDateStr
-      })
-    } else {
-      await addLocation(tripId, {
-        name: locationName,
-        color: locationColor,
-        coordinates: locationCoordinates,
-        googlePlaceId: locationGooglePlaceId,
-        startDate: startDateStr,
-        endDate: endDateStr
-      })
+      if (editingLocation) {
+        await updateLocation(tripId, editingLocation.id, {
+          name: locationName,
+          color: locationColor,
+          coordinates: locationCoordinates,
+          googlePlaceId: locationGooglePlaceId,
+          startDate: startDateStr,
+          endDate: endDateStr
+        })
+      } else {
+        await addLocation(tripId, {
+          name: locationName,
+          color: locationColor,
+          coordinates: locationCoordinates,
+          googlePlaceId: locationGooglePlaceId,
+          startDate: startDateStr,
+          endDate: endDateStr
+        })
+      }
+
+      setIsLocationOpen(false)
+      await refreshTrip()
+    } finally {
+      setIsSavingLocation(false)
     }
+  }
 
+  const handleDeleteLocation = async () => {
+    if (!editingLocation) return
+
+    await deleteLocation(tripId, editingLocation.id)
     setIsLocationOpen(false)
     await refreshTrip()
   }
@@ -449,30 +466,35 @@ export default function TripPage() {
   }
 
   const handleSaveAccommodation = async () => {
-    if (!accommodationAddress || !accommodationCheckIn || !accommodationCheckOut) return
+    if (!accommodationAddress || !accommodationCheckIn || !accommodationCheckOut || isSavingAccommodation) return
 
-    // Use custom name if provided, otherwise fall back to the place name from search
-    const finalName = accommodationName.trim() || accommodationAddress.split(',')[0]
+    setIsSavingAccommodation(true)
+    try {
+      // Use custom name if provided, otherwise fall back to the place name from search
+      const finalName = accommodationName.trim() || accommodationAddress.split(',')[0]
 
-    const data = {
-      name: finalName,
-      type: accommodationType,
-      address: accommodationAddress,
-      coordinates: accommodationCoordinates,
-      googlePlaceId: accommodationGooglePlaceId,
-      checkIn: formatLocalDate(accommodationCheckIn),
-      checkOut: formatLocalDate(accommodationCheckOut),
-      locationId: accommodationLocationId || undefined
+      const data = {
+        name: finalName,
+        type: accommodationType,
+        address: accommodationAddress,
+        coordinates: accommodationCoordinates,
+        googlePlaceId: accommodationGooglePlaceId,
+        checkIn: formatLocalDate(accommodationCheckIn),
+        checkOut: formatLocalDate(accommodationCheckOut),
+        locationId: accommodationLocationId || undefined
+      }
+
+      if (editingAccommodation) {
+        await updateAccommodation(tripId, editingAccommodation.id, data)
+      } else {
+        await addAccommodation(tripId, data)
+      }
+
+      setIsAccommodationOpen(false)
+      await refreshTrip()
+    } finally {
+      setIsSavingAccommodation(false)
     }
-
-    if (editingAccommodation) {
-      await updateAccommodation(tripId, editingAccommodation.id, data)
-    } else {
-      await addAccommodation(tripId, data)
-    }
-
-    setIsAccommodationOpen(false)
-    await refreshTrip()
   }
 
   const handleDeleteAccommodation = async (accommodationId: string) => {
@@ -521,30 +543,35 @@ export default function TripPage() {
   }
 
   const handleSavePlace = async () => {
-    if (!searchedPlace) return
+    if (!searchedPlace || isSavingPlace) return
 
-    const name = placeName || searchedPlace.name
+    setIsSavingPlace(true)
+    try {
+      const name = placeName || searchedPlace.name
 
-    const data = {
-      name,
-      address: searchedPlace.address,
-      coordinates: searchedPlace.coordinates,
-      googlePlaceId: searchedPlace.placeId,
-      category: placeCategory,
-      locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
-      notes: placeNotes || undefined,
-      photos: searchedPlace.photos
+      const data = {
+        name,
+        address: searchedPlace.address,
+        coordinates: searchedPlace.coordinates,
+        googlePlaceId: searchedPlace.placeId,
+        category: placeCategory,
+        locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
+        notes: placeNotes || undefined,
+        photos: searchedPlace.photos
+      }
+
+      if (editingPlace) {
+        await updateSavedPlace(tripId, editingPlace.id, data)
+      } else {
+        await addSavedPlace(tripId, data)
+      }
+
+      setIsPlaceOpen(false)
+      setSearchedPlace(null)
+      await refreshTrip()
+    } finally {
+      setIsSavingPlace(false)
     }
-
-    if (editingPlace) {
-      await updateSavedPlace(tripId, editingPlace.id, data)
-    } else {
-      await addSavedPlace(tripId, data)
-    }
-
-    setIsPlaceOpen(false)
-    setSearchedPlace(null)
-    await refreshTrip()
   }
 
   const handleDeletePlace = async () => {
@@ -814,13 +841,22 @@ export default function TripPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary" size="small">Cancel</Button>
-            </DialogClose>
-            <Button variant="primary" size="small" onClick={handleSaveLocation}>
-              {editingLocation ? 'Save' : 'Add'}
-            </Button>
+          <DialogFooter className="sm:!justify-between sm:!space-x-0">
+            {editingLocation ? (
+              <Button variant="secondary" size="small" onClick={handleDeleteLocation} className="mr-auto" leftIcon={<Trash2 />}>
+                Delete
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="secondary" size="small">Cancel</Button>
+              </DialogClose>
+              <Button variant="primary" size="small" onClick={handleSaveLocation} disabled={isSavingLocation}>
+                {isSavingLocation ? 'Saving...' : (editingLocation ? 'Save' : 'Add')}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -944,8 +980,8 @@ export default function TripPage() {
             <DialogClose asChild>
               <Button variant="secondary" size="small">Cancel</Button>
             </DialogClose>
-            <Button variant="primary" size="small" onClick={handleSaveAccommodation} disabled={!accommodationAddress}>
-              {editingAccommodation ? 'Save' : 'Add'}
+            <Button variant="primary" size="small" onClick={handleSaveAccommodation} disabled={!accommodationAddress || isSavingAccommodation}>
+              {isSavingAccommodation ? 'Saving...' : (editingAccommodation ? 'Save' : 'Add')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -959,6 +995,7 @@ export default function TripPage() {
         accommodation={selectedStay}
         locations={trip.locations}
         onRefresh={refreshTrip}
+        onEdit={handleOpenAccommodationDialog}
       />
 
       {/* Place Dialog */}
@@ -1041,10 +1078,9 @@ export default function TripPage() {
               />
             </div>
           </div>
-          <DialogFooter className="flex justify-between">
+          <DialogFooter className="sm:!justify-between sm:!space-x-0">
             {editingPlace ? (
-              <Button variant="ghost" size="small" className="text-destructive hover:text-destructive" onClick={handleDeletePlace}>
-                <Trash2 className="w-4 h-4 mr-2" />
+              <Button variant="secondary" size="small" onClick={handleDeletePlace} className="mr-auto" leftIcon={<Trash2 />}>
                 Delete
               </Button>
             ) : (
@@ -1054,8 +1090,8 @@ export default function TripPage() {
               <DialogClose asChild>
                 <Button variant="secondary" size="small">Cancel</Button>
               </DialogClose>
-              <Button variant="primary" size="small" onClick={handleSavePlace} disabled={!searchedPlace}>
-                {editingPlace ? 'Save' : 'Add'}
+              <Button variant="primary" size="small" onClick={handleSavePlace} disabled={!searchedPlace || isSavingPlace}>
+                {isSavingPlace ? 'Saving...' : (editingPlace ? 'Save' : 'Add')}
               </Button>
             </div>
           </DialogFooter>

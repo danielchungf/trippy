@@ -110,6 +110,7 @@ export default function SavedPlacesPage() {
   const [placeLocationId, setPlaceLocationId] = useState("")
   const [placeNotes, setPlaceNotes] = useState("")
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
+  const [isSavingPlace, setIsSavingPlace] = useState(false)
 
   // Assign to day dialog
   const [isAssignOpen, setIsAssignOpen] = useState(false)
@@ -172,30 +173,35 @@ export default function SavedPlacesPage() {
   }
 
   const handleSavePlace = async () => {
-    if (!searchedPlace) return
+    if (!searchedPlace || isSavingPlace) return
 
-    const name = placeName || searchedPlace.name
+    setIsSavingPlace(true)
+    try {
+      const name = placeName || searchedPlace.name
 
-    const data = {
-      name,
-      address: searchedPlace.address,
-      coordinates: searchedPlace.coordinates,
-      googlePlaceId: searchedPlace.placeId,
-      category: placeCategory,
-      locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
-      notes: placeNotes || undefined,
-      photos: searchedPlace.photos
+      const data = {
+        name,
+        address: searchedPlace.address,
+        coordinates: searchedPlace.coordinates,
+        googlePlaceId: searchedPlace.placeId,
+        category: placeCategory,
+        locationId: placeLocationId && placeLocationId !== 'none' ? placeLocationId : undefined,
+        notes: placeNotes || undefined,
+        photos: searchedPlace.photos
+      }
+
+      if (editingPlace) {
+        await updateSavedPlace(tripId, editingPlace.id, data)
+      } else {
+        await addSavedPlace(tripId, data)
+      }
+
+      setIsPlaceOpen(false)
+      setSearchedPlace(null)
+      await refreshTrip()
+    } finally {
+      setIsSavingPlace(false)
     }
-
-    if (editingPlace) {
-      await updateSavedPlace(tripId, editingPlace.id, data)
-    } else {
-      await addSavedPlace(tripId, data)
-    }
-
-    setIsPlaceOpen(false)
-    setSearchedPlace(null)
-    await refreshTrip()
   }
 
   const handleDeletePlace = async (placeId: string) => {
@@ -511,8 +517,8 @@ export default function SavedPlacesPage() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSavePlace} disabled={!searchedPlace}>
-              {editingPlace ? 'Save' : 'Add Place'}
+            <Button onClick={handleSavePlace} disabled={!searchedPlace || isSavingPlace}>
+              {isSavingPlace ? 'Saving...' : (editingPlace ? 'Save' : 'Add Place')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -693,40 +699,50 @@ function PlaceCardMapView({
 
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <Badge variant="secondary" className="w-fit text-xs mb-1">
-              {getCategoryLabel(place.category)}
-            </Badge>
+            {/* Badges row with dropdown */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {place.locationId && (
+                  <Badge dotColor={trip.locations.find(l => l.id === place.locationId)?.color}>
+                    {trip.locations.find(l => l.id === place.locationId)?.name}
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="text-xs">
+                  {getCategoryLabel(place.category)}
+                </Badge>
+              </div>
+              {/* Dropdown menu - animated on hover */}
+              <DropdownMenu>
+                <div className="overflow-hidden w-0 opacity-0 group-hover:w-8 group-hover:opacity-100 has-[[data-state=open]]:w-8 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </div>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onAssign}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Day
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onEdit}>
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {/* Name and address */}
             <h3 className="font-fustat font-semibold text-sm truncate">{place.name}</h3>
             {place.address && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {place.address}
               </p>
             )}
-          </div>
-
-          {/* Actions */}
-          <div className="shrink-0 flex items-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onAssign}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add to Day
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onEdit}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </CardContent>
