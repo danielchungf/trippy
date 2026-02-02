@@ -49,11 +49,13 @@ function formatDateRange(checkIn: string, checkOut: string): string {
   const start = parseLocalDate(checkIn)
   const end = parseLocalDate(checkOut)
 
-  const formatOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
-  const startStr = start.toLocaleDateString('en-US', formatOptions).toUpperCase()
-  const endStr = end.toLocaleDateString('en-US', formatOptions).toUpperCase()
+  const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
+  const startMonth = monthFormat.format(start).toUpperCase()
+  const endMonth = monthFormat.format(end).toUpperCase()
+  const startDay = String(start.getDate()).padStart(2, '0')
+  const endDay = String(end.getDate()).padStart(2, '0')
 
-  return `${startStr} — ${endStr}`
+  return `${startMonth} ${startDay} — ${endMonth} ${endDay}`
 }
 
 function getNightsCount(checkIn: string, checkOut: string): number {
