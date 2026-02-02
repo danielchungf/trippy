@@ -7,16 +7,11 @@ import Link from "next/link"
 import {
   DndContext,
   closestCenter,
-  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  useDraggable,
-  useDroppable,
   DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -50,6 +45,7 @@ import {
   ListOrdered,
   ScrollText,
   CalendarClock,
+  Replace,
   // Category icons
   Soup,
   Coffee,
@@ -137,6 +133,7 @@ import {
   addActivity,
   updateActivity,
   deleteActivity,
+  moveActivity,
   reorderActivities,
   createActivityFromPlace,
   TripWithOwnership,
@@ -238,84 +235,6 @@ export default function TripPage() {
   const [placeNotes, setPlaceNotes] = useState("")
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
   const [isSavingPlace, setIsSavingPlace] = useState(false)
-
-  // Place-to-day drag state
-  const [draggingPlace, setDraggingPlace] = useState<SavedPlace | null>(null)
-  const [assignedConfirmation, setAssignedConfirmation] = useState<{
-    placeId: string
-    dayName: string
-    dayNumber: number
-    dayDate: string
-  } | null>(null)
-
-  // Drag sensors for place-to-day
-  const placeDragSensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
-
-  // Handle drag start for place-to-day
-  const handlePlaceDragStart = (event: DragStartEvent) => {
-    const placeId = event.active.id as string
-    const place = trip?.savedPlaces.find(p => p.id === placeId)
-    if (place) {
-      setDraggingPlace(place)
-    }
-  }
-
-  // Handle drag end for place-to-day
-  const handlePlaceDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-    setDraggingPlace(null)
-
-    if (!over || !trip) return
-
-    const placeId = active.id as string
-    const dayDate = over.id as string
-
-    // Check if dropped on a day (day IDs are date strings like "2024-01-15")
-    if (!dayDate.match(/^\d{4}-\d{2}-\d{2}$/)) return
-
-    const place = trip.savedPlaces.find(p => p.id === placeId)
-    if (!place) return
-
-    // Find the day info for confirmation
-    const days = generateDaysFromTrip(trip)
-    const dayIndex = days.findIndex(d => d.date === dayDate)
-    const day = days[dayIndex]
-
-    if (!day) return
-
-    // Create activity from place
-    await addActivity(trip.id, dayDate, {
-      title: place.name,
-      place: {
-        name: place.name,
-        address: place.address,
-        coordinates: place.coordinates,
-        googlePlaceId: place.googlePlaceId,
-      },
-      savedPlaceId: place.id,
-    })
-
-    // Show confirmation on the place card
-    setAssignedConfirmation({
-      placeId: place.id,
-      dayName: day.name || `Day ${dayIndex + 1}`,
-      dayNumber: dayIndex + 1,
-      dayDate: dayDate,
-    })
-
-    // Clear confirmation after 2 seconds
-    setTimeout(() => {
-      setAssignedConfirmation(null)
-    }, 2000)
-
-    await refreshTrip()
-  }
 
   // Select first day by default when trip loads
   useEffect(() => {
@@ -608,7 +527,6 @@ export default function TripPage() {
         onOpenPlaceDialog={handleOpenPlaceDialog}
         onDeletePlace={handleDeletePlaceById}
         onRefresh={refreshTrip}
-        assignedConfirmation={assignedConfirmation}
       />
     </div>
   ) : activeTab === 'itinerary' ? (
@@ -682,54 +600,8 @@ export default function TripPage() {
       {/* Sidebar */}
       <Sidebar onNavigateHome={() => router.push('/')} />
 
-      {/* Main content - wrapped in DndContext when places tab is active */}
-      {activeTab === 'places' ? (
-        <DndContext
-          sensors={placeDragSensors}
-          collisionDetection={rectIntersection}
-          onDragStart={handlePlaceDragStart}
-          onDragEnd={handlePlaceDragEnd}
-        >
-          {mainContent}
-          <DragOverlay dropAnimation={null}>
-            {draggingPlace && (() => {
-              const location = draggingPlace.locationId
-                ? trip.locations.find(l => l.id === draggingPlace.locationId) ?? null
-                : null
-              const photoUrl = draggingPlace.photos?.[0]
-
-              return (
-                <div className="bg-white rounded-lg shadow-xl border border-neutral-300 w-64 overflow-hidden opacity-95">
-                  {/* Photo */}
-                  <div className="w-full aspect-video bg-neutral-100 flex items-center justify-center overflow-hidden">
-                    {photoUrl ? (
-                      <img
-                        src={photoUrl}
-                        alt={draggingPlace.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <ImageOff className="w-6 h-6 text-text-secondary" strokeWidth={1.5} />
-                    )}
-                  </div>
-                  {/* Content */}
-                  <div className="p-3">
-                    {location && (
-                      <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="mb-2">
-                        {location.name}
-                      </Badge>
-                    )}
-                    <p className="text-h3 text-text-primary truncate">{draggingPlace.name}</p>
-                    <p className="text-body text-text-secondary truncate">{draggingPlace.address}</p>
-                  </div>
-                </div>
-              )
-            })()}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        mainContent
-      )}
+      {/* Main content */}
+      {mainContent}
 
       {/* Location Dialog */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
@@ -1238,12 +1110,14 @@ function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (ta
   )
 }
 
-// Draggable Place Card Component
-function DraggablePlaceCard({
+// Place Card Component for Grid View
+function PlaceCardGrid({
   place,
   location,
   tripId,
-  onOpenPlaceDialog,
+  onEdit,
+  onDelete,
+  onAssign,
   onRefresh,
   confirmation,
   isAssigned
@@ -1251,7 +1125,9 @@ function DraggablePlaceCard({
   place: SavedPlace
   location: Location | null
   tripId: string
-  onOpenPlaceDialog: (place: SavedPlace) => void
+  onEdit: () => void
+  onDelete: () => void
+  onAssign: () => void
   onRefresh: () => Promise<void>
   confirmation: {
     placeId: string
@@ -1261,10 +1137,6 @@ function DraggablePlaceCard({
   } | null
   isAssigned: boolean
 }) {
-  const { attributes, listeners, setNodeRef } = useDraggable({
-    id: place.id,
-  })
-
   const categoryConfig = CATEGORY_CONFIG[place.category] || { label: place.category, icon: Flower }
   const CategoryIcon = categoryConfig.icon
 
@@ -1279,11 +1151,7 @@ function DraggablePlaceCard({
 
   return (
     <div
-      ref={setNodeRef}
-      className="group/card border-r border-b border-neutral-200 overflow-hidden hover:bg-neutral-100 cursor-grab relative"
-      {...listeners}
-      {...attributes}
-      onClick={() => onOpenPlaceDialog(place)}
+      className="group/card border-r border-b border-neutral-200 overflow-hidden hover:bg-neutral-50 relative"
     >
       {/* Confirmation Overlay */}
       {confirmation && (
@@ -1309,25 +1177,61 @@ function DraggablePlaceCard({
         }}
       />
       {/* Content */}
-      <div className="p-3">
+      <div className="p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             {location && (
-              <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover/card:bg-neutral-100">
+              <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover/card:bg-neutral-50">
                 {location.name}
               </Badge>
             )}
-            <Badge icon={<CategoryIcon />} className="group-hover/card:bg-neutral-100">
+            <Badge icon={<CategoryIcon />} className="group-hover/card:bg-neutral-50">
               {categoryConfig.label}
             </Badge>
           </div>
-          {isAssigned && (
-            <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
-              <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-text-secondary">
-                <MapPinCheck />
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {isAssigned && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
+                      <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-text-secondary">
+                        <MapPinCheck />
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>On itinerary</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {/* More actions menu - visible on hover */}
+            <DropdownMenu>
+              <div className="overflow-hidden w-0 opacity-0 group-hover/card:w-7 group-hover/card:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+                <DropdownMenuTrigger asChild>
+                  <NakedIconButton
+                    icon={<MoreHorizontal />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={onAssign}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Day
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <p className="text-h3 text-text-primary line-clamp-1">{place.name}</p>
         <p className="text-body text-text-secondary line-clamp-1">{place.address}</p>
@@ -1341,19 +1245,12 @@ function PlacesRightPanel({
   trip,
   onOpenPlaceDialog,
   onDeletePlace,
-  onRefresh,
-  assignedConfirmation
+  onRefresh
 }: {
   trip: TripWithOwnership
   onOpenPlaceDialog: (place?: SavedPlace) => void
   onDeletePlace: (placeId: string) => Promise<void>
   onRefresh: () => Promise<void>
-  assignedConfirmation: {
-    placeId: string
-    dayName: string
-    dayNumber: number
-    dayDate: string
-  } | null
 }) {
   const [showMapView, setShowMapView] = useState(false)
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
@@ -1364,6 +1261,19 @@ function PlacesRightPanel({
 
   // Assignment filter state
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'assigned' | 'not_assigned'>('all')
+
+  // Assign to day dialog state
+  const [isAssignOpen, setIsAssignOpen] = useState(false)
+  const [assigningPlace, setAssigningPlace] = useState<SavedPlace | null>(null)
+  const [assignDay, setAssignDay] = useState("")
+
+  // Confirmation state for showing overlay after assignment
+  const [assignedConfirmation, setAssignedConfirmation] = useState<{
+    placeId: string
+    dayName: string
+    dayNumber: number
+    dayDate: string
+  } | null>(null)
 
   // Get unique locations from places (including null for places without a location)
   const locationsInPlaces = useMemo(() => {
@@ -1400,6 +1310,41 @@ function PlacesRightPanel({
       day.activities.some(activity => activity.savedPlaceId === placeId)
     )
   }, [days])
+
+  // Handle opening assign dialog
+  const handleOpenAssignDialog = (place: SavedPlace) => {
+    setAssigningPlace(place)
+    setAssignDay(days[0]?.date || "")
+    setIsAssignOpen(true)
+  }
+
+  // Handle assigning place to day
+  const handleAssignToDay = async () => {
+    if (!assigningPlace || !assignDay) return
+
+    const dayIndex = days.findIndex(d => d.date === assignDay)
+    const day = days[dayIndex]
+
+    if (!day) return
+
+    await createActivityFromPlace(trip.id, assignDay, assigningPlace.id)
+    setIsAssignOpen(false)
+
+    // Show confirmation overlay on the card
+    setAssignedConfirmation({
+      placeId: assigningPlace.id,
+      dayName: day.name || `Day ${dayIndex + 1}`,
+      dayNumber: dayIndex + 1,
+      dayDate: assignDay,
+    })
+
+    // Clear confirmation after 2 seconds
+    setTimeout(() => {
+      setAssignedConfirmation(null)
+    }, 2000)
+
+    await onRefresh()
+  }
 
   // Filter places based on selected locations, categories, and assignment status
   const filteredPlaces = useMemo(() => {
@@ -1658,9 +1603,11 @@ function PlacesRightPanel({
                       tripId={trip.id}
                       onEdit={() => onOpenPlaceDialog(place)}
                       onDelete={() => onDeletePlace(place.id)}
+                      onAssign={() => handleOpenAssignDialog(place)}
                       onHover={setHoveredPlaceId}
                       onClick={() => setFocusedPlaceId(place.id)}
                       onRefresh={onRefresh}
+                      isAssigned={isPlaceAssigned(place.id)}
                     />
                   )
                 })
@@ -1828,12 +1775,14 @@ function PlacesRightPanel({
                   const confirmation = assignedConfirmation?.placeId === place.id ? assignedConfirmation : null
 
                   return (
-                    <DraggablePlaceCard
+                    <PlaceCardGrid
                       key={place.id}
                       place={place}
                       location={location}
                       tripId={trip.id}
-                      onOpenPlaceDialog={onOpenPlaceDialog}
+                      onEdit={() => onOpenPlaceDialog(place)}
+                      onDelete={() => onDeletePlace(place.id)}
+                      onAssign={() => handleOpenAssignDialog(place)}
                       onRefresh={onRefresh}
                       confirmation={confirmation}
                       isAssigned={isPlaceAssigned(place.id)}
@@ -1845,6 +1794,47 @@ function PlacesRightPanel({
           </div>
         </div>
       )}
+
+      {/* Assign to Day Dialog */}
+      <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Day</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Add <strong>{assigningPlace?.name}</strong> to your itinerary
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Day</label>
+              <Select value={assignDay} onValueChange={setAssignDay}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {days.map((day, index) => {
+                    const location = trip.locations.find(l => l.id === day.locationId)
+                    return (
+                      <SelectItem key={day.date} value={day.date}>
+                        Day {index + 1} - {new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {location && ` (${location.name})`}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleAssignToDay}>
+              Add to Day
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1856,18 +1846,22 @@ function PlaceCardMapView({
   tripId,
   onEdit,
   onDelete,
+  onAssign,
   onHover,
   onClick,
-  onRefresh
+  onRefresh,
+  isAssigned
 }: {
   place: SavedPlace
   location: Location | null
   tripId: string
   onEdit: () => void
   onDelete: () => void
+  onAssign: () => void
   onHover: (placeId: string | null) => void
   onClick: () => void
   onRefresh: () => Promise<void>
+  isAssigned: boolean
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
@@ -1910,16 +1904,62 @@ function PlaceCardMapView({
 
       {/* Content - 16px padding, 12px gap */}
       <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
-        {/* Badges row: Location + Category with 8px gap */}
-        <div className="flex items-center gap-2">
-          {location && (
-            <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-              {location.name}
+        {/* Badges row: Location + Category on left, icons on right */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {location && (
+              <Badge dotColor={location.color || LOCATION_COLORS[0].value} className="group-hover:bg-neutral-50">
+                {location.name}
+              </Badge>
+            )}
+            <Badge icon={<CategoryIcon />} className="group-hover:bg-neutral-50">
+              {categoryConfig.label}
             </Badge>
-          )}
-          <Badge icon={<CategoryIcon />}>
-            {categoryConfig.label}
-          </Badge>
+          </div>
+          {/* Assigned indicator and more actions menu */}
+          <div className="flex items-center gap-1">
+            {isAssigned && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-muted">
+                      <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-text-secondary">
+                        <MapPinCheck />
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>On itinerary</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {/* More actions menu - visible on hover */}
+            <DropdownMenu>
+              <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
+                <DropdownMenuTrigger asChild>
+                  <NakedIconButton
+                    icon={<MoreHorizontal />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={onAssign}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Day
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="flex flex-col">
           <span className="text-h3 text-text-primary truncate">{place.name}</span>
@@ -1929,31 +1969,6 @@ function PlaceCardMapView({
             </span>
           )}
         </div>
-      </div>
-
-      {/* Dropdown menu - animated on hover */}
-      <div className="flex items-center pr-4">
-        <DropdownMenu>
-          <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
-            <DropdownMenuTrigger asChild>
-              <NakedIconButton
-                icon={<MoreHorizontal />}
-                onClick={(e) => e.stopPropagation()}
-                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
-              />
-            </DropdownMenuTrigger>
-          </div>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit() }}>
-              <Edit2 className="h-4 w-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete() }}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   )
@@ -1986,6 +2001,11 @@ function RightPanel({
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
+
+  // Move to day dialog state
+  const [isMoveOpen, setIsMoveOpen] = useState(false)
+  const [movingActivity, setMovingActivity] = useState<Activity | null>(null)
+  const [moveTargetDay, setMoveTargetDay] = useState("")
 
   // Filter saved places not already scheduled for this day
   const unscheduledSavedPlaces = useMemo(() =>
@@ -2152,6 +2172,20 @@ function RightPanel({
       time: '',
       duration: 0,
     })
+    await onRefresh()
+  }
+
+  const handleOpenMoveDialog = (activity: Activity) => {
+    setMovingActivity(activity)
+    setMoveTargetDay("")
+    setIsMoveOpen(true)
+  }
+
+  const handleMoveToDay = async () => {
+    if (!movingActivity || !moveTargetDay) return
+    await moveActivity(trip.id, selectedDayDate, moveTargetDay, movingActivity.id)
+    setIsMoveOpen(false)
+    setMovingActivity(null)
     await onRefresh()
   }
 
@@ -2389,6 +2423,7 @@ function RightPanel({
                       onMouseLeave={() => setHoveredActivityIndex(null)}
                       onEdit={() => handleOpenActivityDialog(activity)}
                       onRemoveTime={() => handleRemoveTime(activity)}
+                      onMoveToDay={() => handleOpenMoveDialog(activity)}
                       onDelete={() => handleDeleteActivity(activity.id)}
                     />
                   ))}
@@ -2636,6 +2671,42 @@ function RightPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move to Day Dialog */}
+      <Dialog open={isMoveOpen} onOpenChange={setIsMoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move {movingActivity?.title} to another day</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={moveTargetDay} onValueChange={setMoveTargetDay}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a day" />
+              </SelectTrigger>
+              <SelectContent>
+                {days.filter(d => d.date !== selectedDayDate).map((d) => {
+                  const dayIdx = days.findIndex(day => day.date === d.date)
+                  const location = trip.locations.find(l => l.id === d.locationId)
+                  return (
+                    <SelectItem key={d.date} value={d.date}>
+                      Day {dayIdx + 1} - {new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {location && ` (${location.name})`}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleMoveToDay} disabled={!moveTargetDay}>
+              Move
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -2648,6 +2719,7 @@ function SortableActivityCard({
   onMouseLeave,
   onEdit,
   onRemoveTime,
+  onMoveToDay,
   onDelete
 }: {
   activity: Activity
@@ -2656,6 +2728,7 @@ function SortableActivityCard({
   onMouseLeave?: () => void
   onEdit?: () => void
   onRemoveTime?: () => void
+  onMoveToDay?: () => void
   onDelete?: () => void
 }) {
   const {
@@ -2681,8 +2754,8 @@ function SortableActivityCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer",
-        isDragging && "opacity-50 bg-neutral-100 shadow-lg z-50"
+        "group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-50 transition-colors cursor-pointer",
+        isDragging && "opacity-50 bg-neutral-50 shadow-lg z-50"
       )}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -2708,28 +2781,36 @@ function SortableActivityCard({
           <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
         </div>
       </div>
-      {/* Right: Time + Dropdown menu */}
+      {/* Right: Time + More actions menu */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-mono-regular text-text-secondary">{formattedTime}</span>
+        {/* More actions menu - visible on hover */}
         <DropdownMenu>
           <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
             <DropdownMenuTrigger asChild>
               <NakedIconButton
                 icon={<MoreHorizontal />}
                 onClick={(e) => e.stopPropagation()}
-                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
               />
             </DropdownMenuTrigger>
           </div>
           <DropdownMenuContent align="end">
             {onEdit && (
               <DropdownMenuItem onClick={onEdit}>
+                <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
             )}
             {onRemoveTime && hasTime && (
               <DropdownMenuItem onClick={onRemoveTime}>
+                <CalendarClock className="h-4 w-4 mr-2" />
                 Remove time
+              </DropdownMenuItem>
+            )}
+            {onMoveToDay && (
+              <DropdownMenuItem onClick={onMoveToDay}>
+                <Replace className="h-4 w-4 mr-2" />
+                Move to day
               </DropdownMenuItem>
             )}
             {onDelete && (
@@ -2737,6 +2818,7 @@ function SortableActivityCard({
                 onClick={onDelete}
                 className="text-destructive focus:text-destructive"
               >
+                <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>
             )}
@@ -2755,6 +2837,7 @@ function ActivityCard({
   onMouseLeave,
   onEdit,
   onRemoveTime,
+  onMoveToDay,
   onDelete
 }: {
   activity: Activity
@@ -2763,6 +2846,7 @@ function ActivityCard({
   onMouseLeave?: () => void
   onEdit?: () => void
   onRemoveTime?: () => void
+  onMoveToDay?: () => void
   onDelete?: () => void
 }) {
   // Format time as XX:XX
@@ -2771,7 +2855,7 @@ function ActivityCard({
 
   return (
     <div
-      className="group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-100 transition-colors cursor-pointer"
+      className="group py-4 px-4 border-b border-neutral-200 flex items-start justify-between hover:bg-neutral-50 transition-colors cursor-pointer"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -2787,28 +2871,36 @@ function ActivityCard({
           <span className="text-body text-text-secondary">{activity.place?.address || 'No address'}</span>
         </div>
       </div>
-      {/* Right: Time + Dropdown menu */}
+      {/* Right: Time + More actions menu */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-mono-regular text-text-secondary">{formattedTime}</span>
+        {/* More actions menu - visible on hover */}
         <DropdownMenu>
           <div className="overflow-hidden w-0 opacity-0 group-hover:w-7 group-hover:opacity-100 has-[[data-state=open]]:w-7 has-[[data-state=open]]:opacity-100 transition-all duration-200">
             <DropdownMenuTrigger asChild>
               <NakedIconButton
                 icon={<MoreHorizontal />}
                 onClick={(e) => e.stopPropagation()}
-                className="data-[state=open]:bg-neutral-200 focus-visible:ring-0"
               />
             </DropdownMenuTrigger>
           </div>
           <DropdownMenuContent align="end">
             {onEdit && (
               <DropdownMenuItem onClick={onEdit}>
+                <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
             )}
             {onRemoveTime && hasTime && (
               <DropdownMenuItem onClick={onRemoveTime}>
+                <CalendarClock className="h-4 w-4 mr-2" />
                 Remove time
+              </DropdownMenuItem>
+            )}
+            {onMoveToDay && (
+              <DropdownMenuItem onClick={onMoveToDay}>
+                <Replace className="h-4 w-4 mr-2" />
+                Move to day
               </DropdownMenuItem>
             )}
             {onDelete && (
@@ -2816,6 +2908,7 @@ function ActivityCard({
                 onClick={onDelete}
                 className="text-destructive focus:text-destructive"
               >
+                <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>
             )}
