@@ -685,7 +685,6 @@ function PlaceCardMapView({
           {/* Photo - 4:3 aspect ratio, height determined by content */}
           <PlacePhoto
             googlePlaceId={place.googlePlaceId}
-            photos={place.photos}
             selectedPhotoIndex={place.selectedPhotoIndex}
             alt={place.name}
             className="w-20 aspect-[4/3] rounded-md"

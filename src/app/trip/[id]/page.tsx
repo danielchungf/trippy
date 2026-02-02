@@ -1296,7 +1296,6 @@ function DraggablePlaceCard({
       {/* Photo */}
       <PlacePhoto
         googlePlaceId={place.googlePlaceId}
-        photos={place.photos}
         selectedPhotoIndex={place.selectedPhotoIndex}
         alt={place.name}
         className="w-full aspect-video"
@@ -1896,7 +1895,6 @@ function PlaceCardMapView({
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
       <PlacePhoto
         googlePlaceId={place.googlePlaceId}
-        photos={place.photos}
         selectedPhotoIndex={place.selectedPhotoIndex}
         alt={place.name}
         width={photoDimensions?.width ?? 0}
