@@ -49,25 +49,29 @@ export function PlacePhoto({
 }: PlacePhotoProps) {
   const [photos, setPhotos] = useState<string[]>(preloadedPhotos || [])
   const [photoIndex, setPhotoIndex] = useState(selectedPhotoIndex)
+  const [needsFresh, setNeedsFresh] = useState(false)
 
   // Sync photoIndex when selectedPhotoIndex prop changes
   useEffect(() => {
     setPhotoIndex(selectedPhotoIndex)
   }, [selectedPhotoIndex])
 
-  // Use preloaded photos if provided
+  // Use preloaded photos if provided (and not marked as needing fresh)
   useEffect(() => {
-    if (preloadedPhotos && preloadedPhotos.length > 0) {
+    if (preloadedPhotos && preloadedPhotos.length > 0 && !needsFresh) {
       setPhotos(preloadedPhotos)
     }
-  }, [preloadedPhotos])
+  }, [preloadedPhotos, needsFresh])
 
-  // Fetch photos from Google Places API (with caching) if no preloaded photos
+  // Fetch fresh photos from Google Places API when:
+  // - No preloaded photos available, OR
+  // - Preloaded photos failed to load (expired URLs return 403)
   useEffect(() => {
-    if (preloadedPhotos && preloadedPhotos.length > 0) return
+    const shouldFetch = !preloadedPhotos?.length || needsFresh
+    if (!shouldFetch) return
     if (!googlePlaceId) return
 
-    // Check cache first
+    // Check session cache first
     const cached = photoCache.get(googlePlaceId)
     if (cached) {
       setPhotos(cached)
@@ -84,7 +88,17 @@ export function PlacePhoto({
         // Silently fail - no photos available
       })
     })
-  }, [googlePlaceId, preloadedPhotos])
+  }, [googlePlaceId, preloadedPhotos, needsFresh])
+
+  // Handle image load error (expired Google Places URLs return 403)
+  const handleImageError = useCallback(() => {
+    if (!needsFresh && googlePlaceId) {
+      // Clear stale cache and fetch fresh photos
+      photoCache.delete(googlePlaceId)
+      setPhotos([])
+      setNeedsFresh(true)
+    }
+  }, [needsFresh, googlePlaceId])
 
   // Save photo selection to database based on entity type
   const savePhotoIndex = useCallback(async (newIndex: number) => {
@@ -149,6 +163,7 @@ export function PlacePhoto({
             src={currentPhoto}
             alt={alt}
             className="w-full h-full object-cover"
+            onError={handleImageError}
           />
           {/* Hover overlay with navigation arrows */}
           {showArrows && (
