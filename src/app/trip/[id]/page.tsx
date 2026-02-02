@@ -46,6 +46,7 @@ import {
   ScrollText,
   CalendarClock,
   Replace,
+  Upload,
   // Category icons
   Soup,
   Coffee,
@@ -144,6 +145,9 @@ import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { StayDrawer } from "@/components/trip/StayDrawer"
+import { ImportPlacesDialog, PlaceToImport } from "@/components/trip/ImportPlacesDialog"
+import { matchLocationByAddress } from "@/lib/csv-import"
+import { searchPlaces } from "@/lib/maps"
 import { DayMap } from "@/components/maps/DayMap"
 import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { PlacePhoto } from "@/components/PlacePhoto"
@@ -1288,6 +1292,16 @@ function PlacesRightPanel({
     dayDate: string
   } | null>(null)
 
+  // Import dialog state
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+  // Import progress state
+  const [importProgress, setImportProgress] = useState<{
+    current: number
+    total: number
+    currentName: string
+  } | null>(null)
+
   // Get unique locations from places (including null for places without a location)
   const locationsInPlaces = useMemo(() => {
     const locationIds = new Set<string | null>()
@@ -1416,8 +1430,67 @@ function PlacesRightPanel({
     return selectedLocationIds.has(locationId)
   }
 
+  // Handle starting the import process
+  const handleStartImport = async (placesToImport: PlaceToImport[]) => {
+    setImportProgress({ current: 0, total: placesToImport.length, currentName: '' })
+
+    for (let i = 0; i < placesToImport.length; i++) {
+      const { place, category } = placesToImport[i]
+
+      setImportProgress({
+        current: i + 1,
+        total: placesToImport.length,
+        currentName: place.name,
+      })
+
+      try {
+        // Search for the place on Google
+        const searchResults = await searchPlaces(place.name)
+        if (searchResults.length === 0) continue
+
+        const placeResult = searchResults[0]
+
+        // Match location by address
+        const locationId = matchLocationByAddress(placeResult.address, trip.locations)
+
+        // Check for duplicates
+        const isDuplicate = trip.savedPlaces.some(
+          p => p.googlePlaceId === placeResult.placeId ||
+               (p.name.toLowerCase() === placeResult.name.toLowerCase() &&
+                p.address.toLowerCase() === placeResult.address.toLowerCase())
+        )
+        if (isDuplicate) continue
+
+        // Add to database
+        await addSavedPlace(trip.id, {
+          name: placeResult.name,
+          googlePlaceId: placeResult.placeId,
+          address: placeResult.address,
+          coordinates: placeResult.coordinates,
+          category: category || 'other',
+          notes: place.note || undefined,
+          locationId,
+        })
+
+        // Refresh to show new place in list
+        await onRefresh()
+
+      } catch (err) {
+        // Continue with next place on error
+        console.error('Failed to import place:', place.name, err)
+      }
+
+      // Small delay to avoid rate limiting
+      if (i < placesToImport.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+    }
+
+    setImportProgress(null)
+  }
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       {/* Header */}
       <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
         <div className="flex flex-col">
@@ -1455,6 +1528,13 @@ function PlacesRightPanel({
           <Button
             variant="secondary"
             size="small"
+            leftIcon={<Upload />}
+            onClick={() => setIsImportDialogOpen(true)}
+          >
+            Import
+          </Button>
+          <Button
+            size="small"
             leftIcon={<Plus />}
             onClick={() => onOpenPlaceDialog()}
           >
@@ -1462,6 +1542,34 @@ function PlacesRightPanel({
           </Button>
         </div>
       </div>
+
+      {/* Import Places Dialog */}
+      <ImportPlacesDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        onStartImport={handleStartImport}
+      />
+
+      {/* Import Progress Banner */}
+      {importProgress && (
+        <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-md border border-neutral-200 p-4 z-10 w-[320px]">
+          <span className="text-h3 text-text-primary">Importing places...</span>
+          <div className="w-full bg-neutral-100 rounded-full h-1 mt-2">
+            <div
+              className="bg-neutral-800 h-1 rounded-full transition-all duration-300"
+              style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-body text-text-secondary truncate flex-1 min-w-0 mr-2">
+              {importProgress.currentName}
+            </span>
+            <span className="text-mono-regular text-text-secondary flex-shrink-0">
+              {importProgress.current}/{importProgress.total}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {showMapView ? (
@@ -1597,8 +1705,11 @@ function PlacesRightPanel({
             {/* Scrollable Places List or Empty State */}
             <div className="flex-1 overflow-auto">
               {totalPlaceCount === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+                <div className="h-full flex flex-col items-center justify-center gap-2">
+                  <Button variant="secondary" size="small" leftIcon={<Upload />} onClick={() => setIsImportDialogOpen(true)}>
+                    Import from CSV
+                  </Button>
+                  <Button size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
                     New place
                   </Button>
                 </div>
@@ -1773,8 +1884,11 @@ function PlacesRightPanel({
           {/* Grid or Empty State */}
           <div className="flex-1 overflow-auto">
             {totalPlaceCount === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+              <div className="h-full flex flex-col items-center justify-center gap-2">
+                <Button variant="secondary" size="small" leftIcon={<Upload />} onClick={() => setIsImportDialogOpen(true)}>
+                  Import from CSV
+                </Button>
+                <Button size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
                   New place
                 </Button>
               </div>

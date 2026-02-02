@@ -110,3 +110,50 @@ export async function deleteSavedPlace(tripId: string, placeId: string): Promise
 
   return true
 }
+
+// Add multiple saved places in bulk
+export async function addSavedPlaces(
+  tripId: string,
+  places: Omit<SavedPlace, 'id'>[]
+): Promise<{ success: SavedPlace[]; failed: number }> {
+  const supabase = createClient()
+
+  const rows = places.map(data => ({
+    trip_id: tripId,
+    location_id: data.locationId || null,
+    name: data.name,
+    google_place_id: data.googlePlaceId || null,
+    address: data.address,
+    lat: data.coordinates.lat,
+    lng: data.coordinates.lng,
+    category: data.category,
+    notes: data.notes || null,
+    photos: data.photos || null,
+    selected_photo_index: data.selectedPhotoIndex ?? null,
+  }))
+
+  const { data: insertedRows, error } = await supabase
+    .from('saved_places')
+    .insert(rows)
+    .select()
+
+  if (error) {
+    console.error('Error adding saved places:', error)
+    return { success: [], failed: places.length }
+  }
+
+  const successPlaces: SavedPlace[] = (insertedRows || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    googlePlaceId: row.google_place_id || undefined,
+    address: row.address,
+    coordinates: { lat: row.lat, lng: row.lng },
+    category: row.category,
+    notes: row.notes || undefined,
+    photos: row.photos || undefined,
+    locationId: row.location_id || undefined,
+    selectedPhotoIndex: row.selected_photo_index ?? undefined,
+  }))
+
+  return { success: successPlaces, failed: places.length - successPlaces.length }
+}

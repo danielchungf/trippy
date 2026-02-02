@@ -34,6 +34,7 @@ export {
 
 export {
   addSavedPlace,
+  addSavedPlaces,
   updateSavedPlace,
   deleteSavedPlace,
 } from './saved-places'
