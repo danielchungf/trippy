@@ -1,22 +1,26 @@
 "use client"
 
-import { useEffect, useRef, useState, useMemo } from "react"
-import { Activity } from "@/types"
+import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { Activity, SavedPlace } from "@/types"
 import { loadGoogleMaps, getDirections, formatDistance, formatDuration } from "@/lib/maps"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Footprints, Car } from "lucide-react"
+import { getPlaceDetails } from "@/lib/maps"
+import { MapPin, Footprints, Car, Plus } from "lucide-react"
 
 interface DayMapProps {
   activities: Activity[]
   hoveredIndex?: number | null
+  savedPlaces?: SavedPlace[]
+  onAddPlaceAsActivity?: (placeId: string) => void
 }
 
-export function DayMap({ activities, hoveredIndex }: DayMapProps) {
+export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActivity }: DayMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const googleMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
   const markerContentsRef = useRef<HTMLDivElement[]>([])
+  const savedPlaceMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
   const polylineRef = useRef<google.maps.Polyline | null>(null)
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
   const isUpdatingRouteRef = useRef(false)
@@ -26,6 +30,9 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
   const [routeMode, setRouteMode] = useState<'lines' | 'directions'>('lines')
   const [travelMode, setTravelMode] = useState<'WALKING' | 'DRIVING'>('WALKING')
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
+  const [selectedSavedPlace, setSelectedSavedPlace] = useState<SavedPlace | null>(null)
+  const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null)
+  const [popoverPhoto, setPopoverPhoto] = useState<string | null>(null)
 
   // Filter activities with valid coordinates - memoize to prevent unnecessary re-renders
   const validActivities = useMemo(() =>
@@ -40,6 +47,37 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
     validActivities.map(a => `${a.id}:${a.place.coordinates.lat},${a.place.coordinates.lng}`).join('|'),
     [validActivities]
   )
+
+  // Filter saved places with valid coordinates
+  const validSavedPlaces = useMemo(() =>
+    (savedPlaces || []).filter(
+      p => p.coordinates.lat !== 0 && p.coordinates.lng !== 0
+    ),
+    [savedPlaces]
+  )
+
+  // Close popover when clicking outside
+  const handleMapClick = useCallback(() => {
+    setSelectedSavedPlace(null)
+    setPopoverPosition(null)
+    setPopoverPhoto(null)
+  }, [])
+
+  // Fetch photo when saved place is selected
+  useEffect(() => {
+    if (!selectedSavedPlace?.googlePlaceId) {
+      setPopoverPhoto(null)
+      return
+    }
+
+    getPlaceDetails(selectedSavedPlace.googlePlaceId).then(details => {
+      if (details?.photos?.[0]) {
+        setPopoverPhoto(details.photos[0])
+      }
+    }).catch(() => {
+      setPopoverPhoto(null)
+    })
+  }, [selectedSavedPlace])
 
   // Initialize map
   useEffect(() => {
@@ -154,6 +192,118 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
       }
     }
   }, [validActivities, isLoading])
+
+  // Update saved place markers
+  useEffect(() => {
+    if (!googleMapRef.current || isLoading) return
+
+    // Clear existing saved place markers
+    savedPlaceMarkersRef.current.forEach(marker => {
+      marker.map = null
+    })
+    savedPlaceMarkersRef.current = []
+
+    if (validSavedPlaces.length === 0) return
+
+    // Add saved place markers as small blue dots
+    validSavedPlaces.forEach((place) => {
+      const position = {
+        lat: place.coordinates.lat,
+        lng: place.coordinates.lng
+      }
+
+      // Create custom marker content - small orange dot
+      const markerContent = document.createElement('div')
+      markerContent.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 12px;
+        height: 12px;
+        border-radius: 9999px;
+        background-color: #FF591E;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.15s ease;
+        transform: translateY(50%);
+        cursor: pointer;
+      `
+
+      // Hover effects
+      markerContent.addEventListener('mouseenter', () => {
+        markerContent.style.width = '16px'
+        markerContent.style.height = '16px'
+        markerContent.style.backgroundColor = '#E04D15'
+      })
+      markerContent.addEventListener('mouseleave', () => {
+        markerContent.style.width = '12px'
+        markerContent.style.height = '12px'
+        markerContent.style.backgroundColor = '#FF591E'
+      })
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        map: googleMapRef.current,
+        position,
+        title: place.name,
+        content: markerContent,
+        zIndex: 1 // Below activity markers
+      })
+
+      // Click handler to show popover
+      marker.addListener('click', () => {
+        if (!mapRef.current || !googleMapRef.current) return
+
+        // Get marker position on screen
+        const projection = googleMapRef.current.getProjection()
+        const bounds = googleMapRef.current.getBounds()
+        if (!projection || !bounds) return
+
+        const scale = Math.pow(2, googleMapRef.current.getZoom() || 0)
+        const nw = projection.fromLatLngToPoint(bounds.getNorthEast())
+        const point = projection.fromLatLngToPoint(new google.maps.LatLng(position.lat, position.lng))
+
+        if (!nw || !point) return
+
+        const mapRect = mapRef.current.getBoundingClientRect()
+        const x = Math.floor((point.x - nw.x) * scale + mapRect.width)
+        const y = Math.floor((point.y - nw.y) * scale)
+
+        // Adjust position to keep popover in view
+        const popoverWidth = 240
+        const popoverHeight = 200
+        const adjustedX = Math.min(Math.max(10, x - popoverWidth / 2), mapRect.width - popoverWidth - 10)
+        const adjustedY = y + 20 > mapRect.height - popoverHeight ? y - popoverHeight - 20 : y + 20
+
+        setSelectedSavedPlace(place)
+        setPopoverPosition({ x: adjustedX, y: adjustedY })
+      })
+
+      savedPlaceMarkersRef.current.push(marker)
+    })
+
+    // Update bounds to include saved places
+    if (validActivities.length === 0 && validSavedPlaces.length > 0) {
+      const bounds = new google.maps.LatLngBounds()
+      validSavedPlaces.forEach(place => {
+        bounds.extend(new google.maps.LatLng(place.coordinates.lat, place.coordinates.lng))
+      })
+      if (validSavedPlaces.length > 1) {
+        googleMapRef.current.fitBounds(bounds, 50)
+      } else {
+        googleMapRef.current.setCenter(bounds.getCenter())
+        googleMapRef.current.setZoom(15)
+      }
+    }
+  }, [validSavedPlaces, validActivities.length, isLoading])
+
+  // Add map click listener to close popover
+  useEffect(() => {
+    if (!googleMapRef.current) return
+    const listener = googleMapRef.current.addListener('click', handleMapClick)
+    return () => {
+      google.maps.event.removeListener(listener)
+    }
+  }, [handleMapClick, isLoading])
 
   // Update route display
   useEffect(() => {
@@ -271,8 +421,8 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
         </div>
       )}
 
-      {/* Empty state overlay */}
-      {!error && !isLoading && validActivities.length === 0 && (
+      {/* Empty state overlay - only show if no activities AND no saved places */}
+      {!error && !isLoading && validActivities.length === 0 && validSavedPlaces.length === 0 && (
         <div className="absolute inset-0 bg-neutral-100 flex items-center justify-center">
           <div className="flex flex-col items-center gap-1">
             <span className="text-h2 text-text-primary">Nothing to show yet</span>
@@ -331,6 +481,49 @@ export function DayMap({ activities, hoveredIndex }: DayMapProps) {
         </div>
       )}
       */}
+
+      {/* Saved Place Popover */}
+      {selectedSavedPlace && popoverPosition && (
+        <div
+          className="absolute z-50 bg-white rounded-lg shadow-lg border overflow-hidden w-[240px]"
+          style={{ left: popoverPosition.x, top: popoverPosition.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Photo - 16:9 aspect ratio */}
+          <div className="w-full aspect-video bg-neutral-100">
+            {popoverPhoto ? (
+              <img
+                src={popoverPhoto}
+                alt={selectedSavedPlace.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <MapPin className="h-6 w-6 text-neutral-300" />
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="p-3 flex flex-col gap-2">
+            <div className="text-h3 text-text-primary line-clamp-1">{selectedSavedPlace.name}</div>
+            <Button
+              variant="secondary"
+              size="small"
+              className="w-full"
+              leftIcon={<Plus />}
+              onClick={() => {
+                onAddPlaceAsActivity?.(selectedSavedPlace.id)
+                setSelectedSavedPlace(null)
+                setPopoverPosition(null)
+                setPopoverPhoto(null)
+              }}
+            >
+              Add as activity
+            </Button>
+          </div>
+        </div>
+      )}
 
     </div>
   )

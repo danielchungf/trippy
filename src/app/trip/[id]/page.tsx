@@ -138,6 +138,7 @@ import {
   updateActivity,
   deleteActivity,
   reorderActivities,
+  createActivityFromPlace,
   TripWithOwnership,
 } from "@/lib/db"
 import { useTrip, useRefreshTrip } from "@/lib/hooks/use-trips"
@@ -1986,6 +1987,20 @@ function RightPanel({
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
 
+  // Filter saved places not already scheduled for this day
+  const unscheduledSavedPlaces = useMemo(() =>
+    trip.savedPlaces.filter(
+      place => !day?.activities.some(a => a.savedPlaceId === place.id)
+    ),
+    [trip.savedPlaces, day?.activities]
+  )
+
+  // Handler to add saved place as activity from map
+  const handleAddSavedPlaceFromMap = async (placeId: string) => {
+    await createActivityFromPlace(trip.id, selectedDayDate, placeId)
+    await onRefresh()
+  }
+
   // Edit day name state
   const [isEditNameOpen, setIsEditNameOpen] = useState(false)
   const [dayName, setDayName] = useState("")
@@ -2245,7 +2260,12 @@ function RightPanel({
           className="flex-shrink-0"
           style={{ height: mapHeight }}
         >
-          <DayMap activities={day.activities} hoveredIndex={hoveredActivityIndex} />
+          <DayMap
+              activities={day.activities}
+              hoveredIndex={hoveredActivityIndex}
+              savedPlaces={unscheduledSavedPlaces}
+              onAddPlaceAsActivity={handleAddSavedPlaceFromMap}
+            />
         </div>
 
         {/* Activities Panel - Takes remaining space */}
@@ -2819,6 +2839,19 @@ function ItineraryPanel({
   selectedDayDate: string | null
 }) {
   const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list')
+
+  // Persist view mode preference
+  useEffect(() => {
+    const saved = localStorage.getItem('piper_itinerary_view')
+    if (saved === 'list' || saved === 'timeline') {
+      setViewMode(saved)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('piper_itinerary_view', viewMode)
+  }, [viewMode])
+
   const days = generateDaysFromTrip(trip)
 
   const getLocationForDay = (day: Day): Location | undefined => {
