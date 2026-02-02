@@ -35,8 +35,17 @@ Users open Piper on mobile while traveling:
 - **Database:** Supabase (PostgreSQL + Auth + RLS)
 - **State:** TanStack React Query (5-min stale, 30-min gc)
 - **UI:** Tailwind CSS + Radix UI components
-- **Maps:** Google Maps JavaScript API
+- **Maps:** Google Maps JavaScript API (see [API Usage Guide](/.context/google-maps-api-usage.md))
 - **Fonts:** Fustat (headings), Inter (body)
+
+## Google Maps API Usage
+Core API functions live in `src/lib/maps.ts`. We use:
+- **Places Text Search** - `searchPlaces()` for place lookups
+- **Place Details** - `getPlaceDetails()` and `getPlaceDetailsExtended()` for place info
+- **Directions** - `getDirections()` and `optimizeRoute()` for routing
+- **Geocoding** - `geocodeAddress()` for address-to-coordinates
+
+**Cost note:** We request photos, reviews, opening hours which bills at **Pro tier** rates, not the cheaper Essentials tier. See `/.context/google-maps-api-usage.md` for full analysis.
 
 ## Design System
 See `src/lib/design-tokens.ts` for:
