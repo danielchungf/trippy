@@ -13,9 +13,10 @@ interface DayMapProps {
   hoveredIndex?: number | null
   savedPlaces?: SavedPlace[]
   onAddPlaceAsActivity?: (placeId: string) => void
+  locationCenter?: { lat: number; lng: number }
 }
 
-export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActivity }: DayMapProps) {
+export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActivity, locationCenter }: DayMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const googleMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -105,12 +106,12 @@ export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActi
           }
         })
 
-        // Default center if no valid activities
-        const defaultCenter = { lat: 40.7128, lng: -74.0060 } // NYC
+        // Default center: use location center if provided, otherwise NYC fallback
+        const defaultCenter = locationCenter || { lat: 40.7128, lng: -74.0060 }
 
         googleMapRef.current = new maps.Map(mapRef.current, {
           center: hasValidCoords ? bounds.getCenter().toJSON() : defaultCenter,
-          zoom: hasValidCoords ? 13 : 12,
+          zoom: hasValidCoords ? 13 : (locationCenter ? 13 : 12),
           mapId: 'piper-day-map',
           disableDefaultUI: true,
           zoomControl: true,
@@ -281,20 +282,27 @@ export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActi
       savedPlaceMarkersRef.current.push(marker)
     })
 
-    // Update bounds to include saved places
-    if (validActivities.length === 0 && validSavedPlaces.length > 0) {
-      const bounds = new google.maps.LatLngBounds()
-      validSavedPlaces.forEach(place => {
-        bounds.extend(new google.maps.LatLng(place.coordinates.lat, place.coordinates.lng))
-      })
-      if (validSavedPlaces.length > 1) {
-        googleMapRef.current.fitBounds(bounds, 50)
-      } else {
-        googleMapRef.current.setCenter(bounds.getCenter())
-        googleMapRef.current.setZoom(15)
+    // Update map center when no activities
+    if (validActivities.length === 0) {
+      if (locationCenter) {
+        // Center on the day's location (e.g., Kyoto)
+        googleMapRef.current.setCenter(locationCenter)
+        googleMapRef.current.setZoom(13)
+      } else if (validSavedPlaces.length > 0) {
+        // Fallback: fit to saved places if no location center
+        const bounds = new google.maps.LatLngBounds()
+        validSavedPlaces.forEach(place => {
+          bounds.extend(new google.maps.LatLng(place.coordinates.lat, place.coordinates.lng))
+        })
+        if (validSavedPlaces.length > 1) {
+          googleMapRef.current.fitBounds(bounds, 50)
+        } else {
+          googleMapRef.current.setCenter(bounds.getCenter())
+          googleMapRef.current.setZoom(15)
+        }
       }
     }
-  }, [validSavedPlaces, validActivities.length, isLoading])
+  }, [validSavedPlaces, validActivities.length, isLoading, locationCenter])
 
   // Add map click listener to close popover
   useEffect(() => {
