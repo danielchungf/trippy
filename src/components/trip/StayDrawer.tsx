@@ -29,10 +29,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import { PlacePhoto } from "@/components/PlacePhoto"
 import { Accommodation, Location, parseLocalDate } from "@/types"
 import { getPlaceDetailsExtended, PlaceDetailsExtended } from "@/lib/maps"
-import { deleteAccommodation } from "@/lib/db"
+import { deleteAccommodation, updateAccommodation } from "@/lib/db"
 
 interface StayDrawerProps {
   open: boolean
@@ -41,6 +42,7 @@ interface StayDrawerProps {
   accommodation: Accommodation | null
   locations: Location[]
   onRefresh: () => Promise<void>
+  onEdit?: (accommodation: Accommodation) => void
 }
 
 function formatDateRange(checkIn: string, checkOut: string): string {
@@ -68,12 +70,21 @@ export function StayDrawer({
   accommodation,
   locations,
   onRefresh,
+  onEdit,
 }: StayDrawerProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Google details state
   const [googleDetails, setGoogleDetails] = useState<PlaceDetailsExtended | null>(null)
+
+  // Editable fields state
+  const [notes, setNotes] = useState(accommodation?.notes || "")
+
+  // Sync local state when accommodation changes
+  useEffect(() => {
+    setNotes(accommodation?.notes || "")
+  }, [accommodation?.id, accommodation?.notes])
 
   // Get location for this accommodation
   const location = accommodation?.locationId
@@ -119,6 +130,12 @@ export function StayDrawer({
       return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(accommodation.address)}`
     }
     return null
+  }
+
+  const handleSaveNotes = async () => {
+    if (!accommodation || notes === (accommodation.notes || "")) return
+    await updateAccommodation(tripId, accommodation.id, { notes: notes || undefined })
+    await onRefresh()
   }
 
   if (!accommodation) return null
@@ -226,6 +243,24 @@ export function StayDrawer({
                 </div>
               </div>
 
+              {/* Divider - full width */}
+              <div className="border-t border-muted" />
+
+              {/* Notes Section */}
+              <div className="p-4">
+                {/* Editable Notes field */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Notes <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <Textarea
+                    placeholder="Door code, WiFi password, check-in instructions..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    onBlur={handleSaveNotes}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
             </ScrollArea>
 
             {/* Footer Actions */}
@@ -242,6 +277,12 @@ export function StayDrawer({
                 variant="secondary"
                 size="small"
                 leftIcon={<SquarePen />}
+                onClick={() => {
+                  if (accommodation && onEdit) {
+                    onOpenChange(false)
+                    onEdit(accommodation)
+                  }
+                }}
               >
                 Edit
               </Button>
