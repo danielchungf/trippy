@@ -192,6 +192,15 @@ export default function TripPage() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
 
+  // Shared map height state (persisted to localStorage)
+  const [mapHeight, setMapHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piper-map-height')
+      return saved ? parseInt(saved, 10) : 500
+    }
+    return 500
+  })
+
   // Location dialog state
   const [isLocationOpen, setIsLocationOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
@@ -559,6 +568,8 @@ export default function TripPage() {
             selectedDayDate={selectedDayDate}
             onRefresh={refreshTrip}
             onOpenAccommodationDialog={handleOpenAccommodationDialog}
+            mapHeight={mapHeight}
+            setMapHeight={setMapHeight}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-text-secondary">
@@ -575,6 +586,8 @@ export default function TripPage() {
       onOpenAccommodationDialog={handleOpenAccommodationDialog}
       onOpenStayDrawer={handleOpenStayDrawer}
       onRefresh={refreshTrip}
+      mapHeight={mapHeight}
+      setMapHeight={setMapHeight}
     />
   )
 
@@ -1979,12 +1992,16 @@ function RightPanel({
   trip,
   selectedDayDate,
   onRefresh,
-  onOpenAccommodationDialog
+  onOpenAccommodationDialog,
+  mapHeight,
+  setMapHeight
 }: {
   trip: TripWithOwnership
   selectedDayDate: string
   onRefresh: () => Promise<void>
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  mapHeight: number
+  setMapHeight: (height: number | ((h: number) => number)) => void
 }) {
   const days = generateDaysFromTrip(trip)
   const dayIndex = days.findIndex(d => d.date === selectedDayDate)
@@ -1993,7 +2010,6 @@ function RightPanel({
 
   // Resizable map state
   const containerRef = useRef<HTMLDivElement>(null)
-  const [mapHeight, setMapHeight] = useState(500) // Default 500px
   const [isResizing, setIsResizing] = useState(false)
 
   // Activity dialog state
@@ -2079,6 +2095,11 @@ function RightPanel({
 
     const handleMouseUp = () => {
       setIsResizing(false)
+      // Save to localStorage when resize ends
+      setMapHeight(h => {
+        localStorage.setItem('piper-map-height', h.toString())
+        return h
+      })
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -2386,12 +2407,9 @@ function RightPanel({
                       const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
                       const inMonth = monthFormat.format(checkIn).toUpperCase()
                       const outMonth = monthFormat.format(checkOut).toUpperCase()
-                      const inDay = checkIn.getDate()
-                      const outDay = checkOut.getDate()
-                      if (inMonth === outMonth) {
-                        return `${inMonth} ${inDay}—${outDay}`
-                      }
-                      return `${inMonth} ${inDay}—${outMonth} ${outDay}`
+                      const inDay = String(checkIn.getDate()).padStart(2, '0')
+                      const outDay = String(checkOut.getDate()).padStart(2, '0')
+                      return `${inMonth} ${inDay} — ${outMonth} ${outDay}`
                     })()}
                   </span>
                   {departingAccommodation.googlePlaceId && (
@@ -2466,12 +2484,9 @@ function RightPanel({
                       const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
                       const inMonth = monthFormat.format(checkIn).toUpperCase()
                       const outMonth = monthFormat.format(checkOut).toUpperCase()
-                      const inDay = checkIn.getDate()
-                      const outDay = checkOut.getDate()
-                      if (inMonth === outMonth) {
-                        return `${inMonth} ${inDay}—${outDay}`
-                      }
-                      return `${inMonth} ${inDay}—${outMonth} ${outDay}`
+                      const inDay = String(checkIn.getDate()).padStart(2, '0')
+                      const outDay = String(checkOut.getDate()).padStart(2, '0')
+                      return `${inMonth} ${inDay} — ${outMonth} ${outDay}`
                     })()}
                   </span>
                   {stayingAccommodation.googlePlaceId && (
@@ -3053,13 +3068,13 @@ function DayCard({
   const [dayName, setDayName] = useState(day.name || '')
 
   const date = parseLocalDate(day.date)
-  const dayOfWeekLong = date.toLocaleDateString('en-US', { weekday: 'long' })
-  const monthName = date.toLocaleDateString('en-US', { month: 'long' })
-  const dayOfMonthNum = date.getDate()
+  const dayOfWeekShort = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+  const monthName = date.toLocaleDateString('en-US', { month: 'long' }).toUpperCase()
+  const dayOfMonthNum = String(date.getDate()).padStart(2, '0')
   const activityCount = day.activities.length
 
-  // Badge always shows date format
-  const badgeLabel = `${monthName} ${dayOfMonthNum}, ${dayOfWeekLong}`
+  // Date label for right side (e.g., "SAT, MARCH 13")
+  const dateLabel = `${dayOfWeekShort}, ${monthName} ${dayOfMonthNum}`
   // Day name shows custom name or "Day X"
   const displayDayName = day.name || `Day ${dayNumber}`
 
@@ -3085,16 +3100,17 @@ function DayCard({
         )}
         onClick={onSelect}
       >
-        {/* Row 1: Badge (date only, not editable) */}
-        <div className="flex items-center">
+        {/* Row 1: Badge (location) + Date */}
+        <div className="flex items-center justify-between">
           <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
-            {badgeLabel}
+            {location?.name || 'No destination'}
           </Badge>
+          <span className="text-mono-regular text-text-secondary">{dateLabel}</span>
         </div>
 
         {/* Row 2: Day Name + Edit Icon */}
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-h3 text-text-primary">{displayDayName}</span>
+          <span className="text-h2 text-text-primary">{displayDayName}</span>
           <button
             onClick={handleEditClick}
             className="w-3 h-3 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100"
@@ -3173,19 +3189,22 @@ function OverviewPanel({
   onOpenLocationDialog,
   onOpenAccommodationDialog,
   onOpenStayDrawer,
-  onRefresh
+  onRefresh,
+  mapHeight,
+  setMapHeight
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   onOpenStayDrawer: (accommodation: Accommodation) => void
   onRefresh: () => Promise<void>
+  mapHeight: number
+  setMapHeight: (height: number | ((h: number) => number)) => void
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
 
   // Resizable map state for right panel
   const rightPanelRef = useRef<HTMLDivElement>(null)
-  const [mapHeight, setMapHeight] = useState(500)
   const [isResizing, setIsResizing] = useState(false)
 
   // Handle resize drag
@@ -3207,6 +3226,11 @@ function OverviewPanel({
 
     const handleMouseUp = () => {
       setIsResizing(false)
+      // Save to localStorage when resize ends
+      setMapHeight(h => {
+        localStorage.setItem('piper-map-height', h.toString())
+        return h
+      })
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -3535,11 +3559,9 @@ function StaysPanel({
         const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
         const inMonth = monthFormat.format(checkIn).toUpperCase()
         const outMonth = monthFormat.format(checkOut).toUpperCase()
-        const inDay = checkIn.getDate()
-        const outDay = checkOut.getDate()
-        const dateRange = inMonth === outMonth
-          ? `${inMonth} ${inDay}—${outDay}`
-          : `${inMonth} ${inDay}—${outMonth} ${outDay}`
+        const inDay = String(checkIn.getDate()).padStart(2, '0')
+        const outDay = String(checkOut.getDate()).padStart(2, '0')
+        const dateRange = `${inMonth} ${inDay} — ${outMonth} ${outDay}`
 
         return (
           <div
