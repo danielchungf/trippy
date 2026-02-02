@@ -1988,9 +1988,13 @@ function RightPanel({
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
 
   // Filter saved places not already scheduled for this day
+  // Hide if: linked via savedPlaceId OR same googlePlaceId
   const unscheduledSavedPlaces = useMemo(() =>
     trip.savedPlaces.filter(
-      place => !day?.activities.some(a => a.savedPlaceId === place.id)
+      place => !day?.activities.some(a =>
+        a.savedPlaceId === place.id ||
+        (place.googlePlaceId && a.place.googlePlaceId === place.googlePlaceId)
+      )
     ),
     [trip.savedPlaces, day?.activities]
   )
@@ -2089,8 +2093,8 @@ function RightPanel({
   const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
   const dayNumberPadded = String(dayNumber).padStart(2, '0')
 
-  // Display name: use day name if set, otherwise location name, otherwise "Day X"
-  const displayName = day.name || location?.name || `Day ${dayNumber}`
+  // Display name: use custom day name if set, otherwise "Day X"
+  const displayName = day.name || `Day ${dayNumber}`
   const dayInfo = `${dayOfWeek}, ${monthDay}`
 
   // Departing accommodation (checking out this day) - shown at top
@@ -2265,6 +2269,7 @@ function RightPanel({
               hoveredIndex={hoveredActivityIndex}
               savedPlaces={unscheduledSavedPlaces}
               onAddPlaceAsActivity={handleAddSavedPlaceFromMap}
+              locationCenter={location?.coordinates}
             />
         </div>
 
@@ -2394,7 +2399,7 @@ function RightPanel({
                   ))}
                 </SortableContext>
               </DndContext>
-            ) : (
+            ) : !(departingAccommodation || stayingAccommodation) ? (
               <div className="h-full flex items-center justify-center">
                 <Button
                   variant="secondary"
@@ -2405,11 +2410,11 @@ function RightPanel({
                   New activity
                 </Button>
               </div>
-            )}
+            ) : null}
 
             {/* Staying Accommodation Row (checking in or staying tonight) */}
             {stayingAccommodation && (
-              <div className="group py-3 px-4 border-t border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
+              <div className={cn("group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors", day.activities.length > 0 && "border-t")}>
                 {/* Left: Bed icon + Name */}
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-text-secondary">
