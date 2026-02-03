@@ -1,4 +1,4 @@
-import { PlaceCategory, Location } from '@/types'
+import { PlaceCategory, Location, Coordinates } from '@/types'
 
 // Parsed place from Google Maps CSV
 export interface ParsedCSVPlace {
@@ -189,6 +189,67 @@ export function matchLocationByAddress(address: string, locations: Location[]): 
  */
 function removeDiacritics(str: string): string {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/**
+ * Extract coordinates from a Google Maps URL
+ * URL format: https://www.google.com/maps/place/.../@35.701961,139.7851624,17z/...
+ * Returns null if coordinates cannot be extracted
+ */
+export function extractCoordinatesFromUrl(url: string): Coordinates | null {
+  // Match @lat,lng pattern in Google Maps URLs
+  const match = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)
+  if (match) {
+    const lat = parseFloat(match[1])
+    const lng = parseFloat(match[2])
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng }
+    }
+  }
+  return null
+}
+
+/**
+ * Extract Google Place ID from a Google Maps URL
+ * URL formats:
+ * - https://www.google.com/maps/place/?q=place_id:ChIJ...
+ * - https://maps.google.com/?cid=12345678901234567890
+ * - https://www.google.com/maps/place/Name/data=...!1s0x...:0x...  (feature ID format)
+ * Returns null if place_id cannot be extracted
+ */
+export function extractPlaceIdFromUrl(url: string): string | null {
+  // Match place_id:ChIJ... pattern
+  const placeIdMatch = url.match(/place_id[=:]([A-Za-z0-9_-]+)/)
+  if (placeIdMatch) {
+    return placeIdMatch[1]
+  }
+
+  // Match the !1s prefix followed by a feature ID (0x...:0x... format)
+  // This format is used in Google Maps data URLs
+  const featureIdMatch = url.match(/!1s(0x[a-f0-9]+:0x[a-f0-9]+)/i)
+  if (featureIdMatch) {
+    // Return the feature ID - we'll need to handle this specially
+    return featureIdMatch[1]
+  }
+
+  return null
+}
+
+/**
+ * Extract place name from a Google Maps URL
+ * URL formats:
+ * - https://www.google.com/maps/place/Place+Name/@lat,lng,...
+ * - https://www.google.com/maps/place/Place+Name/data=...
+ * Returns null if name cannot be extracted
+ */
+export function extractPlaceNameFromUrl(url: string): string | null {
+  // Match /place/Name/ pattern - name ends at @ or /data= or ?
+  const match = url.match(/\/place\/([^/@?]+)(?:\/[@d]|[?@])/)
+  if (match) {
+    // URL decode and replace + with spaces
+    return decodeURIComponent(match[1].replace(/\+/g, ' '))
+  }
+  return null
 }
 
 /**

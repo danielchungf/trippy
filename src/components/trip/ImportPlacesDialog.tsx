@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
-import { Upload, ExternalLink, X, MapPin, Bookmark, FolderDown, FolderUp } from "lucide-react"
+import { Upload, ExternalLink, X, MapPin, Bookmark, FolderDown, FolderUp, ArrowLeft, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogPortal,
-  DialogOverlay,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -198,14 +197,18 @@ export function ImportPlacesDialog({
   if (!open) return null
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogPortal>
-        <DialogOverlay />
+        {/* Custom overlay since modal={false} disables the default one */}
+        <div
+          className="fixed inset-0 z-50 bg-black/25"
+          onClick={() => handleOpenChange(false)}
+        />
         <div className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]">
-          <div className="bg-white rounded-lg p-5 w-[700px] h-[500px] flex flex-col shadow-lg">
+          <div className="bg-white rounded-lg w-[700px] h-[676px] flex flex-col shadow-lg">
             {/* Show upload step if no file loaded, otherwise show selection step */}
             {places.length === 0 ? (
-              <>
+              <div className="flex flex-col h-full p-5">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h1 className="text-h1 text-text-primary">Import Google Maps places</h1>
@@ -218,7 +221,7 @@ export function ImportPlacesDialog({
                 {/* Description */}
                 <div className="mt-5">
                   <p className="text-body text-text-secondary">
-                    Great news! You can import all your saved places from Google Maps by uploading a CSV file:
+                    Good news! You can import all your saved places from Google Maps using a CSV file.
                   </p>
 
                   {/* Steps */}
@@ -237,6 +240,7 @@ export function ImportPlacesDialog({
                         >
                           Google Takeout
                         </a>
+                        .
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -252,7 +256,7 @@ export function ImportPlacesDialog({
                         <FolderDown />
                       </span>
                       <span className="text-body text-text-secondary">
-                        Download and unzip your export. You'll find a CSV for each saved list
+                        Download and unzip. You'll find a CSV for each saved list.
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -260,7 +264,15 @@ export function ImportPlacesDialog({
                         <FolderUp />
                       </span>
                       <span className="text-body text-text-secondary">
-                        Upload a CSV file below
+                        Upload one of your CSV files below.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 flex items-center justify-center text-text-secondary [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25]">
+                        <Info />
+                      </span>
+                      <span className="text-body text-text-secondary">
+                        For best results, create your Destinations in the Overview tab first.
                       </span>
                     </div>
                   </div>
@@ -296,11 +308,11 @@ export function ImportPlacesDialog({
                 {uploadError && (
                   <p className="text-body text-red-600 mt-3">{uploadError}</p>
                 )}
-              </>
+              </div>
             ) : (
-              <>
+              <div className="flex flex-col h-full overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-5 flex-shrink-0">
                   <h1 className="text-h1 text-text-primary">Select places to import</h1>
                   <NakedIconButton
                     icon={<X />}
@@ -308,41 +320,46 @@ export function ImportPlacesDialog({
                   />
                 </div>
 
-                {/* Subheader with actions */}
-                <div className="flex items-center justify-between mt-5">
-                  <p className="text-body text-text-secondary">
-                    {selectedCount} of {places.length} places selected
-                  </p>
+                {/* Selection controls row */}
+                <div className="flex items-center justify-between px-5 py-4 border-t border-b border-neutral-200 flex-shrink-0">
                   <div className="flex gap-2">
                     <Button variant="secondary" size="small" onClick={handleSelectAll}>
-                      Select All
+                      Select all
                     </Button>
                     <Button variant="secondary" size="small" onClick={handleDeselectAll}>
-                      Deselect All
+                      Deselect all
                     </Button>
                   </div>
+                  <span className="text-mono-regular text-text-secondary">
+                    {String(selectedCount).padStart(2, '0')}/{String(places.length).padStart(2, '0')} PLACES SELECTED
+                  </span>
                 </div>
 
                 {/* List with checkboxes and category dropdowns */}
-                <div className="flex-1 min-h-0 mt-4 -mx-5 px-5 overflow-y-auto max-h-[400px]">
-                  <div>
+                <div className="flex-1 overflow-hidden">
+                  <div
+                    className="h-full overflow-y-scroll overscroll-contain px-5 py-4"
+                    style={{ touchAction: 'pan-y' }}
+                  >
                     {places.map((item, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 py-1 px-2 rounded hover:bg-neutral-50"
+                        className="flex items-center py-1"
                       >
-                        <Checkbox
-                          checked={item.selected}
-                          onCheckedChange={() => handleTogglePlace(index)}
-                        />
-                        <span className="flex-1 min-w-0 text-body text-text-primary truncate">
-                          {item.place.name}
-                        </span>
+                      <Checkbox
+                        checked={item.selected}
+                        onCheckedChange={() => handleTogglePlace(index)}
+                        className="flex-shrink-0"
+                      />
+                      <span className="flex-1 min-w-0 text-body text-text-primary truncate mx-2">
+                        {item.place.name}
+                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Select
                           value={item.category || ""}
                           onValueChange={(value) => handleUpdateCategory(index, value as PlaceCategory)}
                         >
-                          <SelectTrigger className="w-[110px] h-7 text-xs flex-shrink-0">
+                          <SelectTrigger className="w-auto h-[32px] px-[8px] rounded-[8px] gap-[6px] font-fustat font-bold text-[14px] tracking-[-0.02em] bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -353,24 +370,23 @@ export function ImportPlacesDialog({
                             ))}
                           </SelectContent>
                         </Select>
-                        <a
-                          href={item.place.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-neutral-400 hover:text-neutral-600 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
+                        <NakedIconButton
+                          icon={<ExternalLink />}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.open(item.place.url, '_blank', 'noopener,noreferrer')
+                          }}
+                        />
                       </div>
+                    </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-between gap-2 mt-4 pt-4 border-t border-neutral-200">
-                  <Button variant="secondary" size="small" onClick={handleClearFile}>
-                    Change file
+                <div className="flex justify-between items-center px-5 py-5 border-t border-neutral-200 flex-shrink-0">
+                  <Button variant="secondary" size="small" leftIcon={<ArrowLeft />} onClick={handleClearFile}>
+                    Back
                   </Button>
                   <Button
                     size="small"
@@ -380,7 +396,7 @@ export function ImportPlacesDialog({
                     Import {selectedCount} places
                   </Button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>

@@ -94,17 +94,21 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 
 export async function searchPlaces(
   query: string,
-  location?: Coordinates
+  location?: Coordinates,
+  /** When true, strictly filter results to only include places within 500m of the coordinates */
+  preciseMatch?: boolean
 ): Promise<PlaceSearchResult[]> {
   // Load both maps (for LatLng) and places libraries
   await loadGoogleMaps()
   const places = await loadPlacesLibrary()
 
+  // For precise matching, use a larger search radius to get results,
+  // then filter strictly by distance afterward
   const request: google.maps.places.TextSearchRequest = {
     query,
     ...(location && {
       location: new google.maps.LatLng(location.lat, location.lng),
-      radius: 50000 // 50km radius
+      radius: preciseMatch ? 5000 : 50000 // 5km search radius, will filter later
     })
   }
 
@@ -113,7 +117,7 @@ export async function searchPlaces(
 
     service.textSearch(request, (results, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        const mapped: PlaceSearchResult[] = results.slice(0, 10).map(place => ({
+        let mapped: PlaceSearchResult[] = results.slice(0, 10).map(place => ({
           placeId: place.place_id || '',
           name: place.name || '',
           address: place.formatted_address || '',
@@ -125,6 +129,33 @@ export async function searchPlaces(
           types: place.types,
           photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
         }))
+
+        // When preciseMatch is true and we have coordinates, strictly filter results
+        // to only include places within 500m of the target coordinates.
+        // This is necessary because Google's textSearch treats location/radius as a
+        // "bias" not a strict filter, and can return places from anywhere in the world.
+        if (preciseMatch && location) {
+          console.log('[searchPlaces Debug] Before filter:', mapped.length, 'results')
+          mapped.forEach(p => {
+            const dist = calculateDistance(location, p.coordinates)
+            console.log('[searchPlaces Debug]', p.name, 'at', p.coordinates, 'distance:', Math.round(dist), 'm')
+          })
+
+          mapped = mapped.filter(place => {
+            const distance = calculateDistance(location, place.coordinates)
+            return distance <= 500 // 500m max distance for precise matching
+          })
+
+          console.log('[searchPlaces Debug] After filter:', mapped.length, 'results')
+
+          // Sort by distance, closest first
+          mapped.sort((a, b) => {
+            const distA = calculateDistance(location, a.coordinates)
+            const distB = calculateDistance(location, b.coordinates)
+            return distA - distB
+          })
+        }
+
         resolve(mapped)
       } else {
         resolve([])
@@ -147,6 +178,45 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
       },
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          resolve({
+            placeId: place.place_id || '',
+            name: place.name || '',
+            address: place.formatted_address || '',
+            coordinates: {
+              lat: place.geometry?.location?.lat() || 0,
+              lng: place.geometry?.location?.lng() || 0
+            },
+            rating: place.rating,
+            types: place.types,
+            photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
+          })
+        } else {
+          resolve(null)
+        }
+      }
+    )
+  })
+}
+
+/**
+ * Find a specific place using Find Place API
+ * This is more reliable than textSearch for finding a known place by name
+ */
+export async function findPlaceByQuery(query: string): Promise<PlaceSearchResult | null> {
+  await loadGoogleMaps()
+  const places = await loadPlacesLibrary()
+
+  return new Promise((resolve) => {
+    const service = new places.PlacesService(document.createElement('div'))
+
+    service.findPlaceFromQuery(
+      {
+        query,
+        fields: ['place_id', 'name', 'formatted_address', 'geometry', 'rating', 'photos', 'types']
+      },
+      (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          const place = results[0]
           resolve({
             placeId: place.place_id || '',
             name: place.name || '',
