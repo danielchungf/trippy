@@ -102,7 +102,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
-import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
+import { PlaceSearchResult, optimizeRoute, searchPlaces, getPlaceDetails, findPlaceByQuery } from "@/lib/maps"
 import { Coordinates } from "@/types"
 import {
   Day,
@@ -146,8 +146,7 @@ import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { StayDrawer } from "@/components/trip/StayDrawer"
 import { ImportPlacesDialog, PlaceToImport } from "@/components/trip/ImportPlacesDialog"
-import { matchLocationByAddress } from "@/lib/csv-import"
-import { searchPlaces } from "@/lib/maps"
+import { matchLocationByAddress, extractCoordinatesFromUrl, extractPlaceIdFromUrl, extractPlaceNameFromUrl } from "@/lib/csv-import"
 import { DayMap } from "@/components/maps/DayMap"
 import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { PlacePhoto } from "@/components/PlacePhoto"
@@ -1444,11 +1443,79 @@ function PlacesRightPanel({
       })
 
       try {
-        // Search for the place on Google
-        const searchResults = await searchPlaces(place.name)
-        if (searchResults.length === 0) continue
+        // Try multiple strategies to find the exact place:
+        // 1. Use Find Place API with the place name from URL (most reliable for known places)
+        // 2. Extract coordinates and search with precise matching
+        // 3. Try place_id if available in URL
+        // NO FALLBACK to generic name search - it returns wrong results
 
-        const placeResult = searchResults[0]
+        let placeResult: PlaceSearchResult | null = null
+
+        // Extract place name from URL - this is the most reliable identifier
+        const urlPlaceName = extractPlaceNameFromUrl(place.url)
+        console.log('[Import Debug] URL:', place.url)
+        console.log('[Import Debug] Extracted place name from URL:', urlPlaceName)
+
+        // Get trip locations for search context
+        const locationNames = trip.locations.map(loc => loc.name)
+        console.log('[Import Debug] Trip locations:', locationNames)
+
+        // Strategy 1: Use Find Place API with each trip location as context
+        // Try each location until we find the place
+        if (!placeResult && urlPlaceName) {
+          for (const locationName of locationNames) {
+            const query = `${urlPlaceName} ${locationName}`
+            console.log('[Import Debug] Trying findPlaceByQuery:', query)
+            placeResult = await findPlaceByQuery(query)
+            if (placeResult) {
+              console.log('[Import Debug] Found with location:', locationName, '->', placeResult.name, placeResult.address)
+              break
+            }
+          }
+        }
+
+        // Strategy 2: Try coordinates-based search if we have them
+        if (!placeResult) {
+          const coordinates = extractCoordinatesFromUrl(place.url)
+          console.log('[Import Debug] Extracted coordinates:', coordinates)
+
+          if (coordinates) {
+            const searchQuery = urlPlaceName || place.name
+            console.log('[Import Debug] Searching with coordinates:', searchQuery)
+
+            const searchResults = await searchPlaces(
+              searchQuery,
+              coordinates,
+              true // preciseMatch: strictly filter to within 500m
+            )
+            console.log('[Import Debug] Search results after filtering:', searchResults.length)
+
+            if (searchResults.length > 0) {
+              placeResult = searchResults[0]
+              console.log('[Import Debug] Found via coordinate search:', placeResult.name, placeResult.address)
+            }
+          }
+        }
+
+        // Strategy 3: Try place_id if available (feature ID format)
+        if (!placeResult) {
+          const placeId = extractPlaceIdFromUrl(place.url)
+          if (placeId && !placeId.startsWith('0x')) {
+            // Only use standard ChIJ... format place IDs, not feature IDs
+            console.log('[Import Debug] Trying place_id:', placeId)
+            placeResult = await getPlaceDetails(placeId)
+            if (placeResult) {
+              console.log('[Import Debug] Found via place_id:', placeResult.name)
+            }
+          }
+        }
+
+        // NO FALLBACK - if we can't find the place reliably, skip it
+        // This prevents importing wrong places from user's current location
+        if (!placeResult) {
+          console.log('[Import Debug] Skipping place - could not find reliably:', place.name)
+          continue
+        }
 
         // Match location by address
         const locationId = matchLocationByAddress(placeResult.address, trip.locations)
