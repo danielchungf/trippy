@@ -45,6 +45,7 @@ import {
   ListOrdered,
   ScrollText,
   CalendarClock,
+  CalendarRange,
   Replace,
   Upload,
   // Category icons
@@ -61,6 +62,8 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SegmentedControl } from "@/components/ui/segmented-control"
+import { DestinationCalendar } from "@/components/DestinationCalendar"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -2198,6 +2201,7 @@ function RightPanel({
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [hoveredActivityIndex, setHoveredActivityIndex] = useState<number | null>(null)
+  const [focusedActivityIndex, setFocusedActivityIndex] = useState<number | null>(null)
 
   // Move to day dialog state
   const [isMoveOpen, setIsMoveOpen] = useState(false)
@@ -2503,6 +2507,7 @@ function RightPanel({
           <DayMap
               activities={day.activities}
               hoveredIndex={hoveredActivityIndex}
+              focusedIndex={focusedActivityIndex}
               savedPlaces={unscheduledSavedPlaces}
               onAddPlaceAsActivity={handleAddSavedPlaceFromMap}
               locationCenter={location?.coordinates}
@@ -2625,6 +2630,7 @@ function RightPanel({
                       number={index + 1}
                       onMouseEnter={() => setHoveredActivityIndex(index)}
                       onMouseLeave={() => setHoveredActivityIndex(null)}
+                      onClick={() => setFocusedActivityIndex(prev => prev === index ? null : index)}
                       onEdit={() => handleOpenActivityDialog(activity)}
                       onRemoveTime={() => handleRemoveTime(activity)}
                       onMoveToDay={() => handleOpenMoveDialog(activity)}
@@ -2918,6 +2924,7 @@ function SortableActivityCard({
   number,
   onMouseEnter,
   onMouseLeave,
+  onClick,
   onEdit,
   onRemoveTime,
   onMoveToDay,
@@ -2927,6 +2934,7 @@ function SortableActivityCard({
   number: number
   onMouseEnter?: () => void
   onMouseLeave?: () => void
+  onClick?: () => void
   onEdit?: () => void
   onRemoveTime?: () => void
   onMoveToDay?: () => void
@@ -2960,6 +2968,7 @@ function SortableActivityCard({
       )}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onClick={onClick}
     >
       {/* Left: Drag handle + Number + Details */}
       <div className="flex items-start">
@@ -3171,33 +3180,14 @@ function ItineraryPanel({
         </div>
         {/* Only show view toggle when there are activities */}
         {totalActivities > 0 && (
-          <div className="flex items-center gap-3">
-            {/* View Toggle - Segmented Control */}
-            <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 bg-neutral-100">
-              <button
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
-                  viewMode === 'list'
-                    ? "bg-white text-text-primary shadow-sm"
-                    : "bg-transparent text-text-secondary"
-                )}
-              >
-                <ListOrdered className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('timeline')}
-                className={cn(
-                  "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
-                  viewMode === 'timeline'
-                    ? "bg-white text-text-primary shadow-sm"
-                    : "bg-transparent text-text-secondary"
-                )}
-              >
-                <ScrollText className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+              { value: 'timeline', icon: <ScrollText className="h-4 w-4" /> },
+            ]}
+          />
         )}
       </div>
 
@@ -3383,6 +3373,7 @@ function OverviewPanel({
   setMapHeight: (height: number | ((h: number) => number)) => void
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
+  const [destinationsViewMode, setDestinationsViewMode] = useState<'list' | 'calendar'>('list')
 
   // Resizable map state for right panel
   const rightPanelRef = useRef<HTMLDivElement>(null)
@@ -3509,18 +3500,30 @@ function OverviewPanel({
           {/* Destinations Header */}
           <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
             <span className="text-h2 text-text-primary">Destinations</span>
-            <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
-              New destination
-            </Button>
+            <div className="flex items-center gap-2">
+              <SegmentedControl
+                value={destinationsViewMode}
+                onChange={setDestinationsViewMode}
+                options={[
+                  { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+                  { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
+                ]}
+              />
+              <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+                New destination
+              </Button>
+            </div>
           </div>
 
-          {/* Destinations List */}
+          {/* Destinations List / Calendar */}
           {sortedLocations.length === 0 ? (
             <div className="h-[200px] flex items-center justify-center">
               <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
                 Add your first destination
               </Button>
             </div>
+          ) : destinationsViewMode === 'calendar' ? (
+            <DestinationCalendar trip={trip} onEditLocation={onOpenLocationDialog} />
           ) : (
             <div>
               {sortedLocations.map((location, index) => (

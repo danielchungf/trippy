@@ -11,12 +11,13 @@ import { MapPin, Footprints, Car, Plus } from "lucide-react"
 interface DayMapProps {
   activities: Activity[]
   hoveredIndex?: number | null
+  focusedIndex?: number | null
   savedPlaces?: SavedPlace[]
   onAddPlaceAsActivity?: (placeId: string) => void
   locationCenter?: { lat: number; lng: number }
 }
 
-export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActivity, locationCenter }: DayMapProps) {
+export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, onAddPlaceAsActivity, locationCenter }: DayMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const googleMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -400,6 +401,27 @@ export function DayMap({ activities, hoveredIndex, savedPlaces, onAddPlaceAsActi
       }
     })
   }, [hoveredIndex])
+
+  // Smooth zoom to focused activity when clicked
+  useEffect(() => {
+    if (!googleMapRef.current || focusedIndex === null || focusedIndex === undefined) return
+
+    const activity = validActivities[focusedIndex]
+    if (!activity) return
+
+    const targetPosition = {
+      lat: activity.place.coordinates.lat,
+      lng: activity.place.coordinates.lng
+    }
+
+    googleMapRef.current.panTo(targetPosition)
+
+    setTimeout(() => {
+      if (googleMapRef.current) {
+        googleMapRef.current.setZoom(16)
+      }
+    }, 200)
+  }, [focusedIndex, validActivities])
 
   return (
     <div className="relative w-full h-full">
