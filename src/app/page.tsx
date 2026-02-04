@@ -820,6 +820,7 @@ function CountdownBadge({ trip }: { trip: TripWithOwnership }) {
 }
 
 function NextTripCard({ trip }: { trip: TripWithOwnership }) {
+  const router = useRouter()
   const duration = getTripDuration(trip)
   const dateRangeText = `${formatDateRange(trip.startDate, trip.endDate)} (${duration} day${duration === 1 ? '' : 's'})`
 
@@ -869,19 +870,28 @@ function NextTripCard({ trip }: { trip: TripWithOwnership }) {
       {/* Stats Grid - 2x2 quadrant */}
       <div className="flex-1 grid grid-cols-2 grid-rows-2 border-t border-border-muted">
         {/* Days Planned */}
-        <div className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted">
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
+        >
           <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
           <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
         </div>
 
         {/* Activities */}
-        <div className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted">
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
+        >
           <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
           <span className="text-h3 text-text-secondary uppercase">Activities</span>
         </div>
 
         {/* Places Saved */}
-        <div className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted">
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=places`) }}
+        >
           <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
           <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -189,14 +189,54 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
 export default function TripPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const tripId = params.id as string
 
   // React Query hook for trip data
   const { data: trip, isLoading } = useTrip(tripId)
   const refreshTrip = useRefreshTrip(tripId)
 
-  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const initialTab = searchParams.get('tab') as TabId | null
+  const [activeTab, setActiveTab] = useState<TabId>(
+    initialTab && ['overview', 'itinerary', 'places', 'packing'].includes(initialTab) ? initialTab : 'overview'
+  )
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
+
+  // Persisted view mode states (survive tab switches)
+  const [itineraryViewMode, setItineraryViewMode] = useState<'list' | 'timeline'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piper_itinerary_view')
+      if (saved === 'list' || saved === 'timeline') return saved
+    }
+    return 'list'
+  })
+  const [destinationsViewMode, setDestinationsViewMode] = useState<'list' | 'calendar'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piper_destinations_view')
+      if (saved === 'list' || saved === 'calendar') return saved
+    }
+    return 'list'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('piper_itinerary_view', itineraryViewMode)
+  }, [itineraryViewMode])
+
+  useEffect(() => {
+    localStorage.setItem('piper_destinations_view', destinationsViewMode)
+  }, [destinationsViewMode])
+
+  const [placesViewMode, setPlacesViewMode] = useState<'grid' | 'map'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piper_places_view')
+      if (saved === 'grid' || saved === 'map') return saved
+    }
+    return 'grid'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('piper_places_view', placesViewMode)
+  }, [placesViewMode])
 
   // Shared map height state (persisted to localStorage)
   const [mapHeight, setMapHeight] = useState(() => {
@@ -542,6 +582,8 @@ export default function TripPage() {
         onOpenPlaceDialog={handleOpenPlaceDialog}
         onDeletePlace={handleDeletePlaceById}
         onRefresh={refreshTrip}
+        showMapView={placesViewMode === 'map'}
+        setShowMapView={(show) => setPlacesViewMode(show ? 'map' : 'grid')}
       />
     </div>
   ) : activeTab === 'itinerary' ? (
@@ -560,6 +602,8 @@ export default function TripPage() {
             onRefresh={refreshTrip}
             onSelectDay={setSelectedDayDate}
             selectedDayDate={selectedDayDate}
+            viewMode={itineraryViewMode}
+            setViewMode={setItineraryViewMode}
           />
         </div>
       </ResizablePanel>
@@ -594,6 +638,9 @@ export default function TripPage() {
       onRefresh={refreshTrip}
       mapHeight={mapHeight}
       setMapHeight={setMapHeight}
+      onTabChange={setActiveTab}
+      destinationsViewMode={destinationsViewMode}
+      setDestinationsViewMode={setDestinationsViewMode}
     />
   )
 
@@ -1264,14 +1311,17 @@ function PlacesRightPanel({
   trip,
   onOpenPlaceDialog,
   onDeletePlace,
-  onRefresh
+  onRefresh,
+  showMapView,
+  setShowMapView
 }: {
   trip: TripWithOwnership
   onOpenPlaceDialog: (place?: SavedPlace) => void
   onDeletePlace: (placeId: string) => Promise<void>
   onRefresh: () => Promise<void>
+  showMapView: boolean
+  setShowMapView: (show: boolean) => void
 }) {
-  const [showMapView, setShowMapView] = useState(false)
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
 
@@ -3134,26 +3184,17 @@ function ItineraryPanel({
   trip,
   onRefresh,
   onSelectDay,
-  selectedDayDate
+  selectedDayDate,
+  viewMode,
+  setViewMode
 }: {
   trip: TripWithOwnership
   onRefresh: () => Promise<void>
   onSelectDay: (date: string) => void
   selectedDayDate: string | null
+  viewMode: 'list' | 'timeline'
+  setViewMode: (mode: 'list' | 'timeline') => void
 }) {
-  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list')
-
-  // Persist view mode preference
-  useEffect(() => {
-    const saved = localStorage.getItem('piper_itinerary_view')
-    if (saved === 'list' || saved === 'timeline') {
-      setViewMode(saved)
-    }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem('piper_itinerary_view', viewMode)
-  }, [viewMode])
 
   const days = generateDaysFromTrip(trip)
 
@@ -3362,7 +3403,10 @@ function OverviewPanel({
   onOpenStayDrawer,
   onRefresh,
   mapHeight,
-  setMapHeight
+  setMapHeight,
+  onTabChange,
+  destinationsViewMode,
+  setDestinationsViewMode
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
@@ -3371,9 +3415,11 @@ function OverviewPanel({
   onRefresh: () => Promise<void>
   mapHeight: number
   setMapHeight: (height: number | ((h: number) => number)) => void
+  onTabChange: (tab: TabId) => void
+  destinationsViewMode: 'list' | 'calendar'
+  setDestinationsViewMode: (mode: 'list' | 'calendar') => void
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
-  const [destinationsViewMode, setDestinationsViewMode] = useState<'list' | 'calendar'>('list')
 
   // Resizable map state for right panel
   const rightPanelRef = useRef<HTMLDivElement>(null)
@@ -3471,19 +3517,28 @@ function OverviewPanel({
         {/* Stats Grid - 2x2 */}
         <div className="h-[200px] grid grid-cols-2 grid-rows-2 border-b border-border-muted flex-shrink-0">
           {/* Days Planned */}
-          <div className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted">
+          <div
+            className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+            onClick={() => onTabChange('itinerary')}
+          >
             <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
             <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
           </div>
 
           {/* Activities */}
-          <div className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted">
+          <div
+            className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+            onClick={() => onTabChange('itinerary')}
+          >
             <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
             <span className="text-h3 text-text-secondary uppercase">Activities</span>
           </div>
 
           {/* Places Saved */}
-          <div className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted">
+          <div
+            className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+            onClick={() => onTabChange('places')}
+          >
             <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
             <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
           </div>
