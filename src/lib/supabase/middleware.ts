@@ -33,7 +33,8 @@ export async function updateSession(request: NextRequest) {
   // Protected routes - redirect to login if not authenticated
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
                      request.nextUrl.pathname.startsWith('/signup') ||
-                     request.nextUrl.pathname.startsWith('/auth')
+                     request.nextUrl.pathname.startsWith('/auth') ||
+                     request.nextUrl.pathname.startsWith('/forgot-password')
 
   if (!user && !isAuthPage) {
     const url = request.nextUrl.clone()
