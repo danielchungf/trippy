@@ -34,6 +34,7 @@
  *
  * Border colors:
  * - border-border-muted (neutral-200) - Subtle borders, dividers
+ * - border-border-regular (neutral-300) - Input hover/focus borders
  *
  * Usage examples:
  *   text-text-primary
@@ -102,6 +103,7 @@ export const tokens = {
     },
     border: {
       muted: 'neutral-200',     // rgb(229 229 229)
+      regular: 'neutral-300',   // rgb(212 212 212)
     },
   },
   typography: {

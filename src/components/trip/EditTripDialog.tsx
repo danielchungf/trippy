@@ -1,19 +1,10 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Settings, Trash2, ChevronDown, ImagePlus, X, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Settings } from "lucide-react"
+import { DateRange } from "react-day-picker"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,17 +15,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { Input } from "@/components/ui/input"
+import { FormDialog } from "@/components/ui/form-dialog"
+import { FormField } from "@/components/ui/form-field"
+import { TextField } from "@/components/ui/text-field"
+import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
+import { ColorPicker } from "@/components/ui/color-picker"
+import { ImageUploadField } from "@/components/ui/image-upload-field"
 import { LOCATION_COLORS, parseLocalDate, formatLocalDate } from "@/types"
 import { updateTrip, deleteTrip } from "@/lib/db"
 import { uploadTripCoverImage, deleteTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
-import { FocalPointPicker } from "@/components/ui/FocalPointPicker"
 
 interface EditTripDialogProps {
   tripId: string
@@ -62,7 +51,6 @@ export function EditTripDialog({
   onUpdate,
 }: EditTripDialogProps) {
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [showDateShortenAlert, setShowDateShortenAlert] = useState(false)
@@ -76,11 +64,10 @@ export function EditTripDialog({
   const [coverImage, setCoverImage] = useState<string | undefined>(tripCoverImage)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(tripCoverImage)
-  const [startDate, setStartDate] = useState<Date | undefined>(parseLocalDate(tripStartDate))
-  const [endDate, setEndDate] = useState<Date | undefined>(parseLocalDate(tripEndDate))
-  const [isStartDateOpen, setIsStartDateOpen] = useState(false)
-  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: parseLocalDate(tripStartDate),
+    to: parseLocalDate(tripEndDate),
+  })
   const [focusX, setFocusX] = useState(tripCoverImageFocusX ?? 0.5)
   const [focusY, setFocusY] = useState(tripCoverImageFocusY ?? 0.5)
 
@@ -92,8 +79,10 @@ export function EditTripDialog({
       setCoverImage(tripCoverImage)
       setPreviewUrl(tripCoverImage)
       setPendingFile(null)
-      setStartDate(parseLocalDate(tripStartDate))
-      setEndDate(parseLocalDate(tripEndDate))
+      setDateRange({
+        from: parseLocalDate(tripStartDate),
+        to: parseLocalDate(tripEndDate),
+      })
       setUploadError(null)
       setFocusX(tripCoverImageFocusX ?? 0.5)
       setFocusY(tripCoverImageFocusY ?? 0.5)
@@ -103,78 +92,31 @@ export function EditTripDialog({
 
   const handleFileSelect = (file: File) => {
     setUploadError(null)
-
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"]
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError("Invalid file type. Please upload a JPEG, PNG, or WebP image.")
-      return
-    }
-
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File is too large. Maximum size is 5MB.")
-      return
-    }
-
-    // Create preview URL
     const objectUrl = URL.createObjectURL(file)
     setPreviewUrl(objectUrl)
     setPendingFile(file)
-    // Reset focal point to center for new images
     setFocusX(0.5)
     setFocusY(0.5)
-  }
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      handleFileSelect(file)
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-
-    const file = e.dataTransfer.files?.[0]
-    if (file) {
-      handleFileSelect(file)
-    }
   }
 
   const handleRemoveImage = () => {
     setPreviewUrl(undefined)
     setPendingFile(null)
     setCoverImage(undefined)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
   }
 
   // Check if new dates would shorten the trip
   const wouldShortenTrip = () => {
-    if (!startDate || !endDate) return false
+    if (!dateRange?.from || !dateRange?.to) return false
     const originalStart = parseLocalDate(tripStartDate)
     const originalEnd = parseLocalDate(tripEndDate)
     if (!originalStart || !originalEnd) return false
 
-    // Trip is shortened if new start is after original start OR new end is before original end
-    return startDate > originalStart || endDate < originalEnd
+    return dateRange.from > originalStart || dateRange.to < originalEnd
   }
 
   const performSave = async () => {
-    if (!name.trim() || !startDate || !endDate) return
+    if (!name.trim() || !dateRange?.from || !dateRange?.to) return
 
     setLoading(true)
     setUploadError(null)
@@ -215,8 +157,8 @@ export function EditTripDialog({
         coverImage: newCoverImageUrl,
         coverImageFocusX: focusX,
         coverImageFocusY: focusY,
-        startDate: formatLocalDate(startDate),
-        endDate: formatLocalDate(endDate),
+        startDate: formatLocalDate(dateRange.from),
+        endDate: formatLocalDate(dateRange.to),
       })
 
       setLoading(false)
@@ -230,7 +172,7 @@ export function EditTripDialog({
   }
 
   const handleSave = async () => {
-    if (!name.trim() || !startDate || !endDate) return
+    if (!name.trim() || !dateRange?.from || !dateRange?.to) return
 
     // Check if dates are being shortened - warn user about potential activity loss
     if (wouldShortenTrip()) {
@@ -261,195 +203,54 @@ export function EditTripDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          <NakedIconButton icon={<Settings />} />
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Trip</DialogTitle>
-          </DialogHeader>
+      <NakedIconButton icon={<Settings />} onClick={() => setOpen(true)} />
 
-          <div className="space-y-4 py-4">
-            {/* Trip Name */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Trip Name</label>
-              <Input
-                placeholder="e.g., Summer in Europe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+      <FormDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        title={`Edit Trip to ${tripName}`}
+        submitLabel="Save"
+        onSubmit={handleSave}
+        submitDisabled={loading || !name.trim() || !dateRange?.from || !dateRange?.to}
+        loading={loading}
+        loadingLabel={isUploading ? "Uploading..." : "Saving..."}
+        onDelete={isOwner ? () => setShowDeleteAlert(true) : undefined}
+        deleteLabel="Delete"
+      >
+        <FormField label="Trip name">
+          <TextField
+            placeholder="e.g., Summer in Europe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </FormField>
 
-            {/* Trip Color */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Color</label>
-              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
-                {LOCATION_COLORS.map(colorOption => (
-                  <button
-                    key={colorOption.value}
-                    type="button"
-                    className={`aspect-square rounded-full transition-all ${colorOption.value} ${
-                      color === colorOption.value
-                        ? 'ring-2 ring-offset-2 ring-primary'
-                        : 'hover:scale-110'
-                    }`}
-                    onClick={() => setColor(colorOption.value)}
-                    title={colorOption.name}
-                  />
-                ))}
-              </div>
-            </div>
+        <FormField label="Dates">
+          <DateRangePickerField
+            value={dateRange}
+            onChange={setDateRange}
+          />
+        </FormField>
 
-            {/* Trip Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Start Date</label>
-                <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {startDate ? (
-                        startDate.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => {
-                        setStartDate(date)
-                        // If end date is before new start date, update it
-                        if (date && endDate && date > endDate) {
-                          setEndDate(date)
-                        }
-                        setIsStartDateOpen(false)
-                      }}
-                      defaultMonth={startDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">End Date</label>
-                <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {endDate ? (
-                        endDate.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={(date) => {
-                        setEndDate(date)
-                        setIsEndDateOpen(false)
-                      }}
-                      disabled={(date) => {
-                        return startDate ? date < startDate : false
-                      }}
-                      defaultMonth={endDate || startDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
+        <FormField label="Color">
+          <ColorPicker value={color} onChange={setColor} />
+        </FormField>
 
-            {/* Cover Image */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Cover Image <span className="text-muted-foreground font-normal">(optional)</span>
-              </label>
-              {previewUrl ? (
-                <>
-                  <FocalPointPicker
-                    imageUrl={previewUrl}
-                    focusX={focusX}
-                    focusY={focusY}
-                    onChange={(x, y) => {
-                      setFocusX(x)
-                      setFocusY(y)
-                    }}
-                    onRemove={handleRemoveImage}
-                    onReplace={() => fileInputRef.current?.click()}
-                  />
-                  {isUploading && (
-                    <div className="text-sm text-muted-foreground">Uploading...</div>
-                  )}
-                </>
-              ) : (
-                <div
-                  className={`relative rounded-lg border-2 border-dashed transition-colors ${
-                    isDragging
-                      ? "border-primary bg-primary/5"
-                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-[120px] flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <ImagePlus className="h-8 w-8" />
-                    <span className="text-sm">Click or drag to upload</span>
-                    <span className="text-xs text-muted-foreground">JPEG, PNG, WebP (max 5MB)</span>
-                  </button>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleFileInputChange}
-                className="hidden"
-              />
-              {uploadError && (
-                <p className="text-sm text-destructive">{uploadError}</p>
-              )}
-            </div>
-
-            {/* Delete Trip Button - Only for owners */}
-            {isOwner && (
-              <div className="pt-4 border-t">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  className="w-full"
-                  onClick={() => setShowDeleteAlert(true)}
-                  leftIcon={<Trash2 />}
-                >
-                  Delete Trip
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary" size="small">Cancel</Button>
-            </DialogClose>
-            <Button variant="primary" size="small" onClick={handleSave} disabled={loading || !name.trim()}>
-              {loading ? (isUploading ? "Uploading..." : "Saving...") : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <FormField label="Cover image">
+          <ImageUploadField
+            previewUrl={previewUrl}
+            focusX={focusX}
+            focusY={focusY}
+            onFocusChange={(x, y) => {
+              setFocusX(x)
+              setFocusY(y)
+            }}
+            onFileSelect={handleFileSelect}
+            onRemove={handleRemoveImage}
+            error={uploadError ?? undefined}
+          />
+        </FormField>
+      </FormDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>

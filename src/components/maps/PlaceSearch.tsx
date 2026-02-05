@@ -130,12 +130,14 @@ export function PlaceSearch({
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-muted-foreground">
+          <Search />
+        </span>
         <Input
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
           placeholder={placeholder}
-          className="pl-9 pr-9"
+          className="pl-9 pr-9 h-[42px] py-3 rounded-lg border-border-muted shadow-none"
           onFocus={() => results.length > 0 && setIsOpen(true)}
         />
         {(isSearching || isFetchingDetails) && (

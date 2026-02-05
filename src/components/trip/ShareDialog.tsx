@@ -1,16 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { UserRoundPlus, Mail, Crown, Trash2, Clock, Loader2, Search } from "lucide-react"
+import { UserRoundPlus, UserRoundPen, Trash2, Clock, Loader2, Search, Check } from "lucide-react"
 import { toast } from "sonner"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { FormDialog } from "@/components/ui/form-dialog"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { TripMember } from "@/types"
@@ -123,7 +118,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
 
   const handleSelectUser = (user: UserSearchResult) => {
     setSelectedUser(user)
-    setSearchQuery(user.name || user.email)
+    setSearchQuery(user.name ? `${user.name} (${user.email})` : user.email)
     setShowDropdown(false)
     setSearchResults([])
   }
@@ -136,8 +131,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
     }
   }
 
-  const handleInvite = async (e?: React.FormEvent) => {
-    e?.preventDefault()
+  const handleInvite = async () => {
     if (loading) return
 
     // Use selected user's email or treat input as email
@@ -179,147 +173,136 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
   }
 
   const canInvite = selectedUser || (searchQuery.trim() && searchQuery.includes("@"))
+  const nonOwnerMembers = members.filter(m => m.role !== 'owner')
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <NakedIconButton icon={<UserRoundPlus />} />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share &quot;{tripName}&quot;</DialogTitle>
-        </DialogHeader>
+    <>
+      <NakedIconButton icon={<UserRoundPlus />} onClick={() => setOpen(true)} />
 
-        <div className="space-y-4 py-4">
-          {/* Invite form - only for owners */}
-          {isOwner && (
-            <form onSubmit={handleInvite} className="space-y-2">
-              <div className="relative" ref={dropdownRef}>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    ref={inputRef}
-                    placeholder="Search by name or enter email"
-                    value={searchQuery}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    onFocus={() => {
-                      if (searchResults.length > 0 && !selectedUser) {
-                        setShowDropdown(true)
-                      }
-                    }}
-                    className="pl-9 pr-4"
-                    disabled={loading}
-                  />
-                  {isSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                  )}
-                </div>
-
-                {/* Search results dropdown */}
-                {showDropdown && searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-48 overflow-auto">
-                    {searchResults.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                        onClick={() => handleSelectUser(user)}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-medium text-primary">
-                            {(user.name || user.email)?.[0]?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {user.name || user.email}
-                          </p>
-                          {user.name && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {user.email}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Share ${tripName}`}
+        submitLabel="Send invite"
+        onSubmit={handleInvite}
+        submitDisabled={loading || !canInvite || !isOwner}
+        loading={loading}
+        loadingLabel="Sending..."
+      >
+        {isOwner && (
+          <FormField label="Users in Piper">
+            <div className="relative" ref={dropdownRef}>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary">
+                  {selectedUser ? <Check /> : <Search />}
+                </span>
+                <Input
+                  ref={inputRef}
+                  placeholder="Search by name or enter email"
+                  value={searchQuery}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onFocus={() => {
+                    if (searchResults.length > 0 && !selectedUser) {
+                      setShowDropdown(true)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleInvite()
+                    }
+                  }}
+                  className="pl-9 pr-9 h-[42px] py-3 rounded-lg border-border-muted shadow-none"
+                  disabled={loading}
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-text-secondary" />
                 )}
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading || !canInvite}
-                className="w-full"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4 mr-2" />
-                )}
-                {loading ? "Sending..." : "Send Invite"}
-              </Button>
-            </form>
-          )}
+              {/* Search results dropdown */}
+              {showDropdown && searchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-border-muted rounded-lg shadow-lg max-h-48 overflow-auto">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-neutral-50 flex items-center gap-3 transition-colors"
+                      onClick={() => handleSelectUser(user)}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-h3 font-fustat text-text-primary">
+                          {(user.name || user.email)?.[0]?.toUpperCase() || "?"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-body font-inter text-text-primary truncate">
+                          {user.name || user.email}
+                        </p>
+                        {user.name && (
+                          <p className="text-small font-inter text-text-secondary truncate">
+                            {user.email}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </FormField>
+        )}
 
-          {/* Members list */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">
-              People with access
+        {/* Editors section */}
+        <div className="flex flex-col gap-2">
+          <span className="text-h2 font-fustat text-text-primary">Editors</span>
+          {nonOwnerMembers.length === 0 ? (
+            <p className="text-body font-inter text-text-secondary">
+              No other editors yet. Invite a Piper user to collaborate.
             </p>
-            {members.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">
-                No one else has access yet. Invite someone to collaborate!
-              </p>
-            ) : (
-              members.map(member => (
+          ) : (
+            <div className="flex flex-col gap-2">
+              {nonOwnerMembers.map(member => (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted"
+                  className="flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      {member.role === 'owner' ? (
-                        <Crown className="h-4 w-4 text-primary" />
-                      ) : member.status === 'pending' ? (
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#FF591E]/10 flex items-center justify-center flex-shrink-0">
+                      {member.status === 'pending' ? (
+                        <Clock className="h-4 w-4 text-text-accent" />
                       ) : (
-                        <span className="text-sm font-medium text-primary">
-                          {(member.email || member.invitedEmail || '?')[0].toUpperCase()}
-                        </span>
+                        <UserRoundPen className="h-4 w-4 text-text-accent" />
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">
+                      <p className="text-body font-inter text-text-primary">
                         {member.email || member.invitedEmail}
                       </p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {member.role}
-                        {member.status === 'pending' && (
-                          <span className="ml-1 text-amber-600">
-                            (invited {formatRelativeTime(member.createdAt)})
-                          </span>
-                        )}
-                      </p>
+                      {member.status === 'pending' && (
+                        <p className="text-small font-inter text-text-secondary">
+                          Invited {formatRelativeTime(member.createdAt)}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Remove button - only for owners, cannot remove owner */}
-                  {isOwner && member.role !== 'owner' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  {/* Remove button - only for owners */}
+                  {isOwner && (
+                    <button
+                      type="button"
+                      className="w-5 h-5 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary hover:text-text-primary transition-colors"
                       onClick={() => handleRemove(member.id, member.email || member.invitedEmail)}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Trash2 />
+                    </button>
                   )}
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </FormDialog>
+    </>
   )
 }

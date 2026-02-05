@@ -96,18 +96,15 @@ export interface Accommodation {
 export const LOCATION_COLORS = [
   { name: 'Blue', value: 'bg-blue-400' },
   { name: 'Sky', value: 'bg-sky-400' },
-  { name: 'Cyan', value: 'bg-cyan-400' },
-  { name: 'Teal', value: 'bg-teal-400' },
   { name: 'Emerald', value: 'bg-emerald-400' },
-  { name: 'Green', value: 'bg-green-400' },
   { name: 'Lime', value: 'bg-lime-400' },
-  { name: 'Yellow', value: 'bg-yellow-400' },
   { name: 'Amber', value: 'bg-amber-400' },
   { name: 'Orange', value: 'bg-orange-400' },
   { name: 'Red', value: 'bg-red-400' },
-  { name: 'Rose', value: 'bg-rose-400' },
   { name: 'Pink', value: 'bg-pink-400' },
   { name: 'Purple', value: 'bg-purple-400' },
+  { name: 'Violet', value: 'bg-violet-400' },
+  { name: 'Indigo', value: 'bg-indigo-400' },
 ] as const
 
 export type LocationColor = typeof LOCATION_COLORS[number]['value']

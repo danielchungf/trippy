@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { X, Replace } from "lucide-react"
+import { Trash2, Replace } from "lucide-react"
 
 interface FocalPointPickerProps {
   imageUrl: string
@@ -87,7 +87,7 @@ export function FocalPointPicker({
           <button
             type="button"
             onClick={onReplace}
-            className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
             title="Replace image"
           >
             <Replace className="h-4 w-4" />
@@ -97,10 +97,10 @@ export function FocalPointPicker({
           <button
             type="button"
             onClick={onRemove}
-            className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
             title="Remove image"
           >
-            <X className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>

@@ -1,35 +1,26 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Plus, MapPin, ChevronDown, ImagePlus, X, Loader2, Plane, User as UserIcon, LogOut, CircleAlert, Calendar as CalendarIcon } from "lucide-react"
+import { Plus, MapPin, Plane, User as UserIcon, LogOut, CircleAlert, Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Input } from "@/components/ui/input"
-import { Calendar } from "@/components/ui/calendar"
-import { getTripStatus, parseLocalDate, formatDateRange, getTripDuration, LOCATION_COLORS } from "@/types"
+import { FormDialog } from "@/components/ui/form-dialog"
+import { FormField } from "@/components/ui/form-field"
+import { TextField } from "@/components/ui/text-field"
+import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
+import { ColorPicker } from "@/components/ui/color-picker"
+import { ImageUploadField } from "@/components/ui/image-upload-field"
+import { getTripStatus, parseLocalDate, formatDateRange, getTripDuration } from "@/types"
 import { TripWithOwnership, acceptPendingInvites } from "@/lib/db"
 import { useTrips, useCreateTrip, tripKeys } from "@/lib/hooks/use-trips"
 import { useRealtimeInvites } from "@/lib/hooks/use-realtime-invites"
@@ -44,7 +35,6 @@ import { CalendarView } from "@/components/home/CalendarView"
 import { createClient } from "@/lib/supabase/client"
 import { uploadTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
 import { toast } from "sonner"
-import { FocalPointPicker } from "@/components/ui/FocalPointPicker"
 import type { User } from "@supabase/supabase-js"
 import logo from "@/app/logo.png"
 
@@ -55,17 +45,14 @@ export default function HomePage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [tripColor, setTripColor] = useState<string | undefined>()
   const [user, setUser] = useState<User | null>(null)
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
   const [coverImagePreview, setCoverImagePreview] = useState<string | undefined>()
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
   const [coverImageFocusX, setCoverImageFocusX] = useState(0.5)
   const [coverImageFocusY, setCoverImageFocusY] = useState(0.5)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const isDesktop = useMediaQuery("(min-width: 1024px)")
 
   // React Query hooks
@@ -108,22 +95,9 @@ export default function HomePage() {
 
   const handleFileSelect = (file: File) => {
     setUploadError(null)
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"]
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError("Invalid file type. Please upload a JPEG, PNG, or WebP image.")
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File is too large. Maximum size is 5MB.")
-      return
-    }
-
     const objectUrl = URL.createObjectURL(file)
     setCoverImagePreview(objectUrl)
     setCoverImageFile(file)
-    // Reset focal point to center for new images
     setCoverImageFocusX(0.5)
     setCoverImageFocusY(0.5)
   }
@@ -131,8 +105,19 @@ export default function HomePage() {
   const handleRemoveCoverImage = () => {
     setCoverImagePreview(undefined)
     setCoverImageFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+  }
+
+  const handleCreateOpenChange = (open: boolean) => {
+    setIsCreateOpen(open)
+    if (!open) {
+      setNewTripName("")
+      setDateRange(undefined)
+      setTripColor(undefined)
+      setCoverImageFile(null)
+      setCoverImagePreview(undefined)
+      setCoverImageFocusX(0.5)
+      setCoverImageFocusY(0.5)
+      setUploadError(null)
     }
   }
 
@@ -258,158 +243,51 @@ export default function HomePage() {
       )}
 
       {/* Create Trip Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={(open) => {
-        setIsCreateOpen(open)
-        if (!open) {
-          setNewTripName("")
-          setDateRange(undefined)
-          setTripColor(undefined)
-          setCoverImageFile(null)
-          setCoverImagePreview(undefined)
-          setCoverImageFocusX(0.5)
-          setCoverImageFocusY(0.5)
-          setUploadError(null)
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Trip</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Trip Name</label>
-              <Input
-                placeholder="e.g., Summer in Europe"
-                value={newTripName}
-                onChange={(e) => setNewTripName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Trip Dates</label>
-              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {dateRange?.from && dateRange?.to ? (
-                      `${dateRange.from.toLocaleDateString()} - ${dateRange.to.toLocaleDateString()}`
-                    ) : (
-                      <span className="text-muted-foreground">Select dates</span>
-                    )}
-                    <ChevronDown className="h-4 w-4 opacity-50" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={(range) => {
-                      setDateRange(range)
-                      if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) {
-                        setIsCalendarOpen(false)
-                      }
-                    }}
-                    numberOfMonths={isDesktop ? 2 : 1}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Color (for calendar)</label>
-              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
-                {LOCATION_COLORS.map(color => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    className={`aspect-square rounded-full transition-all ${color.value} ${
-                      tripColor === color.value
-                        ? 'ring-2 ring-offset-2 ring-primary'
-                        : 'hover:scale-110'
-                    }`}
-                    onClick={() => setTripColor(color.value)}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            </div>
+      <FormDialog
+        open={isCreateOpen}
+        onOpenChange={handleCreateOpenChange}
+        title="Create new trip"
+        submitLabel="Create"
+        onSubmit={handleCreateTrip}
+        submitDisabled={!newTripName || !dateRange?.from || !dateRange?.to}
+        loading={isUploading || createTripMutation.isPending}
+        loadingLabel="Creating..."
+      >
+        <FormField label="Trip name">
+          <TextField
+            placeholder="e.g., Spring Trip to Japan"
+            value={newTripName}
+            onChange={(e) => setNewTripName(e.target.value)}
+          />
+        </FormField>
 
-            {/* Cover Image */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Cover Image <span className="text-muted-foreground font-normal">(optional)</span>
-              </label>
-              {coverImagePreview ? (
-                <FocalPointPicker
-                  imageUrl={coverImagePreview}
-                  focusX={coverImageFocusX}
-                  focusY={coverImageFocusY}
-                  onChange={(x, y) => {
-                    setCoverImageFocusX(x)
-                    setCoverImageFocusY(y)
-                  }}
-                  onRemove={handleRemoveCoverImage}
-                  onReplace={() => fileInputRef.current?.click()}
-                />
-              ) : (
-                <div
-                  className={`relative rounded-lg border-2 border-dashed transition-colors ${
-                    isDragging
-                      ? "border-primary bg-primary/5"
-                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-                  onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setIsDragging(false)
-                    const file = e.dataTransfer.files?.[0]
-                    if (file) handleFileSelect(file)
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-[120px] flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <ImagePlus className="h-8 w-8" />
-                    <span className="text-sm">Click or drag to upload</span>
-                    <span className="text-xs text-muted-foreground">JPEG, PNG, WebP (max 5MB)</span>
-                  </button>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleFileSelect(file)
-                }}
-                className="hidden"
-              />
-              {uploadError && (
-                <p className="text-sm text-destructive">{uploadError}</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handleCreateTrip} disabled={isUploading || createTripMutation.isPending || !newTripName || !dateRange?.from || !dateRange?.to}>
-              {isUploading || createTripMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Trip"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <FormField label="Dates">
+          <DateRangePickerField
+            value={dateRange}
+            onChange={setDateRange}
+            numberOfMonths={isDesktop ? 2 : 1}
+          />
+        </FormField>
+
+        <FormField label="Color">
+          <ColorPicker value={tripColor} onChange={setTripColor} />
+        </FormField>
+
+        <FormField label="Cover image">
+          <ImageUploadField
+            previewUrl={coverImagePreview}
+            focusX={coverImageFocusX}
+            focusY={coverImageFocusY}
+            onFocusChange={(x, y) => {
+              setCoverImageFocusX(x)
+              setCoverImageFocusY(y)
+            }}
+            onFileSelect={handleFileSelect}
+            onRemove={handleRemoveCoverImage}
+            error={uploadError ?? undefined}
+          />
+        </FormField>
+      </FormDialog>
     </div>
   )
 }
