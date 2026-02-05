@@ -96,7 +96,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
 import {
   Tooltip,
@@ -149,7 +148,10 @@ import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { FormDialog } from "@/components/ui/form-dialog"
 import { FormField } from "@/components/ui/form-field"
+import { TextField } from "@/components/ui/text-field"
+import { DateRange } from "react-day-picker"
 import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
+import { SelectField } from "@/components/ui/select-field"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { StayDrawer } from "@/components/trip/StayDrawer"
 import { ImportPlacesDialog, PlaceToImport } from "@/components/trip/ImportPlacesDialog"
@@ -274,8 +276,6 @@ export default function TripPage() {
   const [accommodationCheckIn, setAccommodationCheckIn] = useState<Date | undefined>()
   const [accommodationCheckOut, setAccommodationCheckOut] = useState<Date | undefined>()
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
-  const [isCheckInOpen, setIsCheckInOpen] = useState(false)
-  const [isCheckOutOpen, setIsCheckOutOpen] = useState(false)
   const [isSavingAccommodation, setIsSavingAccommodation] = useState(false)
 
   // Stay drawer state
@@ -409,12 +409,10 @@ export default function TripPage() {
       setAccommodationAddress("")
       setAccommodationCoordinates(undefined)
       setAccommodationGooglePlaceId(undefined)
-      setAccommodationCheckIn(trip ? parseLocalDate(trip.startDate) : undefined)
-      setAccommodationCheckOut(trip ? parseLocalDate(trip.endDate) : undefined)
+      setAccommodationCheckIn(undefined)
+      setAccommodationCheckOut(undefined)
       setAccommodationLocationId("")
     }
-    setIsCheckInOpen(false)
-    setIsCheckOutOpen(false)
     setIsAccommodationOpen(true)
   }
 
@@ -436,6 +434,14 @@ export default function TripPage() {
   const handleAccommodationNameChange = (value: string) => {
     setAccommodationName(value)
     setAccommodationNameTouched(true)
+  }
+
+  const handleClearAccommodation = () => {
+    setAccommodationName("")
+    setAccommodationNameTouched(false)
+    setAccommodationAddress("")
+    setAccommodationCoordinates(undefined)
+    setAccommodationGooglePlaceId(undefined)
   }
 
   const getAccommodationSearchCenter = (): Coordinates | undefined => {
@@ -521,6 +527,12 @@ export default function TripPage() {
   const handlePlaceNameChange = (value: string) => {
     setPlaceName(value)
     setPlaceNameTouched(true)
+  }
+
+  const handleClearPlace = () => {
+    setSearchedPlace(null)
+    setPlaceName("")
+    setPlaceNameTouched(false)
   }
 
   const handleSavePlace = async () => {
@@ -725,130 +737,71 @@ export default function TripPage() {
       </FormDialog>
 
       {/* Accommodation Dialog */}
-      <Dialog open={isAccommodationOpen} onOpenChange={setIsAccommodationOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingAccommodation ? 'Edit Stay' : 'Add Stay'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Place <span className="text-destructive">*</span></label>
-              <PlaceSearch
-                onSelect={handleAccommodationSearchSelect}
-                placeholder="Search for accommodation..."
-                centerLocation={getAccommodationSearchCenter()}
-              />
-              {accommodationAddress && (
-                <div className="mt-2 p-2 rounded-md bg-muted">
-                  <p className="font-medium text-sm">{accommodationName}</p>
-                  <p className="text-xs text-muted-foreground">{accommodationAddress}</p>
-                </div>
-              )}
+      <FormDialog
+        open={isAccommodationOpen}
+        onOpenChange={setIsAccommodationOpen}
+        title={editingAccommodation ? 'Edit stay' : 'Create stay'}
+        submitLabel={editingAccommodation ? 'Save' : 'Create'}
+        onSubmit={handleSaveAccommodation}
+        submitDisabled={!accommodationAddress || !accommodationCheckIn || !accommodationCheckOut || isSavingAccommodation}
+        loading={isSavingAccommodation}
+        onDelete={editingAccommodation ? () => handleDeleteAccommodation(editingAccommodation.id).then(() => setIsAccommodationOpen(false)) : undefined}
+      >
+        <FormField label="Place">
+          {accommodationAddress ? (
+            <div className="flex items-center justify-between rounded-lg border border-border-muted px-3 h-[42px]">
+              <span className="text-[14px] leading-[18px] tracking-[-0.02em] text-text-primary font-inter">
+                {accommodationName || accommodationAddress.split(',')[0]}
+              </span>
+              <button type="button" onClick={handleClearAccommodation} className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary hover:text-text-primary transition-colors">
+                <Trash2 />
+              </button>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Input
-                placeholder="Defaults to location name"
-                value={accommodationName}
-                onChange={(e) => handleAccommodationNameChange(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Location <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Select value={accommodationLocationId} onValueChange={setAccommodationLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trip.locations.map(loc => (
-                    <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Check-in</label>
-                <Popover open={isCheckInOpen} onOpenChange={setIsCheckInOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {accommodationCheckIn ? (
-                        accommodationCheckIn.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={accommodationCheckIn}
-                      onSelect={(date) => {
-                        setAccommodationCheckIn(date)
-                        setIsCheckInOpen(false)
-                      }}
-                      disabled={(date) => {
-                        const start = parseLocalDate(trip.startDate)
-                        const end = parseLocalDate(trip.endDate)
-                        return date < start || date > end
-                      }}
-                      defaultMonth={accommodationCheckIn}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Check-out</label>
-                <Popover open={isCheckOutOpen} onOpenChange={setIsCheckOutOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {accommodationCheckOut ? (
-                        accommodationCheckOut.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={accommodationCheckOut}
-                      onSelect={(date) => {
-                        setAccommodationCheckOut(date)
-                        setIsCheckOutOpen(false)
-                      }}
-                      disabled={(date) => {
-                        const start = accommodationCheckIn || parseLocalDate(trip.startDate)
-                        const end = parseLocalDate(trip.endDate)
-                        return date < start || date > end
-                      }}
-                      defaultMonth={accommodationCheckOut || accommodationCheckIn}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary" size="small">Cancel</Button>
-            </DialogClose>
-            <Button variant="primary" size="small" onClick={handleSaveAccommodation} disabled={!accommodationAddress || isSavingAccommodation}>
-              {isSavingAccommodation ? 'Saving...' : (editingAccommodation ? 'Save' : 'Add')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          ) : (
+            <PlaceSearch
+              onSelect={handleAccommodationSearchSelect}
+              placeholder="Search for a hotel, Airbnb address..."
+              centerLocation={getAccommodationSearchCenter()}
+            />
+          )}
+        </FormField>
+
+        <FormField label="Name" optional>
+          <TextField
+            placeholder="Defaults to place name"
+            value={accommodationName}
+            onChange={(e) => handleAccommodationNameChange(e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Dates">
+          <DateRangePickerField
+            value={accommodationCheckIn && accommodationCheckOut ? { from: accommodationCheckIn, to: accommodationCheckOut } : undefined}
+            onChange={(range: DateRange | undefined) => {
+              setAccommodationCheckIn(range?.from)
+              setAccommodationCheckOut(range?.to)
+            }}
+            disabled={(date) => {
+              const start = parseLocalDate(trip.startDate)
+              const end = parseLocalDate(trip.endDate)
+              return date < start || date > end
+            }}
+            defaultMonth={parseLocalDate(trip.startDate)}
+            placeholder="Select dates"
+          />
+        </FormField>
+
+        {trip.locations.length > 0 && (
+          <FormField label="Destination" optional>
+            <SelectField
+              value={accommodationLocationId}
+              onChange={setAccommodationLocationId}
+              options={trip.locations.map(loc => ({ value: loc.id, label: loc.name }))}
+              placeholder="Select"
+            />
+          </FormField>
+        )}
+      </FormDialog>
 
       {/* Stay Drawer */}
       <StayDrawer
@@ -862,104 +815,82 @@ export default function TripPage() {
       />
 
       {/* Place Dialog */}
-      <Dialog open={isPlaceOpen} onOpenChange={setIsPlaceOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editingPlace ? 'Edit Place' : 'New Place'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Place <span className="text-destructive">*</span></label>
-              <PlaceSearch
-                onSelect={handlePlaceSearchSelect}
-                placeholder="Search for a place..."
-                centerLocation={getPlaceSearchCenter()}
-              />
-              {searchedPlace && (
-                <div className="mt-2 p-2 rounded-md bg-muted">
-                  <p className="font-medium text-sm">{searchedPlace.name}</p>
-                  <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
-                </div>
-              )}
+      <FormDialog
+        open={isPlaceOpen}
+        onOpenChange={setIsPlaceOpen}
+        title={editingPlace ? 'Edit place' : 'Create place'}
+        submitLabel={editingPlace ? 'Save' : 'Create'}
+        onSubmit={handleSavePlace}
+        submitDisabled={!searchedPlace || isSavingPlace}
+        loading={isSavingPlace}
+        onDelete={editingPlace ? handleDeletePlace : undefined}
+      >
+        <FormField label="Place">
+          {searchedPlace ? (
+            <div className="flex items-center justify-between rounded-lg border border-border-muted px-3 h-[42px]">
+              <span className="text-[14px] leading-[18px] tracking-[-0.02em] text-text-primary font-inter">
+                {searchedPlace.name}
+              </span>
+              <button type="button" onClick={handleClearPlace} className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary hover:text-text-primary transition-colors">
+                <Trash2 />
+              </button>
             </div>
+          ) : (
+            <PlaceSearch
+              onSelect={handlePlaceSearchSelect}
+              placeholder="Search in Google Maps..."
+              centerLocation={getPlaceSearchCenter()}
+            />
+          )}
+        </FormField>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Input
-                placeholder="Defaults to place name"
-                value={placeName}
-                onChange={(e) => handlePlaceNameChange(e.target.value)}
-              />
-            </div>
+        <FormField label="Name" optional>
+          <TextField
+            placeholder="Defaults to place name"
+            value={placeName}
+            onChange={(e) => handlePlaceNameChange(e.target.value)}
+          />
+        </FormField>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={placeCategory} onValueChange={(v) => setPlaceCategory(v as PlaceCategory)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="coffee">Coffee</SelectItem>
-                  <SelectItem value="shopping">Shopping</SelectItem>
-                  <SelectItem value="sights">Sights</SelectItem>
-                  <SelectItem value="museums">Museums</SelectItem>
-                  <SelectItem value="nature">Nature</SelectItem>
-                  <SelectItem value="nightlife">Nightlife</SelectItem>
-                  <SelectItem value="entertainment">Entertainment</SelectItem>
-                  <SelectItem value="wellness">Wellness</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <FormField label="Category">
+          <SelectField
+            value={placeCategory}
+            onChange={(v) => setPlaceCategory(v as PlaceCategory)}
+            options={[
+              { value: 'food', label: 'Food' },
+              { value: 'coffee', label: 'Coffee' },
+              { value: 'shopping', label: 'Shopping' },
+              { value: 'sights', label: 'Sights' },
+              { value: 'museums', label: 'Museums' },
+              { value: 'nature', label: 'Nature' },
+              { value: 'nightlife', label: 'Nightlife' },
+              { value: 'entertainment', label: 'Entertainment' },
+              { value: 'wellness', label: 'Wellness' },
+              { value: 'other', label: 'Other' },
+            ]}
+            placeholder="Select"
+          />
+        </FormField>
 
-            {trip.locations.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Location <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <Select value={placeLocationId} onValueChange={setPlaceLocationId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {trip.locations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+        {trip.locations.length > 0 && (
+          <FormField label="Destination" optional>
+            <SelectField
+              value={placeLocationId}
+              onChange={setPlaceLocationId}
+              options={trip.locations.map(loc => ({ value: loc.id, label: loc.name }))}
+              placeholder="Select"
+            />
+          </FormField>
+        )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Input
-                placeholder="Any notes..."
-                value={placeNotes}
-                onChange={(e) => setPlaceNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter className="sm:!justify-between sm:!space-x-0">
-            {editingPlace ? (
-              <Button variant="secondary" size="small" onClick={handleDeletePlace} className="mr-auto" leftIcon={<Trash2 />}>
-                Delete
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex gap-2">
-              <DialogClose asChild>
-                <Button variant="secondary" size="small">Cancel</Button>
-              </DialogClose>
-              <Button variant="primary" size="small" onClick={handleSavePlace} disabled={!searchedPlace || isSavingPlace}>
-                {isSavingPlace ? 'Saving...' : (editingPlace ? 'Save' : 'Add')}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <FormField label="Notes" optional>
+          <TextField
+            placeholder="e.g., Best brunch in the city..."
+            value={placeNotes}
+            onChange={(e) => setPlaceNotes(e.target.value)}
+          />
+        </FormField>
+      </FormDialog>
     </div>
   )
 }
