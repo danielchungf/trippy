@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,11 +12,40 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [hasSession, setHasSession] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(!!session)
+      setSessionChecked(true)
+    })
+
+    // Listen for auth state changes (handles the case where session is established after redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        setHasSession(true)
+        setSessionChecked(true)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!hasSession) {
+      setError("Auth session missing! Please request a new password reset link.")
+      return
+    }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters")
@@ -40,6 +70,41 @@ export default function ResetPasswordPage() {
 
     router.push("/")
     router.refresh()
+  }
+
+  // Show loading while checking session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <p className="text-[#a1a1a1]">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if no valid session
+  if (!hasSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0a0a0a]">Session expired</h1>
+            <p className="text-[#a1a1a1] mt-2">
+              Your password reset link has expired or is invalid.
+            </p>
+          </div>
+          <Link href="/forgot-password">
+            <Button className="w-full bg-[#0a0a0a] hover:bg-[#262626]">
+              Request new reset link
+            </Button>
+          </Link>
+          <Link href="/login" className="block text-sm text-[#0a0a0a] font-medium hover:underline">
+            Back to login
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

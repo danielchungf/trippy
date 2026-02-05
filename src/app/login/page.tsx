@@ -1,17 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { acceptPendingInvites } from "@/lib/db"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const urlError = searchParams.get("error")
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(urlError)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -102,5 +105,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white px-4"><div className="w-full max-w-sm h-64" /></div>}>
+      <LoginForm />
+    </Suspense>
   )
 }
