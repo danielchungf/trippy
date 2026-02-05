@@ -18,6 +18,7 @@ interface DateRangePickerFieldProps {
   placeholder?: string
   className?: string
   disabled?: (date: Date) => boolean
+  defaultMonth?: Date
 }
 
 export function DateRangePickerField({
@@ -27,6 +28,7 @@ export function DateRangePickerField({
   placeholder = "Select dates",
   className,
   disabled,
+  defaultMonth,
 }: DateRangePickerFieldProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -56,7 +58,7 @@ export function DateRangePickerField({
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="range"
-          defaultMonth={value?.from}
+          defaultMonth={value?.from ?? defaultMonth}
           selected={value}
           onSelect={(range) => {
             onChange(range)
