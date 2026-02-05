@@ -5,18 +5,15 @@ const config: Config = {
   safelist: [
     'bg-blue-400',
     'bg-sky-400',
-    'bg-cyan-400',
-    'bg-teal-400',
     'bg-emerald-400',
-    'bg-green-400',
     'bg-lime-400',
-    'bg-yellow-400',
     'bg-amber-400',
     'bg-orange-400',
     'bg-red-400',
-    'bg-rose-400',
     'bg-pink-400',
     'bg-purple-400',
+    'bg-violet-400',
+    'bg-indigo-400',
   ],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -86,6 +83,7 @@ const config: Config = {
         },
         // Border colors
         'border-muted': 'rgb(229 229 229 / <alpha-value>)', // neutral-200
+        'border-regular': 'rgb(212 212 212 / <alpha-value>)', // neutral-300
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -147,6 +147,10 @@ import { createClient } from "@/lib/supabase/client"
 import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
+import { FormDialog } from "@/components/ui/form-dialog"
+import { FormField } from "@/components/ui/form-field"
+import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
+import { ColorPicker } from "@/components/ui/color-picker"
 import { StayDrawer } from "@/components/trip/StayDrawer"
 import { ImportPlacesDialog, PlaceToImport } from "@/components/trip/ImportPlacesDialog"
 import { matchLocationByAddress, extractCoordinatesFromUrl, extractPlaceIdFromUrl, extractPlaceNameFromUrl } from "@/lib/csv-import"
@@ -256,8 +260,6 @@ export default function TripPage() {
   const [locationGooglePlaceId, setLocationGooglePlaceId] = useState<string | undefined>()
   const [locationStartDate, setLocationStartDate] = useState<Date | undefined>()
   const [locationEndDate, setLocationEndDate] = useState<Date | undefined>()
-  const [isLocationStartOpen, setIsLocationStartOpen] = useState(false)
-  const [isLocationEndOpen, setIsLocationEndOpen] = useState(false)
   const [isSavingLocation, setIsSavingLocation] = useState(false)
 
   // Accommodation dialog state
@@ -328,8 +330,6 @@ export default function TripPage() {
       setLocationStartDate(trip ? parseLocalDate(trip.startDate) : undefined)
       setLocationEndDate(trip ? parseLocalDate(trip.endDate) : undefined)
     }
-    setIsLocationStartOpen(false)
-    setIsLocationEndOpen(false)
     setIsLocationOpen(true)
   }
 
@@ -337,6 +337,12 @@ export default function TripPage() {
     setLocationName(place.name)
     setLocationCoordinates(place.coordinates)
     setLocationGooglePlaceId(place.placeId)
+  }
+
+  const handleClearLocation = () => {
+    setLocationName("")
+    setLocationCoordinates(undefined)
+    setLocationGooglePlaceId(undefined)
   }
 
   const handleSaveLocation = async () => {
@@ -670,135 +676,53 @@ export default function TripPage() {
       {mainContent}
 
       {/* Location Dialog */}
-      <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingLocation ? 'Edit Location' : 'Add Location'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">City/Area</label>
-              <PlaceSearch
-                onSelect={handleLocationSearchSelect}
-                placeholder="Search for a city..."
-              />
-              {locationName && (
-                <div className="mt-2 p-2 rounded-md bg-muted">
-                  <p className="font-medium text-sm">{locationName}</p>
-                  {locationCoordinates && (
-                    <p className="text-xs text-muted-foreground">Location saved</p>
-                  )}
-                </div>
-              )}
+      <FormDialog
+        open={isLocationOpen}
+        onOpenChange={setIsLocationOpen}
+        title={editingLocation ? 'Edit destination' : 'Add destination'}
+        submitLabel={editingLocation ? 'Save' : 'Add'}
+        onSubmit={handleSaveLocation}
+        submitDisabled={!locationName || !locationStartDate || !locationEndDate || isSavingLocation}
+        loading={isSavingLocation}
+        loadingLabel="Saving..."
+        onDelete={editingLocation ? handleDeleteLocation : undefined}
+        deleteLabel="Delete"
+      >
+        <FormField label="City, area or country">
+          {locationName ? (
+            <div className="flex items-center justify-between rounded-lg border border-border-muted px-3 h-[42px]">
+              <span className="text-[14px] leading-[18px] tracking-[-0.02em] text-text-primary font-inter">{locationName}</span>
+              <button type="button" onClick={handleClearLocation} className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary hover:text-text-primary transition-colors">
+                <Trash2 />
+              </button>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Color</label>
-              <div className="grid grid-cols-7 gap-1.5 p-1 -m-1">
-                {LOCATION_COLORS.map(color => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    className={`aspect-square rounded-full transition-all ${color.value} ${
-                      locationColor === color.value
-                        ? 'ring-2 ring-offset-2 ring-primary'
-                        : 'hover:scale-110'
-                    }`}
-                    onClick={() => setLocationColor(color.value)}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Start Date</label>
-                <Popover open={isLocationStartOpen} onOpenChange={setIsLocationStartOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {locationStartDate ? (
-                        locationStartDate.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={locationStartDate}
-                      onSelect={(date) => {
-                        setLocationStartDate(date)
-                        setIsLocationStartOpen(false)
-                      }}
-                      disabled={(date) => {
-                        const start = parseLocalDate(trip.startDate)
-                        const end = parseLocalDate(trip.endDate)
-                        return date < start || date > end
-                      }}
-                      defaultMonth={locationStartDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">End Date</label>
-                <Popover open={isLocationEndOpen} onOpenChange={setIsLocationEndOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {locationEndDate ? (
-                        locationEndDate.toLocaleDateString()
-                      ) : (
-                        <span className="text-muted-foreground">Select date</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={locationEndDate}
-                      onSelect={(date) => {
-                        setLocationEndDate(date)
-                        setIsLocationEndOpen(false)
-                      }}
-                      disabled={(date) => {
-                        const start = locationStartDate || parseLocalDate(trip.startDate)
-                        const end = parseLocalDate(trip.endDate)
-                        return date < start || date > end
-                      }}
-                      defaultMonth={locationEndDate || locationStartDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="sm:!justify-between sm:!space-x-0">
-            {editingLocation ? (
-              <Button variant="secondary" size="small" onClick={handleDeleteLocation} className="mr-auto" leftIcon={<Trash2 />}>
-                Delete
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex gap-2">
-              <DialogClose asChild>
-                <Button variant="secondary" size="small">Cancel</Button>
-              </DialogClose>
-              <Button variant="primary" size="small" onClick={handleSaveLocation} disabled={isSavingLocation}>
-                {isSavingLocation ? 'Saving...' : (editingLocation ? 'Save' : 'Add')}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          ) : (
+            <PlaceSearch
+              onSelect={handleLocationSearchSelect}
+              placeholder="Search for a city"
+            />
+          )}
+        </FormField>
+
+        <FormField label="Dates">
+          <DateRangePickerField
+            value={locationStartDate && locationEndDate ? { from: locationStartDate, to: locationEndDate } : undefined}
+            onChange={(range) => {
+              setLocationStartDate(range?.from)
+              setLocationEndDate(range?.to)
+            }}
+            disabled={(date) => {
+              const start = parseLocalDate(trip.startDate)
+              const end = parseLocalDate(trip.endDate)
+              return date < start || date > end
+            }}
+          />
+        </FormField>
+
+        <FormField label="Color">
+          <ColorPicker value={locationColor} onChange={setLocationColor} />
+        </FormField>
+      </FormDialog>
 
       {/* Accommodation Dialog */}
       <Dialog open={isAccommodationOpen} onOpenChange={setIsAccommodationOpen}>
