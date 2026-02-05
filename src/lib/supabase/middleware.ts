@@ -36,13 +36,17 @@ export async function updateSession(request: NextRequest) {
                      request.nextUrl.pathname.startsWith('/auth') ||
                      request.nextUrl.pathname.startsWith('/forgot-password')
 
-  if (!user && !isAuthPage) {
+  // Password reset page needs special handling - users must be able to access it
+  // both before session is established (redirect from callback) and after
+  const isPasswordResetPage = request.nextUrl.pathname === '/reset-password'
+
+  if (!user && !isAuthPage && !isPasswordResetPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages (but not reset-password)
   if (user && isAuthPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
