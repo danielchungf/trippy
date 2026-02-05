@@ -18,22 +18,41 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient()
+    let isMounted = true
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session)
-      setSessionChecked(true)
-    })
-
-    // Listen for auth state changes (handles the case where session is established after redirect)
+    // Listen for auth state changes - this handles the recovery token from URL hash
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return
       if (event === 'PASSWORD_RECOVERY' || session) {
         setHasSession(true)
         setSessionChecked(true)
       }
     })
 
+    // Check for existing session
+    // If there's a hash fragment, Supabase needs time to process it
+    const checkSession = async () => {
+      const hasHashParams = window.location.hash.includes('access_token') ||
+                           window.location.hash.includes('type=recovery')
+
+      if (hasHashParams) {
+        // Wait for Supabase to process hash fragments
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      if (!isMounted) return
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        setHasSession(true)
+      }
+      setSessionChecked(true)
+    }
+
+    checkSession()
+
     return () => {
+      isMounted = false
       subscription.unsubscribe()
     }
   }, [])
