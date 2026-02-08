@@ -169,7 +169,8 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
         map: googleMapRef.current,
         position,
         title: activity.title,
-        content: markerContent
+        content: markerContent,
+        zIndex: 10 // Above saved place markers
       })
 
       markersRef.current.push(marker)
