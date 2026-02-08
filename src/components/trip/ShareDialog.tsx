@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
 import { FormDialog } from "@/components/ui/form-dialog"
 import { FormField } from "@/components/ui/form-field"
-import { Input } from "@/components/ui/input"
+import { TextField } from "@/components/ui/text-field"
 import { Button } from "@/components/ui/button"
 import { TripMember } from "@/types"
 import { getTripMembers, inviteMember, removeMember, searchUsers, UserSearchResult } from "@/lib/db"
@@ -196,7 +196,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary">
                   {selectedUser ? <Check /> : <Search />}
                 </span>
-                <Input
+                <TextField
                   ref={inputRef}
                   placeholder="Search by name or enter email"
                   value={searchQuery}
@@ -212,7 +212,7 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
                       handleInvite()
                     }
                   }}
-                  className="pl-9 pr-9 h-[42px] py-3 rounded-lg border-border-muted shadow-none"
+                  className="pl-9 pr-9"
                   disabled={loading}
                 />
                 {isSearching && (

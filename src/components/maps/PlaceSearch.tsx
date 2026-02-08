@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Search, MapPin, Star, Loader2, Navigation } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { TextField } from "@/components/ui/text-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { searchPlaces, geocodeAddress, getPlaceDetails, PlaceSearchResult } from "@/lib/maps"
 import { Coordinates } from "@/types"
@@ -133,11 +133,11 @@ export function PlaceSearch({
         <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-muted-foreground">
           <Search />
         </span>
-        <Input
+        <TextField
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
           placeholder={placeholder}
-          className="pl-9 pr-9 h-[42px] py-3 rounded-lg border-border-muted shadow-none"
+          className="pl-9 pr-9"
           onFocus={() => results.length > 0 && setIsOpen(true)}
         />
         {(isSearching || isFetchingDetails) && (

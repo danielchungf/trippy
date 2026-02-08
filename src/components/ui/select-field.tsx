@@ -16,6 +16,7 @@ interface SelectFieldProps {
   options: SelectFieldOption[]
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 export function SelectField({
@@ -24,9 +25,10 @@ export function SelectField({
   options,
   placeholder = "Select",
   className,
+  disabled,
 }: SelectFieldProps) {
   return (
-    <SelectPrimitive.Root value={value} onValueChange={onChange}>
+    <SelectPrimitive.Root value={value} onValueChange={onChange} disabled={disabled}>
       <SelectPrimitive.Trigger
         className={cn(
           "flex w-full items-center justify-between rounded-lg border border-border-muted p-3",
@@ -36,16 +38,9 @@ export function SelectField({
           "data-[state=open]:border-border-regular",
           className
         )}
+        style={!value ? { color: 'rgb(115 115 115)' } : undefined}
       >
-        <SelectPrimitive.Value placeholder={placeholder}>
-          {value ? (
-            <span className="text-text-primary">
-              {options.find(o => o.value === value)?.label || value}
-            </span>
-          ) : (
-            <span className="text-text-secondary">{placeholder}</span>
-          )}
-        </SelectPrimitive.Value>
+        <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon>
           <ChevronDown className="h-4 w-4 text-text-secondary" />
         </SelectPrimitive.Icon>
