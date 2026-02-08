@@ -38,21 +38,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { FormDialog } from "@/components/ui/form-dialog"
+import { FormField } from "@/components/ui/form-field"
+import { TextField } from "@/components/ui/text-field"
+import { SelectField } from "@/components/ui/select-field"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -255,6 +244,14 @@ export default function DayPage() {
   const handleActivityTitleChange = (value: string) => {
     setActivityTitle(value)
     setActivityTitleTouched(true)
+  }
+
+  const handleClearActivityPlace = () => {
+    setSearchedPlace(null)
+    setSelectedPlaceId("")
+    if (!activityTitleTouched) {
+      setActivityTitle("")
+    }
   }
 
   const handleDeleteActivity = async (activityId: string) => {
@@ -545,171 +542,123 @@ export default function DayPage() {
       </main>
 
       {/* Add/Edit Activity Dialog */}
-      <Dialog open={isActivityOpen} onOpenChange={setIsActivityOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editingActivity ? 'Edit Activity' : 'Add Activity'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Location <span className="text-destructive">*</span></label>
-              {trip.savedPlaces.length > 0 ? (
-                <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
-                  <TabsList className="w-full">
-                    <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
-                    <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="search" className="mt-2">
-                    <PlaceSearch
-                      onSelect={handlePlaceSearchSelect}
-                      placeholder="Search Google Maps..."
-                      centerLocation={location?.coordinates}
-                    />
-                    {searchedPlace && (
-                      <div className="mt-2 p-2 rounded-md bg-muted">
-                        <p className="font-medium text-sm">{searchedPlace.name}</p>
-                        <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                  <TabsContent value="saved" className="mt-2">
-                    <Select value={selectedPlaceId} onValueChange={handleSavedPlaceSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a saved place" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {trip.savedPlaces.map(place => (
-                          <SelectItem key={place.id} value={place.id}>
-                            {place.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                <>
-                  <PlaceSearch
-                    onSelect={handlePlaceSearchSelect}
-                    placeholder="Search Google Maps..."
-                    centerLocation={location?.coordinates}
-                  />
-                  {searchedPlace && (
-                    <div className="mt-2 p-2 rounded-md bg-muted">
-                      <p className="font-medium text-sm">{searchedPlace.name}</p>
-                      <p className="text-xs text-muted-foreground">{searchedPlace.address}</p>
-                    </div>
-                  )}
-                </>
-              )}
+      <FormDialog
+        open={isActivityOpen}
+        onOpenChange={setIsActivityOpen}
+        title={editingActivity ? 'Edit activity' : 'Add activity'}
+        submitLabel={editingActivity ? 'Save' : 'Add'}
+        onSubmit={handleSaveActivity}
+        submitDisabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
+        onDelete={editingActivity ? () => { handleDeleteActivity(editingActivity.id); setIsActivityOpen(false) } : undefined}
+      >
+        <FormField label="Place">
+          {((addMode === 'search' && searchedPlace) || (addMode === 'saved' && selectedPlaceId)) ? (
+            <div className="flex items-center justify-between rounded-lg border border-border-muted px-3 h-[42px]">
+              <span className="text-[14px] leading-[18px] tracking-[-0.02em] text-text-primary font-inter">
+                {addMode === 'search' ? searchedPlace!.name : trip.savedPlaces.find(p => p.id === selectedPlaceId)?.name}
+              </span>
+              <button type="button" onClick={handleClearActivityPlace} className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2] text-text-secondary hover:text-text-primary transition-colors">
+                <Trash2 />
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Activity Name <span className="text-muted-foreground text-xs">(optional)</span></label>
-              <Input
-                placeholder="Defaults to location name"
-                value={activityTitle}
-                onChange={(e) => handleActivityTitleChange(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Time & Duration</label>
-                <Switch
-                  checked={hasTime}
-                  onCheckedChange={setHasTime}
+          ) : trip.savedPlaces.length > 0 ? (
+            <Tabs value={addMode} onValueChange={(v) => setAddMode(v as typeof addMode)}>
+              <TabsList className="w-full">
+                <TabsTrigger value="search" className="flex-1">Search</TabsTrigger>
+                <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
+              </TabsList>
+              <TabsContent value="search" className="mt-2">
+                <PlaceSearch
+                  onSelect={handlePlaceSearchSelect}
+                  placeholder="Search in Google Maps..."
+                  centerLocation={location?.coordinates}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  type="time"
-                  value={activityTime}
-                  onChange={(e) => setActivityTime(e.target.value)}
-                  disabled={!hasTime}
-                  className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}
+              </TabsContent>
+              <TabsContent value="saved" className="mt-2">
+                <SelectField
+                  value={selectedPlaceId}
+                  onChange={handleSavedPlaceSelect}
+                  options={trip.savedPlaces.map(place => ({ value: place.id, label: place.name }))}
+                  placeholder="Select a saved place"
                 />
-                <Select
-                  value={isCustomDuration ? 'custom' : activityDuration}
-                  onValueChange={(val) => {
-                    if (val === 'custom') {
-                      setIsCustomDuration(true)
-                      setActivityDuration('')
-                    } else {
-                      setIsCustomDuration(false)
-                      setActivityDuration(val)
-                    }
-                  }}
-                  disabled={!hasTime}
-                >
-                  <SelectTrigger className={!hasTime ? "text-muted-foreground disabled:opacity-100" : ""}>
-                    <SelectValue placeholder="Duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="45">45 min</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="90">1.5 hours</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                    <SelectItem value="180">3 hours</SelectItem>
-                    <SelectItem value="240">4 hours</SelectItem>
-                    <SelectItem value="custom">Custom...</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {hasTime && isCustomDuration && (
-                <Input
-                  type="number"
-                  placeholder="Enter duration in minutes"
-                  value={activityDuration}
-                  onChange={(e) => setActivityDuration(e.target.value)}
-                  autoFocus
-                />
-              )}
-            </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <PlaceSearch
+              onSelect={handlePlaceSearchSelect}
+              placeholder="Search in Google Maps..."
+              centerLocation={location?.coordinates}
+            />
+          )}
+        </FormField>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes</label>
-              <Input
-                placeholder="Any additional notes..."
-                value={activityNotes}
-                onChange={(e) => setActivityNotes(e.target.value)}
-              />
-            </div>
+        <FormField label="Activity name" optional>
+          <TextField
+            placeholder="Defaults to location name"
+            value={activityTitle}
+            onChange={(e) => handleActivityTitleChange(e.target.value)}
+          />
+        </FormField>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-h2 font-fustat text-text-primary">Time & duration</label>
+            <Switch checked={hasTime} onCheckedChange={setHasTime} />
           </div>
-          <DialogFooter className={editingActivity ? "flex justify-between sm:justify-between" : ""}>
-            {editingActivity && (
-              <Button
-                variant="secondary"
-                size="small"
-                leftIcon={<Trash2 />}
-                onClick={() => {
-                  handleDeleteActivity(editingActivity.id)
-                  setIsActivityOpen(false)
-                }}
-              >
-                Delete
-              </Button>
-            )}
-            <div className="flex gap-2">
-              <DialogClose asChild>
-                <Button variant="secondary" size="small">Cancel</Button>
-              </DialogClose>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleSaveActivity}
-                disabled={addMode === 'search' ? !searchedPlace : !selectedPlaceId}
-              >
-                {editingActivity ? 'Save' : 'Add Activity'}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="grid grid-cols-2 gap-4">
+            <TextField
+              type="time"
+              value={activityTime}
+              onChange={(e) => setActivityTime(e.target.value)}
+              disabled={!hasTime}
+              className={`h-[44px]${!hasTime ? " text-text-secondary" : ""}`}
+            />
+            <SelectField
+              value={isCustomDuration ? 'custom' : activityDuration}
+              onChange={(val) => {
+                if (val === 'custom') {
+                  setIsCustomDuration(true)
+                  setActivityDuration('')
+                } else {
+                  setIsCustomDuration(false)
+                  setActivityDuration(val)
+                }
+              }}
+              disabled={!hasTime}
+              className="h-[44px]"
+              options={[
+                { value: '15', label: '15 min' },
+                { value: '30', label: '30 min' },
+                { value: '45', label: '45 min' },
+                { value: '60', label: '1 hour' },
+                { value: '90', label: '1.5 hours' },
+                { value: '120', label: '2 hours' },
+                { value: '180', label: '3 hours' },
+                { value: '240', label: '4 hours' },
+                { value: 'custom', label: 'Custom...' },
+              ]}
+              placeholder="Duration"
+            />
+          </div>
+          {hasTime && isCustomDuration && (
+            <TextField
+              type="number"
+              placeholder="Enter duration in minutes"
+              value={activityDuration}
+              onChange={(e) => setActivityDuration(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+
+        <FormField label="Notes" optional>
+          <TextField
+            placeholder="Any additional notes..."
+            value={activityNotes}
+            onChange={(e) => setActivityNotes(e.target.value)}
+          />
+        </FormField>
+      </FormDialog>
     </div>
   )
 }
