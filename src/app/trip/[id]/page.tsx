@@ -959,11 +959,11 @@ function Sidebar({ onNavigateHome, activeTab, onTabChange }: {
       <div className="flex justify-center">
         <button
           onClick={onNavigateHome}
-          className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-[8px] transition-colors hover:bg-neutral-100 hover:text-text-primary"
+          className="group/home w-[28px] h-[28px] inline-flex items-center justify-center rounded-[8px] transition-colors hover:bg-neutral-100"
         >
           <span className="w-[20px] h-[20px] flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8]">
             <Image src={logo} alt="Logo" width={20} height={20} className="group-hover/sidebar:hidden" />
-            <House className="hidden group-hover/sidebar:block" />
+            <House className="hidden group-hover/sidebar:block text-text-tertiary group-hover/home:text-text-primary" />
           </span>
         </button>
       </div>
@@ -1513,15 +1513,119 @@ function PlacesRightPanel({
     <div className="h-full flex flex-col relative">
       {/* Header */}
       <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-        <div className="flex flex-col">
-          <span className="text-h2 text-text-primary">Places</span>
-          <span className="text-h3 text-text-secondary">
-            {totalPlaceCount} {totalPlaceCount === 1 ? 'place' : 'places'} saved on this trip
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Map/List Toggle - Segmented Control */}
-          <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 bg-neutral-100">
+        <div className="flex items-center gap-2">
+          {/* Destination Filter Dropdown */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
+                <span className="px-[2px]">Destination</span>
+                <span className="w-[16px] h-[16px] flex-shrink-0">
+                  <ChevronDown className="w-full h-full stroke-[2]" />
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              {/* Location checkboxes */}
+              <div className="flex flex-col gap-1">
+                {locationsInPlaces.map(location => (
+                  <label
+                    key={location.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={isLocationSelected(location.id)}
+                      onCheckedChange={() => toggleLocation(location.id)}
+                    />
+                    <span className="text-sm text-text-primary">{location.name}</span>
+                  </label>
+                ))}
+                {hasUnassignedPlaces && (
+                  <label
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={isLocationSelected(null)}
+                      onCheckedChange={() => toggleLocation(null)}
+                    />
+                    <span className="text-sm text-text-secondary italic">No location</span>
+                  </label>
+                )}
+              </div>
+              {/* Divider */}
+              <div className="my-2 h-px bg-neutral-200" />
+              {/* Assignment radio options */}
+              <div className="flex flex-col gap-1">
+                <label
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                  onClick={() => setAssignmentFilter('all')}
+                >
+                  <span className={cn(
+                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                    assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
+                  )}>
+                    {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                  </span>
+                  <span className="text-sm text-text-primary">All</span>
+                </label>
+                <label
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                  onClick={() => setAssignmentFilter('assigned')}
+                >
+                  <span className={cn(
+                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                    assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
+                  )}>
+                    {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                  </span>
+                  <span className="text-sm text-text-primary">Assigned</span>
+                </label>
+                <label
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                  onClick={() => setAssignmentFilter('not_assigned')}
+                >
+                  <span className={cn(
+                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                    assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
+                  )}>
+                    {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+                  </span>
+                  <span className="text-sm text-text-primary">Not assigned</span>
+                </label>
+              </div>
+            </PopoverContent>
+          </Popover>
+          {/* Category Filter Dropdown */}
+          <Select
+            value={selectedCategory ?? "_all"}
+            onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
+          >
+            <SelectTrigger
+              className={cn(
+                "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
+                selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
+              )}
+              style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
+            >
+              <span>
+                {selectedCategory !== null
+                  ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
+                  : "Category"}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">All Categories</SelectItem>
+              {categoriesInPlaces.map(category => {
+                const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
+                return (
+                  <SelectItem key={category} value={category}>
+                    {config.label}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          {/* Map/List Toggle */}
+          <div className="flex items-center gap-0.5 p-px h-[32px] rounded-[8px] border border-neutral-200 bg-neutral-100">
             <button
               onClick={() => setShowMapView(false)}
               className={cn(
@@ -1545,6 +1649,12 @@ function PlacesRightPanel({
               <Map className="h-4 w-4" />
             </button>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Places count */}
+          <span className="text-mono-small text-text-secondary">
+            {filteredPlaceCount}/{totalPlaceCount} PLACES
+          </span>
           <Button
             variant="secondary"
             size="small"
@@ -1554,6 +1664,7 @@ function PlacesRightPanel({
             Import
           </Button>
           <Button
+            variant="primary"
             size="small"
             leftIcon={<Plus />}
             onClick={() => onOpenPlaceDialog()}
@@ -1602,126 +1713,6 @@ function PlacesRightPanel({
             maxSize="580px"
             className="border-r border-neutral-200 flex flex-col overflow-hidden"
           >
-            {/* Filter Header */}
-            <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-              <div className="flex items-center gap-2">
-              {/* Location Filter Dropdown */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
-                    <span className="px-[2px]">Location</span>
-                    <span className="w-[16px] h-[16px] flex-shrink-0">
-                      <ChevronDown className="w-full h-full stroke-[2]" />
-                    </span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-56 p-2">
-                  {/* Location checkboxes */}
-                  <div className="flex flex-col gap-1">
-                    {locationsInPlaces.map(location => (
-                      <label
-                        key={location.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={isLocationSelected(location.id)}
-                          onCheckedChange={() => toggleLocation(location.id)}
-                        />
-                        <span className="text-sm text-text-primary">{location.name}</span>
-                      </label>
-                    ))}
-                    {hasUnassignedPlaces && (
-                      <label
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={isLocationSelected(null)}
-                          onCheckedChange={() => toggleLocation(null)}
-                        />
-                        <span className="text-sm text-text-secondary italic">No location</span>
-                      </label>
-                    )}
-                  </div>
-                  {/* Divider */}
-                  <div className="my-2 h-px bg-neutral-200" />
-                  {/* Assignment radio options */}
-                  <div className="flex flex-col gap-1">
-                    <label
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                      onClick={() => setAssignmentFilter('all')}
-                    >
-                      <span className={cn(
-                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                        assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
-                      )}>
-                        {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                      </span>
-                      <span className="text-sm text-text-primary">All</span>
-                    </label>
-                    <label
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                      onClick={() => setAssignmentFilter('assigned')}
-                    >
-                      <span className={cn(
-                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                        assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
-                      )}>
-                        {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                      </span>
-                      <span className="text-sm text-text-primary">Assigned</span>
-                    </label>
-                    <label
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                      onClick={() => setAssignmentFilter('not_assigned')}
-                    >
-                      <span className={cn(
-                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                        assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
-                      )}>
-                        {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                      </span>
-                      <span className="text-sm text-text-primary">Not assigned</span>
-                    </label>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {/* Category Filter Dropdown */}
-              <Select
-                value={selectedCategory ?? "_all"}
-                onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
-              >
-                <SelectTrigger
-                  className={cn(
-                    "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
-                    selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
-                  )}
-                  style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
-                >
-                  <span>
-                    {selectedCategory !== null
-                      ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
-                      : "Category"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">All Categories</SelectItem>
-                  {categoriesInPlaces.map(category => {
-                    const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
-                    return (
-                      <SelectItem key={category} value={category}>
-                        {config.label}
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-              </div>
-              {/* Places count */}
-              <span className="text-mono-small text-text-secondary">
-                {filteredPlaceCount}/{totalPlaceCount} PLACES
-              </span>
-            </div>
-
             {/* Scrollable Places List or Empty State */}
             <div className="flex-1 overflow-auto">
               {totalPlaceCount === 0 ? (
@@ -1782,125 +1773,6 @@ function PlacesRightPanel({
       ) : (
         /* Grid View (original) */
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Filter Header */}
-          <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-            <div className="flex items-center gap-2">
-            {/* Location Filter Dropdown */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
-                  <span className="px-[2px]">Location</span>
-                  <span className="w-[16px] h-[16px] flex-shrink-0">
-                    <ChevronDown className="w-full h-full stroke-[2]" />
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 p-2">
-                {/* Location checkboxes */}
-                <div className="flex flex-col gap-1">
-                  {locationsInPlaces.map(location => (
-                    <label
-                      key={location.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={isLocationSelected(location.id)}
-                        onCheckedChange={() => toggleLocation(location.id)}
-                      />
-                      <span className="text-sm text-text-primary">{location.name}</span>
-                    </label>
-                  ))}
-                  {hasUnassignedPlaces && (
-                    <label
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={isLocationSelected(null)}
-                        onCheckedChange={() => toggleLocation(null)}
-                      />
-                      <span className="text-sm text-text-secondary italic">No location</span>
-                    </label>
-                  )}
-                </div>
-                {/* Divider */}
-                <div className="my-2 h-px bg-neutral-200" />
-                {/* Assignment radio options */}
-                <div className="flex flex-col gap-1">
-                  <label
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                    onClick={() => setAssignmentFilter('all')}
-                  >
-                    <span className={cn(
-                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                      assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
-                    )}>
-                      {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                    </span>
-                    <span className="text-sm text-text-primary">All</span>
-                  </label>
-                  <label
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                    onClick={() => setAssignmentFilter('assigned')}
-                  >
-                    <span className={cn(
-                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                      assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
-                    )}>
-                      {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                    </span>
-                    <span className="text-sm text-text-primary">Assigned</span>
-                  </label>
-                  <label
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                    onClick={() => setAssignmentFilter('not_assigned')}
-                  >
-                    <span className={cn(
-                      "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                      assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
-                    )}>
-                      {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                    </span>
-                    <span className="text-sm text-text-primary">Not assigned</span>
-                  </label>
-                </div>
-              </PopoverContent>
-            </Popover>
-            {/* Category Filter Dropdown */}
-            <Select
-              value={selectedCategory ?? "_all"}
-              onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
-            >
-              <SelectTrigger
-                className={cn(
-                  "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
-                  selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
-                )}
-                style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
-              >
-                <span>
-                  {selectedCategory !== null
-                    ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
-                    : "Category"}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_all">All Categories</SelectItem>
-                {categoriesInPlaces.map(category => {
-                  const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
-                  return (
-                    <SelectItem key={category} value={category}>
-                      {config.label}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-            </div>
-            {/* Places count */}
-            <span className="text-mono-small text-text-secondary">
-              {filteredPlaceCount}/{totalPlaceCount} PLACES
-            </span>
-          </div>
           {/* Grid or Empty State */}
           <div className="flex-1 overflow-auto">
             {totalPlaceCount === 0 ? (
@@ -2520,7 +2392,7 @@ function RightPanel({
                 </TooltipProvider>
               )}
               <Button
-                variant="secondary"
+                variant="primary"
                 size="small"
                 leftIcon={<Plus />}
                 onClick={() => handleOpenActivityDialog()}
@@ -2600,7 +2472,7 @@ function RightPanel({
             ) : !(departingAccommodation || stayingAccommodation) ? (
               <div className="h-full flex items-center justify-center">
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="small"
                   leftIcon={<Plus />}
                   onClick={() => handleOpenActivityDialog()}
@@ -3064,21 +2936,76 @@ function ItineraryPanel({
 
   // Calculate total activities
   const totalActivities = days.reduce((sum, day) => sum + day.activities.length, 0)
-  const totalDays = days.length
 
   // When no activities, always use compact view
   const effectiveViewMode = totalActivities === 0 ? 'list' : viewMode
+
+  // Destination filter state - null means "all destinations"
+  const [selectedDestinationIds, setSelectedDestinationIds] = useState<Set<string | null> | null>(null)
+
+  const toggleDestination = (locationId: string | null) => {
+    setSelectedDestinationIds(prev => {
+      if (prev === null) {
+        const allIds = new Set<string | null>(trip.locations.map(l => l.id))
+        allIds.delete(locationId)
+        return allIds
+      }
+      const newSet = new Set(prev)
+      if (newSet.has(locationId)) {
+        newSet.delete(locationId)
+      } else {
+        newSet.add(locationId)
+      }
+      if (newSet.size === trip.locations.length) {
+        return null
+      }
+      return newSet
+    })
+  }
+
+  const isDestinationSelected = (locationId: string | null) => {
+    if (selectedDestinationIds === null) return true
+    return selectedDestinationIds.has(locationId)
+  }
+
+  // Filter days based on selected destinations
+  const filteredDays = useMemo(() => {
+    if (selectedDestinationIds === null) return days
+    return days.filter(day => selectedDestinationIds.has(day.locationId ?? null))
+  }, [days, selectedDestinationIds])
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-        <div className="flex flex-col">
-          <span className="text-h2 text-text-primary">Itinerary</span>
-          <span className="text-h3 text-text-secondary">
-            {totalActivities} {totalActivities === 1 ? 'activity' : 'activities'} across {totalDays} {totalDays === 1 ? 'day' : 'days'}
-          </span>
-        </div>
+        {/* Destination Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
+              <span className="px-[2px]">Destination</span>
+              <span className="w-[16px] h-[16px] flex-shrink-0">
+                <ChevronDown className="w-full h-full stroke-[2]" />
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-2">
+            <div className="flex flex-col gap-1">
+              {trip.locations.map(location => (
+                <label
+                  key={location.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={isDestinationSelected(location.id)}
+                    onCheckedChange={() => toggleDestination(location.id)}
+                  />
+                  <span className="text-sm text-text-primary">{location.name}</span>
+                </label>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
         {/* Only show view toggle when there are activities */}
         {totalActivities > 0 && (
           <SegmentedControl
@@ -3094,9 +3021,10 @@ function ItineraryPanel({
 
       {/* Day Cards */}
       <div className="flex-1 overflow-auto">
-        {days.map((day, index) => {
+        {filteredDays.map((day, index) => {
           const location = getLocationForDay(day)
-          const dayNumber = index + 1
+          // Use original index for day number
+          const dayNumber = days.indexOf(day) + 1
           return (
             <DayCard
               key={day.date}
@@ -3271,7 +3199,7 @@ function StaysPanel({
           <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
           <p className="text-body text-text-secondary mt-1">Add your hotels, Airbnbs, or other accommodations</p>
         </div>
-        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+        <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
           New stay
         </Button>
       </div>
@@ -3280,14 +3208,8 @@ function StaysPanel({
 
   return (
     <>
-      <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-        <div className="flex flex-col">
-          <span className="text-h2 text-text-primary">Stays</span>
-          <span className="text-body text-text-secondary">
-            {trip.accommodations.length} {trip.accommodations.length === 1 ? 'stay' : 'stays'} across {new Set(trip.accommodations.map(a => a.locationId)).size} {new Set(trip.accommodations.map(a => a.locationId)).size === 1 ? 'destination' : 'destinations'}
-          </span>
-        </div>
-        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+      <div className="p-3 flex items-center justify-end border-b border-neutral-200 flex-shrink-0">
+        <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
           New stay
         </Button>
       </div>
@@ -3418,20 +3340,17 @@ function OverviewPanel({
         <div className="flex-1 overflow-auto">
           {/* Destinations Header */}
           <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
-            <span className="text-h2 text-text-primary">Destinations</span>
-            <div className="flex items-center gap-2">
-              <SegmentedControl
-                value={destinationsViewMode}
-                onChange={setDestinationsViewMode}
-                options={[
-                  { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
-                  { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
-                ]}
-              />
-              <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
-                New destination
-              </Button>
-            </div>
+            <SegmentedControl
+              value={destinationsViewMode}
+              onChange={setDestinationsViewMode}
+              options={[
+                { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+                { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
+              ]}
+            />
+            <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+              New destination
+            </Button>
           </div>
 
           {/* Destinations List / Calendar */}
