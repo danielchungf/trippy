@@ -125,7 +125,8 @@ export function DestinationsMap({ locations, hoveredIndex }: DestinationsMapProp
         map: googleMapRef.current,
         position,
         title: location.name,
-        content: markerContent
+        content: markerContent,
+        zIndex: 100
       })
 
       markersRef.current.push(marker)

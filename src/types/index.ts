@@ -52,6 +52,56 @@ export interface Day {
 // Accommodation type
 export type AccommodationType = 'hotel' | 'airbnb' | 'hostel' | 'family' | 'friend' | 'other'
 
+// Expense category
+export type ExpenseCategory =
+  | 'accommodation'
+  | 'food'
+  | 'transport'
+  | 'activities'
+  | 'shopping'
+  | 'other'
+
+// Supported currencies (ISO 4217)
+export const CURRENCIES = [
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '\u20AC' },
+  { code: 'GBP', name: 'British Pound', symbol: '\u00A3' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '\u00A5' },
+  { code: 'KRW', name: 'South Korean Won', symbol: '\u20A9' },
+  { code: 'THB', name: 'Thai Baht', symbol: '\u0E3F' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '\u00A5' },
+  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'MXN', name: 'Mexican Peso', symbol: 'MX$' },
+  { code: 'INR', name: 'Indian Rupee', symbol: '\u20B9' },
+  { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
+  { code: 'NZD', name: 'New Zealand Dollar', symbol: 'NZ$' },
+] as const
+
+export type CurrencyCode = typeof CURRENCIES[number]['code']
+
+// Expense
+export interface Expense {
+  id: string
+  description: string
+  amount: number
+  currency: string
+  convertedAmount?: number
+  category: ExpenseCategory
+  date: string // ISO date YYYY-MM-DD
+  notes?: string
+}
+
+// Exchange rate (trip-level)
+export interface ExchangeRate {
+  id: string
+  fromCurrency: string
+  toCurrency: string
+  rate: number
+}
+
 // Packing item category
 export type PackingCategory =
   | 'clothing'
@@ -135,6 +185,9 @@ export interface Trip {
   accommodations: Accommodation[]
   savedPlaces: SavedPlace[]
   packingItems: PackingItem[]
+  expenses: Expense[]
+  exchangeRates: ExchangeRate[]
+  homeCurrency: string
   days: Day[]
 }
 

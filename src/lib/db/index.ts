@@ -56,3 +56,14 @@ export {
   deletePackingItem,
   togglePackingItemPacked,
 } from './packing-items'
+
+export {
+  addExpense,
+  updateExpense,
+  deleteExpense,
+} from './expenses'
+
+export {
+  upsertExchangeRate,
+  deleteExchangeRate,
+} from './exchange-rates'

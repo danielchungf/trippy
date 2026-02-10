@@ -30,11 +30,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Plane,
+  TicketsPlane,
+  House,
   User,
   LogOut,
   Route,
   GripVertical,
   BedDouble,
+  MapPinned,
+  PiggyBank,
   ExternalLink,
   ImageOff,
   MapPinCheck,
@@ -161,17 +165,12 @@ import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { PlacePhoto } from "@/components/PlacePhoto"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { PlacesMap } from "@/components/maps/PlacesMap"
+import { ExpenseList } from "@/components/trip/ExpenseList"
 import logo from "@/app/logo.png"
 
 // Tab types
-type TabId = 'overview' | 'itinerary' | 'places' | 'packing'
+type TabId = 'overview' | 'stays' | 'itinerary' | 'places' | 'expenses' | 'packing'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'OVERVIEW' },
-  { id: 'itinerary', label: 'ITINERARY' },
-  { id: 'places', label: 'PLACES' },
-  // { id: 'packing', label: 'PACKING' }, // TODO: Re-enable for post-MVP
-]
 
 // Category configuration with icons
 const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
@@ -204,7 +203,7 @@ export default function TripPage() {
 
   const initialTab = searchParams.get('tab') as TabId | null
   const [activeTab, setActiveTab] = useState<TabId>(
-    initialTab && ['overview', 'itinerary', 'places', 'packing'].includes(initialTab) ? initialTab : 'overview'
+    initialTab && ['overview', 'stays', 'itinerary', 'places', 'expenses', 'packing'].includes(initialTab) ? initialTab : 'overview'
   )
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
 
@@ -252,6 +251,9 @@ export default function TripPage() {
     }
     return 500
   })
+
+  // Stays hover state (for map highlighting)
+  const [hoveredStayIndex, setHoveredStayIndex] = useState<number | null>(null)
 
   // Location dialog state
   const [isLocationOpen, setIsLocationOpen] = useState(false)
@@ -585,6 +587,18 @@ export default function TripPage() {
     return trip?.locations.find(l => l.coordinates)?.coordinates
   }
 
+  // Convert accommodations to Location-like objects for DestinationsMap reuse
+  const staysAsLocations = useMemo(() =>
+    (trip?.accommodations ?? []).map(a => ({
+      id: a.id,
+      name: a.name,
+      coordinates: a.coordinates,
+      startDate: a.checkIn,
+      endDate: a.checkOut,
+    })) as Location[],
+    [trip?.accommodations]
+  )
+
   if (!trip) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
@@ -646,16 +660,45 @@ export default function TripPage() {
         )}
       </ResizablePanel>
     </ResizablePanelGroup>
+  ) : activeTab === 'stays' ? (
+    // Stays tab: Two-panel layout with stays list + map
+    <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanel
+        defaultSize="500px"
+        minSize="420px"
+        maxSize="580px"
+        className="border-r border-neutral-200 flex flex-col overflow-hidden"
+      >
+        <StaysPanel
+          trip={trip}
+          onOpenAccommodationDialog={handleOpenAccommodationDialog}
+          onOpenStayDrawer={handleOpenStayDrawer}
+          onRefresh={refreshTrip}
+          onHoverStay={setHoveredStayIndex}
+        />
+      </ResizablePanel>
+      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+      <ResizablePanel className="flex flex-col overflow-hidden">
+        <DestinationsMap locations={staysAsLocations} hoveredIndex={hoveredStayIndex} />
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  ) : activeTab === 'expenses' ? (
+    // Expenses tab
+    <div className="flex-1 overflow-auto">
+      <ExpenseList
+        tripId={tripId}
+        expenses={trip.expenses}
+        exchangeRates={trip.exchangeRates}
+        homeCurrency={trip.homeCurrency}
+        onRefresh={refreshTrip}
+      />
+    </div>
   ) : (
     // Overview tab: Two-panel layout with destinations + map
     <OverviewPanel
       trip={trip}
       onOpenLocationDialog={handleOpenLocationDialog}
-      onOpenAccommodationDialog={handleOpenAccommodationDialog}
-      onOpenStayDrawer={handleOpenStayDrawer}
       onRefresh={refreshTrip}
-      mapHeight={mapHeight}
-      setMapHeight={setMapHeight}
       onTabChange={setActiveTab}
       destinationsViewMode={destinationsViewMode}
       setDestinationsViewMode={setDestinationsViewMode}
@@ -664,14 +707,13 @@ export default function TripPage() {
 
   const mainContent = (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Trip Header with Tabs */}
+      {/* Trip Header */}
       <TripHeader
         trip={trip}
         tripId={tripId}
         duration={duration}
         onRefresh={refreshTrip}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
       />
 
       {/* Tab Content Area */}
@@ -682,7 +724,7 @@ export default function TripPage() {
   return (
     <div className="h-screen bg-background flex overflow-hidden">
       {/* Sidebar */}
-      <Sidebar onNavigateHome={() => router.push('/')} />
+      <Sidebar onNavigateHome={() => router.push('/')} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main content */}
       {mainContent}
@@ -896,10 +938,13 @@ export default function TripPage() {
 }
 
 // Sidebar Component
-function Sidebar({ onNavigateHome }: { onNavigateHome: () => void }) {
+function Sidebar({ onNavigateHome, activeTab, onTabChange }: {
+  onNavigateHome: () => void
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
+}) {
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-
   const handleSignOut = async () => {
     setIsLoggingOut(true)
     const supabase = createClient()
@@ -909,19 +954,51 @@ function Sidebar({ onNavigateHome }: { onNavigateHome: () => void }) {
   }
 
   return (
-    <div className="w-[49px] flex-shrink-0 border-r border-t border-neutral-200 flex flex-col p-3 px-[10px] bg-background">
-      {/* Top: Logo */}
+    <div className="group/sidebar w-[49px] flex-shrink-0 border-r border-t border-neutral-200 flex flex-col p-3 px-[10px] bg-background">
+      {/* Top: Logo (swaps to Home icon on sidebar hover) */}
       <div className="flex justify-center">
-        <NakedIconButton
-          icon={<Image src={logo} alt="Logo" width={20} height={20} />}
-        />
+        <button
+          onClick={onNavigateHome}
+          className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-[8px] transition-colors hover:bg-neutral-100 hover:text-text-primary"
+        >
+          <span className="w-[20px] h-[20px] flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8]">
+            <Image src={logo} alt="Logo" width={20} height={20} className="group-hover/sidebar:hidden" />
+            <House className="hidden group-hover/sidebar:block" />
+          </span>
+        </button>
       </div>
 
-      {/* Middle: Home/Trips */}
-      <div className="flex-1 flex items-center justify-center">
+      {/* Middle: Tab Navigation */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
         <NakedIconButton
-          icon={<Plane />}
-          onClick={onNavigateHome}
+          icon={<TicketsPlane />}
+          selected={activeTab === 'overview'}
+          onClick={() => onTabChange('overview')}
+          className={activeTab !== 'overview' ? 'text-text-tertiary hover:text-text-primary' : undefined}
+        />
+        <NakedIconButton
+          icon={<BedDouble />}
+          selected={activeTab === 'stays'}
+          onClick={() => onTabChange('stays')}
+          className={activeTab !== 'stays' ? 'text-text-tertiary hover:text-text-primary' : undefined}
+        />
+        <NakedIconButton
+          icon={<CalendarClock />}
+          selected={activeTab === 'itinerary'}
+          onClick={() => onTabChange('itinerary')}
+          className={activeTab !== 'itinerary' ? 'text-text-tertiary hover:text-text-primary' : undefined}
+        />
+        <NakedIconButton
+          icon={<MapPinned />}
+          selected={activeTab === 'places'}
+          onClick={() => onTabChange('places')}
+          className={activeTab !== 'places' ? 'text-text-tertiary hover:text-text-primary' : undefined}
+        />
+        <NakedIconButton
+          icon={<PiggyBank />}
+          selected={activeTab === 'expenses'}
+          onClick={() => onTabChange('expenses')}
+          className={activeTab !== 'expenses' ? 'text-text-tertiary hover:text-text-primary' : undefined}
         />
       </div>
 
@@ -943,31 +1020,37 @@ function Sidebar({ onNavigateHome }: { onNavigateHome: () => void }) {
   )
 }
 
-// Trip Header Component (with tabs)
+// Tab label mapping
+const TAB_LABELS: Record<TabId, string> = {
+  overview: 'Overview',
+  stays: 'Stays',
+  itinerary: 'Itinerary',
+  places: 'Places',
+  expenses: 'Expenses',
+  packing: 'Packing',
+}
+
+// Trip Header Component
 function TripHeader({
   trip,
   tripId,
   duration,
   onRefresh,
   activeTab,
-  onTabChange
 }: {
   trip: TripWithOwnership
   tripId: string
   duration: number
   onRefresh: () => Promise<void>
   activeTab: TabId
-  onTabChange: (tab: TabId) => void
 }) {
   return (
     <header className="flex border-t border-b border-border-muted">
-      {/* Left Section: Title + Dates + Buttons (500px fixed) */}
-      <div className="w-[500px] shrink-0 p-3 flex items-center justify-between border-r border-border-muted">
-        <div>
-          <h1 className="text-h1">{trip.name}</h1>
-          <p className="text-h2 text-text-secondary">
-            {formatDateRange(trip.startDate, trip.endDate)} ({duration} days)
-          </p>
+      <div className="flex-1 p-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-h2 text-text-secondary">{trip.name}</span>
+          <span className="text-h2 text-text-secondary">/</span>
+          <span className="text-h2 text-text-primary">{TAB_LABELS[activeTab]}</span>
         </div>
         <div className="flex items-center gap-2">
           <ShareDialog
@@ -989,45 +1072,7 @@ function TripHeader({
           />
         </div>
       </div>
-
-      {/* Right Section: Tabs (fills remaining space) */}
-      <div className="flex-1 flex items-center">
-        <TabBar activeTab={activeTab} onTabChange={onTabChange} />
-      </div>
     </header>
-  )
-}
-
-// Tab Bar Component
-function TabBar({ activeTab, onTabChange }: { activeTab: TabId; onTabChange: (tab: TabId) => void }) {
-  return (
-    <div className="flex w-full h-full">
-      {TABS.map((tab, index) => {
-        const isActive = activeTab === tab.id
-        const prevIsActive = index > 0 && activeTab === TABS[index - 1].id
-        const showDivider = !isActive && !prevIsActive && index > 0
-
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            className={`
-              flex-1 px-4 text-center font-inter text-[14px] font-medium leading-[18px] tracking-[-0.02em]
-              transition-colors relative
-              ${isActive
-                ? 'bg-neutral-800 text-white'
-                : 'bg-transparent text-text-secondary hover:bg-neutral-50'
-              }
-            `}
-          >
-            {showDivider && (
-              <span className="absolute left-0 top-0 w-px h-full bg-neutral-200" />
-            )}
-            {tab.label}
-          </button>
-        )
-      })}
-    </div>
   )
 }
 
@@ -3205,70 +3250,76 @@ function ActivityRow({ activity }: { activity: Activity }) {
   )
 }
 
+// Stays Panel Component (extracted from OverviewPanel for reuse in Stays tab)
+function StaysPanel({
+  trip,
+  onOpenAccommodationDialog,
+  onOpenStayDrawer,
+  onRefresh,
+  onHoverStay,
+}: {
+  trip: TripWithOwnership
+  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  onOpenStayDrawer: (accommodation: Accommodation) => void
+  onRefresh: () => Promise<void>
+  onHoverStay?: (index: number | null) => void
+}) {
+  if (trip.accommodations.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white">
+        <div className="text-center">
+          <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
+          <p className="text-body text-text-secondary mt-1">Add your hotels, Airbnbs, or other accommodations</p>
+        </div>
+        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+          New stay
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
+        <div className="flex flex-col">
+          <span className="text-h2 text-text-primary">Stays</span>
+          <span className="text-body text-text-secondary">
+            {trip.accommodations.length} {trip.accommodations.length === 1 ? 'stay' : 'stays'} across {new Set(trip.accommodations.map(a => a.locationId)).size} {new Set(trip.accommodations.map(a => a.locationId)).size === 1 ? 'destination' : 'destinations'}
+          </span>
+        </div>
+        <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+          New stay
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <OverviewStaysList
+          trip={trip}
+          onOpenStayDrawer={onOpenStayDrawer}
+          onRefresh={onRefresh}
+          onHoverStay={onHoverStay}
+        />
+      </div>
+    </>
+  )
+}
+
 // Overview Panel Component (two-panel layout with destinations + map)
 function OverviewPanel({
   trip,
   onOpenLocationDialog,
-  onOpenAccommodationDialog,
-  onOpenStayDrawer,
   onRefresh,
-  mapHeight,
-  setMapHeight,
   onTabChange,
   destinationsViewMode,
   setDestinationsViewMode
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
-  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
-  onOpenStayDrawer: (accommodation: Accommodation) => void
   onRefresh: () => Promise<void>
-  mapHeight: number
-  setMapHeight: (height: number | ((h: number) => number)) => void
   onTabChange: (tab: TabId) => void
   destinationsViewMode: 'list' | 'calendar'
   setDestinationsViewMode: (mode: 'list' | 'calendar') => void
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
-
-  // Resizable map state for right panel
-  const rightPanelRef = useRef<HTMLDivElement>(null)
-  const [isResizing, setIsResizing] = useState(false)
-
-  // Handle resize drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-  }, [])
-
-  useEffect(() => {
-    if (!isResizing) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!rightPanelRef.current) return
-      const containerRect = rightPanelRef.current.getBoundingClientRect()
-      const newHeight = e.clientY - containerRect.top
-      // Clamp between 200px and 500px
-      setMapHeight(Math.min(500, Math.max(200, newHeight)))
-    }
-
-    const handleMouseUp = () => {
-      setIsResizing(false)
-      // Save to localStorage when resize ends
-      setMapHeight(h => {
-        localStorage.setItem('piper-map-height', h.toString())
-        return h
-      })
-    }
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing])
 
   // Calculate days away
   const today = new Date()
@@ -3354,7 +3405,10 @@ function OverviewPanel({
           </div>
 
           {/* Stays Logged */}
-          <div className="flex flex-col items-center justify-center gap-[8px]">
+          <div
+            className="flex flex-col items-center justify-center gap-[8px] hover:bg-neutral-50 transition-colors cursor-pointer"
+            onClick={() => onTabChange('stays')}
+          >
             <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
             <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
           </div>
@@ -3410,83 +3464,12 @@ function OverviewPanel({
 
       <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
-      {/* Right Panel - Map + Stays */}
+      {/* Right Panel - Full-height Map */}
       <ResizablePanel className="flex flex-col overflow-hidden">
-        <div ref={rightPanelRef} className="flex flex-col h-full">
-          {/* Map Panel - Resizable height */}
-          <div
-            className="flex-shrink-0"
-            style={{ height: mapHeight }}
-          >
-            <DestinationsMap
-              locations={trip.locations}
-              hoveredIndex={hoveredLocationIndex}
-            />
-          </div>
-
-          {/* Stays Panel - Takes remaining space */}
-          <div className="flex-1 flex flex-col min-h-0 bg-white">
-            {trip.accommodations.length === 0 ? (
-              /* Empty State - No header, just centered content with resize handle */
-              <div className="flex-1 flex flex-col relative group">
-                {/* Resize Handle - pill at top */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center z-10"
-                  onMouseDown={handleMouseDown}
-                >
-                  <div className={cn(
-                    "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
-                    isResizing && "opacity-100"
-                  )} />
-                </div>
-                <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white">
-                  <div className="text-center">
-                    <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
-                    <p className="text-body text-text-secondary mt-1">Add your hotels, Airbnbs, or other accommodations</p>
-                  </div>
-                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
-                    New stay
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              /* Non-empty State - Header + List */
-              <>
-                {/* Stays Header with Resize Handle */}
-                <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
-                  {/* Resize Handle - pill at top of header */}
-                  <div
-                    className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
-                    onMouseDown={handleMouseDown}
-                  >
-                    <div className={cn(
-                      "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
-                      isResizing && "opacity-100"
-                    )} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-h2 text-text-primary">Stays</span>
-                    <span className="text-body text-text-secondary">
-                      {trip.accommodations.length} {trip.accommodations.length === 1 ? 'stay' : 'stays'} across {new Set(trip.accommodations.map(a => a.locationId)).size} {new Set(trip.accommodations.map(a => a.locationId)).size === 1 ? 'destination' : 'destinations'}
-                    </span>
-                  </div>
-                  <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
-                    New stay
-                  </Button>
-                </div>
-
-                {/* Stays List */}
-                <div className="flex-1 overflow-auto">
-                  <OverviewStaysList
-                    trip={trip}
-                    onOpenStayDrawer={onOpenStayDrawer}
-                    onRefresh={onRefresh}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <DestinationsMap
+          locations={trip.locations}
+          hoveredIndex={hoveredLocationIndex}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   )
@@ -3581,77 +3564,27 @@ function DestinationCard({
   )
 }
 
-// Stays Panel Component
-function StaysPanel({
-  trip,
-  onOpenAccommodationDialog,
-  onDeleteAccommodation
-}: {
-  trip: TripWithOwnership
-  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
-  onDeleteAccommodation: (id: string) => Promise<void>
-}) {
-  if (trip.accommodations.length === 0) {
-    return (
-      <div className="py-8 flex items-center justify-center">
-        <span className="text-body text-text-secondary">No stays logged yet</span>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {trip.accommodations.map(accommodation => {
-        const location = trip.locations.find(l => l.id === accommodation.locationId)
-        const checkIn = parseLocalDate(accommodation.checkIn)
-        const checkOut = parseLocalDate(accommodation.checkOut)
-        const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' })
-        const inMonth = monthFormat.format(checkIn).toUpperCase()
-        const outMonth = monthFormat.format(checkOut).toUpperCase()
-        const inDay = String(checkIn.getDate()).padStart(2, '0')
-        const outDay = String(checkOut.getDate()).padStart(2, '0')
-        const dateRange = `${inMonth} ${inDay} — ${outMonth} ${outDay}`
-
-        return (
-          <div
-            key={accommodation.id}
-            className="p-4 border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer"
-            onClick={() => onOpenAccommodationDialog(accommodation)}
-          >
-            {/* Row 1: Location badge + Date range */}
-            <div className="flex items-center justify-between">
-              {location && (
-                <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
-                  {location.name}
-                </Badge>
-              )}
-              <span className="text-mono-small text-text-secondary">{dateRange}</span>
-            </div>
-            {/* Row 2: Name + Address (12px gap from row 1) */}
-            <div className="mt-3">
-              <p className="text-h3 text-text-primary">{accommodation.name}</p>
-              <p className="text-body text-text-secondary">{accommodation.address}</p>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // Overview Stays List Component (for right panel)
 function OverviewStaysList({
   trip,
   onOpenStayDrawer,
-  onRefresh
+  onRefresh,
+  onHoverStay
 }: {
   trip: TripWithOwnership
   onOpenStayDrawer: (accommodation: Accommodation) => void
   onRefresh: () => Promise<void>
+  onHoverStay?: (index: number | null) => void
 }) {
+  // Sort by checkIn to match the map marker order (DestinationsMap sorts by startDate)
+  const sorted = useMemo(() =>
+    [...trip.accommodations].sort((a, b) => a.checkIn.localeCompare(b.checkIn)),
+    [trip.accommodations]
+  )
+
   return (
     <div>
-      {trip.accommodations.map(accommodation => {
+      {sorted.map((accommodation, index) => {
         const location = trip.locations.find(l => l.id === accommodation.locationId)
         return (
           <StayCard
@@ -3661,6 +3594,8 @@ function OverviewStaysList({
             location={location}
             onClick={() => onOpenStayDrawer(accommodation)}
             onRefresh={onRefresh}
+            onHover={() => onHoverStay?.(index)}
+            onLeave={() => onHoverStay?.(null)}
           />
         )
       })}
@@ -3674,13 +3609,17 @@ function StayCard({
   accommodation,
   location,
   onClick,
-  onRefresh
+  onRefresh,
+  onHover,
+  onLeave,
 }: {
   tripId: string
   accommodation: Accommodation
   location?: Location
   onClick: () => void
   onRefresh: () => Promise<void>
+  onHover?: () => void
+  onLeave?: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
@@ -3710,6 +3649,8 @@ function StayCard({
     <div
       className="group flex hover:bg-neutral-50 transition-colors border-b border-neutral-200 cursor-pointer"
       onClick={onClick}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
     >
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
       <PlacePhoto

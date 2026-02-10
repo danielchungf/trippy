@@ -17,7 +17,7 @@ const NakedIconButton = React.forwardRef<HTMLButtonElement, NakedIconButtonProps
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "disabled:pointer-events-none disabled:opacity-50",
           selected
-            ? "text-text-primary"
+            ? "text-text-primary hover:bg-neutral-100"
             : "text-text-secondary hover:bg-neutral-100 hover:text-text-primary",
           className
         )}

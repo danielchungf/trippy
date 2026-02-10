@@ -613,19 +613,8 @@ function HomeSidebar({
         />
       </div>
 
-      {/* Middle: Navigation icons */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-2">
-        <NakedIconButton
-          icon={<Plane fill={activeView === 'trips' ? "currentColor" : "none"} />}
-          selected={activeView === 'trips'}
-          onClick={() => onViewChange('trips')}
-        />
-        <NakedIconButton
-          icon={<CalendarIcon className="w-5 h-5" />}
-          selected={activeView === 'calendar'}
-          onClick={() => onViewChange('calendar')}
-        />
-      </div>
+      {/* Middle: Empty for now */}
+      <div className="flex-1" />
 
       {/* Bottom: User Menu */}
       <div className="flex justify-center">
