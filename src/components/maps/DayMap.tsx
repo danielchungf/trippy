@@ -170,7 +170,7 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
         position,
         title: activity.title,
         content: markerContent,
-        zIndex: 10 // Above saved place markers
+        zIndex: 100 // Above saved place markers and POI labels
       })
 
       markersRef.current.push(marker)

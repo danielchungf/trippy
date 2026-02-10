@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/client'
-import { Trip, Location, Accommodation, SavedPlace, Day, Activity, PackingItem, generateDaysFromTrip } from '@/types'
+import { Trip, Location, Accommodation, SavedPlace, Day, Activity, PackingItem, Expense, ExchangeRate, generateDaysFromTrip } from '@/types'
 import { PackingItemRow, rowToPackingItem } from './packing-items'
+import { ExpenseRow, rowToExpense } from './expenses'
+import { ExchangeRateRow, rowToExchangeRate } from './exchange-rates'
 
 // Database row types (matching Supabase schema)
 interface TripRow {
@@ -13,6 +15,7 @@ interface TripRow {
   cover_image_focus_x: number | null
   cover_image_focus_y: number | null
   color: string | null
+  home_currency: string
   created_at: string
   updated_at: string
 }
@@ -206,12 +209,14 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
   // Fetch all related data in parallel
   const tripIds = tripRows.map(t => t.id)
 
-  const [locationsResult, accommodationsResult, savedPlacesResult, packingItemsResult, daysResult] = await Promise.all([
+  const [locationsResult, accommodationsResult, savedPlacesResult, packingItemsResult, daysResult, expensesResult, exchangeRatesResult] = await Promise.all([
     supabase.from('locations').select('*').in('trip_id', tripIds),
     supabase.from('accommodations').select('*').in('trip_id', tripIds),
     supabase.from('saved_places').select('*').in('trip_id', tripIds),
     supabase.from('packing_items').select('*').in('trip_id', tripIds).order('sort_order'),
     supabase.from('days').select('*').in('trip_id', tripIds),
+    supabase.from('expenses').select('*').in('trip_id', tripIds).order('date', { ascending: false }),
+    supabase.from('trip_exchange_rates').select('*').in('trip_id', tripIds),
   ])
 
   // Fetch activities for all days
@@ -237,6 +242,14 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
     const packingItems = (packingItemsResult.data || [])
       .filter((p: PackingItemRow) => p.trip_id === tripRow.id)
       .map(rowToPackingItem)
+
+    const expenses = (expensesResult.data || [])
+      .filter((e: ExpenseRow) => e.trip_id === tripRow.id)
+      .map(rowToExpense)
+
+    const exchangeRates = (exchangeRatesResult.data || [])
+      .filter((r: ExchangeRateRow) => r.trip_id === tripRow.id)
+      .map(rowToExchangeRate)
 
     const dayRows = (daysResult.data || [])
       .filter((d: DayRow) => d.trip_id === tripRow.id)
@@ -267,6 +280,9 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
       accommodations,
       savedPlaces,
       packingItems,
+      expenses,
+      exchangeRates,
+      homeCurrency: tripRow.home_currency || 'USD',
       days,
       isOwner: tripRow.owner_id === user.id,
     }
@@ -315,12 +331,14 @@ export async function getTrip(id: string): Promise<TripWithOwnership | undefined
   }
 
   // Fetch all related data in parallel
-  const [locationsResult, accommodationsResult, savedPlacesResult, packingItemsResult, daysResult] = await Promise.all([
+  const [locationsResult, accommodationsResult, savedPlacesResult, packingItemsResult, daysResult, expensesResult, exchangeRatesResult] = await Promise.all([
     supabase.from('locations').select('*').eq('trip_id', id),
     supabase.from('accommodations').select('*').eq('trip_id', id),
     supabase.from('saved_places').select('*').eq('trip_id', id),
     supabase.from('packing_items').select('*').eq('trip_id', id).order('sort_order'),
     supabase.from('days').select('*').eq('trip_id', id),
+    supabase.from('expenses').select('*').eq('trip_id', id).order('date', { ascending: false }),
+    supabase.from('trip_exchange_rates').select('*').eq('trip_id', id),
   ])
 
   // Fetch activities for all days
@@ -333,6 +351,8 @@ export async function getTrip(id: string): Promise<TripWithOwnership | undefined
   const accommodations = (accommodationsResult.data || []).map(rowToAccommodation)
   const savedPlaces = (savedPlacesResult.data || []).map(rowToSavedPlace)
   const packingItems = (packingItemsResult.data || []).map(rowToPackingItem)
+  const expenses = (expensesResult.data || []).map(rowToExpense)
+  const exchangeRates = (exchangeRatesResult.data || []).map(rowToExchangeRate)
 
   const days: Day[] = (daysResult.data || []).map((dayRow: DayRow) => {
     const activities = (activitiesResult.data || [])
@@ -360,6 +380,9 @@ export async function getTrip(id: string): Promise<TripWithOwnership | undefined
     accommodations,
     savedPlaces,
     packingItems,
+    expenses,
+    exchangeRates,
+    homeCurrency: tripRow.home_currency || 'USD',
     days,
     isOwner,
   }
@@ -420,6 +443,9 @@ export async function createTrip(data: {
     accommodations: [],
     savedPlaces: [],
     packingItems: [],
+    expenses: [],
+    exchangeRates: [],
+    homeCurrency: 'USD',
     days: [],
   }
 
@@ -460,6 +486,7 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
   if (data.coverImageFocusX !== undefined) updateData.cover_image_focus_x = data.coverImageFocusX
   if (data.coverImageFocusY !== undefined) updateData.cover_image_focus_y = data.coverImageFocusY
   if (data.color !== undefined) updateData.color = data.color || null
+  if (data.homeCurrency !== undefined) updateData.home_currency = data.homeCurrency
 
   const { data: tripRow, error } = await supabase
     .from('trips')
