@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { Settings } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
@@ -24,6 +25,7 @@ import { ImageUploadField } from "@/components/ui/image-upload-field"
 import { LOCATION_COLORS, parseLocalDate, formatLocalDate } from "@/types"
 import { updateTrip, deleteTrip } from "@/lib/db"
 import { uploadTripCoverImage, deleteTripCoverImage, ImageUploadError } from "@/lib/storage/image-upload"
+import { tripKeys } from "@/lib/hooks/use-trips"
 
 interface EditTripDialogProps {
   tripId: string
@@ -51,6 +53,7 @@ export function EditTripDialog({
   onUpdate,
 }: EditTripDialogProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [showDateShortenAlert, setShowDateShortenAlert] = useState(false)
@@ -151,7 +154,7 @@ export function EditTripDialog({
         newCoverImageUrl = undefined
       }
 
-      await updateTrip(tripId, {
+      const result = await updateTrip(tripId, {
         name: name.trim(),
         color,
         coverImage: newCoverImageUrl,
@@ -161,10 +164,16 @@ export function EditTripDialog({
         endDate: formatLocalDate(dateRange.to),
       })
 
+      if (!result) {
+        setUploadError("Failed to save trip. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      await onUpdate()
       setLoading(false)
       setOpen(false)
       setShowDateShortenAlert(false)
-      await onUpdate()
     } catch {
       setUploadError("Failed to save trip. Please try again.")
       setLoading(false)
@@ -195,6 +204,8 @@ export function EditTripDialog({
     setLoading(false)
 
     if (success) {
+      queryClient.removeQueries({ queryKey: tripKeys.detail(tripId) })
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
       setShowDeleteAlert(false)
       setOpen(false)
       router.push("/")
