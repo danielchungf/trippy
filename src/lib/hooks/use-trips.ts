@@ -103,6 +103,9 @@ export function useRefreshTrip(id: string) {
   const queryClient = useQueryClient()
 
   return async () => {
-    await queryClient.invalidateQueries({ queryKey: tripKeys.detail(id) })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: tripKeys.detail(id) }),
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists(), refetchType: 'all' }),
+    ])
   }
 }
