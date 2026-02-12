@@ -208,9 +208,9 @@ export function ImportPlacesDialog({
           <div className="bg-white rounded-lg w-[700px] h-[676px] flex flex-col shadow-lg">
             {/* Show upload step if no file loaded, otherwise show selection step */}
             {places.length === 0 ? (
-              <div className="flex flex-col h-full p-5">
+              <div className="flex flex-col h-full">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-4 border-b border-border-muted flex-shrink-0">
                   <h1 className="text-h1 text-text-primary">Import Google Maps places</h1>
                   <NakedIconButton
                     icon={<X />}
@@ -218,8 +218,9 @@ export function ImportPlacesDialog({
                   />
                 </div>
 
-                {/* Description */}
-                <div className="mt-5">
+                {/* Content */}
+                <div className="flex flex-col flex-1 overflow-auto p-4">
+                <div>
                   <p className="text-body text-text-secondary">
                     Good news! You can import all your saved places from Google Maps using a CSV file.
                   </p>
@@ -308,11 +309,12 @@ export function ImportPlacesDialog({
                 {uploadError && (
                   <p className="text-body text-red-600 mt-3">{uploadError}</p>
                 )}
+                </div>
               </div>
             ) : (
               <div className="flex flex-col h-full overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-5 flex-shrink-0">
+                <div className="flex items-center justify-between p-4 border-b border-border-muted flex-shrink-0">
                   <h1 className="text-h1 text-text-primary">Select places to import</h1>
                   <NakedIconButton
                     icon={<X />}
@@ -321,7 +323,7 @@ export function ImportPlacesDialog({
                 </div>
 
                 {/* Selection controls row */}
-                <div className="flex items-center justify-between px-5 py-4 border-t border-b border-neutral-200 flex-shrink-0">
+                <div className="flex items-center justify-between px-4 py-4 border-b border-border-muted flex-shrink-0">
                   <div className="flex gap-2">
                     <Button variant="secondary" size="small" onClick={handleSelectAll}>
                       Select all
@@ -338,7 +340,7 @@ export function ImportPlacesDialog({
                 {/* List with checkboxes and category dropdowns */}
                 <div className="flex-1 overflow-hidden">
                   <div
-                    className="h-full overflow-y-scroll overscroll-contain px-5 py-4"
+                    className="h-full overflow-y-scroll overscroll-contain px-4 py-4"
                     style={{ touchAction: 'pan-y' }}
                   >
                     {places.map((item, index) => (
@@ -384,7 +386,7 @@ export function ImportPlacesDialog({
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-between items-center px-5 py-5 border-t border-neutral-200 flex-shrink-0">
+                <div className="flex justify-between items-center p-4 border-t border-border-muted flex-shrink-0">
                   <Button variant="secondary" size="small" leftIcon={<ArrowLeft />} onClick={handleClearFile}>
                     Back
                   </Button>
