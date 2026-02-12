@@ -1775,13 +1775,12 @@ function PlacesRightPanel({
             className="border-r border-neutral-200 flex flex-col overflow-hidden"
           >
             {/* Scrollable Places List or Empty State */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto flex flex-col">
               {totalPlaceCount === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center gap-2">
-                  <Button variant="secondary" size="small" leftIcon={<Upload />} onClick={() => setIsImportDialogOpen(true)}>
-                    Import from CSV
-                  </Button>
-                  <Button size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+                <div className="flex-1 flex flex-col items-center justify-center gap-0">
+                  <h2 className="text-h2 text-text-primary">Got any must-visits?</h2>
+                  <p className="text-body text-text-secondary text-center">Save restaurants, landmarks, or anything<br />you don't want to miss.</p>
+                  <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()} className="mt-[20px]">
                     New place
                   </Button>
                 </div>
@@ -1835,13 +1834,12 @@ function PlacesRightPanel({
         /* Grid View (original) */
         <div className="flex-1 flex flex-col min-h-0">
           {/* Grid or Empty State */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto flex flex-col">
             {totalPlaceCount === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-2">
-                <Button variant="secondary" size="small" leftIcon={<Upload />} onClick={() => setIsImportDialogOpen(true)}>
-                  Import from CSV
-                </Button>
-                <Button size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+              <div className="flex-1 flex flex-col items-center justify-center gap-0">
+                <h2 className="text-h2 text-text-primary">Got any must-visits?</h2>
+                <p className="text-body text-text-secondary">Save restaurants, landmarks, or anything you don't want to miss.</p>
+                <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()} className="mt-[20px]">
                   New place
                 </Button>
               </div>
@@ -3067,17 +3065,14 @@ function ItineraryPanel({
           </PopoverContent>
         </Popover>
 
-        {/* Only show view toggle when there are activities */}
-        {totalActivities > 0 && (
-          <SegmentedControl
-            value={viewMode}
-            onChange={setViewMode}
-            options={[
-              { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
-              { value: 'timeline', icon: <ScrollText className="h-4 w-4" /> },
-            ]}
-          />
-        )}
+        <SegmentedControl
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+            { value: 'timeline', icon: <ScrollText className="h-4 w-4" /> },
+          ]}
+        />
       </div>
 
       {/* Day Cards */}
@@ -3255,12 +3250,10 @@ function StaysPanel({
 }) {
   if (trip.accommodations.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white">
-        <div className="text-center">
-          <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
-          <p className="text-body text-text-secondary mt-1">Add your hotels, Airbnbs, or other accommodations</p>
-        </div>
-        <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()}>
+      <div className="flex-1 flex flex-col items-center justify-center gap-0 bg-white">
+        <h2 className="text-h2 text-text-primary">Where are you staying?</h2>
+        <p className="text-body text-text-secondary">Add your hotels, Airbnbs, or other accommodations</p>
+        <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenAccommodationDialog()} className="mt-[20px]">
           New stay
         </Button>
       </div>
@@ -3398,27 +3391,31 @@ function OverviewPanel({
         </div>
 
         {/* Scrollable content area */}
-        <div className="flex-1 overflow-auto">
-          {/* Destinations Header */}
-          <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
-            <SegmentedControl
-              value={destinationsViewMode}
-              onChange={setDestinationsViewMode}
-              options={[
-                { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
-                { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
-              ]}
-            />
-            <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
-              New destination
-            </Button>
-          </div>
+        <div className="flex-1 overflow-auto flex flex-col">
+          {/* Destinations Header - hidden when empty */}
+          {sortedLocations.length > 0 && (
+            <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <SegmentedControl
+                value={destinationsViewMode}
+                onChange={setDestinationsViewMode}
+                options={[
+                  { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+                  { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
+                ]}
+              />
+              <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+                New destination
+              </Button>
+            </div>
+          )}
 
           {/* Destinations List / Calendar */}
           {sortedLocations.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center">
-              <Button variant="secondary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
-                Add your first destination
+            <div className="flex-1 flex flex-col items-center justify-center gap-0">
+              <h2 className="text-h2 text-text-primary">Where are you going?</h2>
+              <p className="text-body text-text-secondary">Add the cities or countries you're planning to visit.</p>
+              <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()} className="mt-[20px]">
+                Add destination
               </Button>
             </div>
           ) : destinationsViewMode === 'calendar' ? (
