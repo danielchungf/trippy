@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { updateAccommodation, updateSavedPlace, updateLocation } from "@/lib/db"
+import { usePlaceDetails, useInvalidatePlacePhotos } from "@/lib/hooks/use-places"
 
 type EntityType = 'accommodation' | 'savedPlace' | 'location'
 
@@ -33,9 +34,6 @@ interface PlacePhotoProps {
   }
 }
 
-// Cache for fetched photos to avoid redundant API calls
-const photoCache = new Map<string, string[]>()
-
 export function PlacePhoto({
   googlePlaceId,
   photos: preloadedPhotos,
@@ -51,6 +49,11 @@ export function PlacePhoto({
   const [photoIndex, setPhotoIndex] = useState(selectedPhotoIndex)
   const [needsFresh, setNeedsFresh] = useState(false)
 
+  // Fetch photos via React Query — only when no preloaded photos or URLs expired
+  const shouldFetch = !preloadedPhotos?.length || needsFresh
+  const { data: placeDetails } = usePlaceDetails(shouldFetch ? googlePlaceId : undefined)
+  const invalidatePhotos = useInvalidatePlacePhotos()
+
   // Sync photoIndex when selectedPhotoIndex prop changes
   useEffect(() => {
     setPhotoIndex(selectedPhotoIndex)
@@ -63,42 +66,21 @@ export function PlacePhoto({
     }
   }, [preloadedPhotos, needsFresh])
 
-  // Fetch fresh photos from Google Places API when:
-  // - No preloaded photos available, OR
-  // - Preloaded photos failed to load (expired URLs return 403)
+  // Sync photos from React Query result
   useEffect(() => {
-    const shouldFetch = !preloadedPhotos?.length || needsFresh
-    if (!shouldFetch) return
-    if (!googlePlaceId) return
-
-    // Check session cache first
-    const cached = photoCache.get(googlePlaceId)
-    if (cached) {
-      setPhotos(cached)
-      return
+    if (placeDetails?.photos && placeDetails.photos.length > 0) {
+      setPhotos(placeDetails.photos)
     }
-
-    import('@/lib/maps').then(({ getPlaceDetails }) => {
-      getPlaceDetails(googlePlaceId).then(details => {
-        if (details?.photos && details.photos.length > 0) {
-          photoCache.set(googlePlaceId, details.photos)
-          setPhotos(details.photos)
-        }
-      }).catch(() => {
-        // Silently fail - no photos available
-      })
-    })
-  }, [googlePlaceId, preloadedPhotos, needsFresh])
+  }, [placeDetails])
 
   // Handle image load error (expired Google Places URLs return 403)
   const handleImageError = useCallback(() => {
     if (!needsFresh && googlePlaceId) {
-      // Clear stale cache and fetch fresh photos
-      photoCache.delete(googlePlaceId)
+      invalidatePhotos(googlePlaceId)
       setPhotos([])
       setNeedsFresh(true)
     }
-  }, [needsFresh, googlePlaceId])
+  }, [needsFresh, googlePlaceId, invalidatePhotos])
 
   // Save photo selection to database based on entity type
   const savePhotoIndex = useCallback(async (newIndex: number) => {

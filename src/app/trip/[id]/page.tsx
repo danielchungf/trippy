@@ -51,7 +51,6 @@ import {
   CalendarClock,
   CalendarRange,
   Replace,
-  Upload,
   // Category icons
   Soup,
   Coffee,
@@ -108,7 +107,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PlaceSearch } from "@/components/maps/PlaceSearch"
-import { PlaceSearchResult, optimizeRoute, searchPlaces, getPlaceDetails, findPlaceByQuery } from "@/lib/maps"
+import { PlaceSearchResult, optimizeRoute } from "@/lib/maps"
 import { Coordinates } from "@/types"
 import {
   Day,
@@ -158,8 +157,6 @@ import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
 import { SelectField } from "@/components/ui/select-field"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { StayDrawer } from "@/components/trip/StayDrawer"
-import { ImportPlacesDialog, PlaceToImport } from "@/components/trip/ImportPlacesDialog"
-import { matchLocationByAddress, extractCoordinatesFromUrl, extractPlaceIdFromUrl, extractPlaceNameFromUrl } from "@/lib/csv-import"
 import { DayMap } from "@/components/maps/DayMap"
 import { DestinationsMap } from "@/components/maps/DestinationsMap"
 import { PlacePhoto } from "@/components/PlacePhoto"
@@ -1305,15 +1302,6 @@ function PlacesRightPanel({
     dayDate: string
   } | null>(null)
 
-  // Import dialog state
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
-
-  // Import progress state
-  const [importProgress, setImportProgress] = useState<{
-    current: number
-    total: number
-    currentName: string
-  } | null>(null)
 
   // Get unique locations from places (including null for places without a location)
   const locationsInPlaces = useMemo(() => {
@@ -1443,132 +1431,6 @@ function PlacesRightPanel({
     return selectedLocationIds.has(locationId)
   }
 
-  // Handle starting the import process
-  const handleStartImport = async (placesToImport: PlaceToImport[]) => {
-    setImportProgress({ current: 0, total: placesToImport.length, currentName: '' })
-
-    for (let i = 0; i < placesToImport.length; i++) {
-      const { place, category } = placesToImport[i]
-
-      setImportProgress({
-        current: i + 1,
-        total: placesToImport.length,
-        currentName: place.name,
-      })
-
-      try {
-        // Try multiple strategies to find the exact place:
-        // 1. Use Find Place API with the place name from URL (most reliable for known places)
-        // 2. Extract coordinates and search with precise matching
-        // 3. Try place_id if available in URL
-        // NO FALLBACK to generic name search - it returns wrong results
-
-        let placeResult: PlaceSearchResult | null = null
-
-        // Extract place name from URL - this is the most reliable identifier
-        const urlPlaceName = extractPlaceNameFromUrl(place.url)
-        console.log('[Import Debug] URL:', place.url)
-        console.log('[Import Debug] Extracted place name from URL:', urlPlaceName)
-
-        // Get trip locations for search context
-        const locationNames = trip.locations.map(loc => loc.name)
-        console.log('[Import Debug] Trip locations:', locationNames)
-
-        // Strategy 1: Use Find Place API with each trip location as context
-        // Try each location until we find the place
-        if (!placeResult && urlPlaceName) {
-          for (const locationName of locationNames) {
-            const query = `${urlPlaceName} ${locationName}`
-            console.log('[Import Debug] Trying findPlaceByQuery:', query)
-            placeResult = await findPlaceByQuery(query)
-            if (placeResult) {
-              console.log('[Import Debug] Found with location:', locationName, '->', placeResult.name, placeResult.address)
-              break
-            }
-          }
-        }
-
-        // Strategy 2: Try coordinates-based search if we have them
-        if (!placeResult) {
-          const coordinates = extractCoordinatesFromUrl(place.url)
-          console.log('[Import Debug] Extracted coordinates:', coordinates)
-
-          if (coordinates) {
-            const searchQuery = urlPlaceName || place.name
-            console.log('[Import Debug] Searching with coordinates:', searchQuery)
-
-            const searchResults = await searchPlaces(
-              searchQuery,
-              coordinates,
-              true // preciseMatch: strictly filter to within 500m
-            )
-            console.log('[Import Debug] Search results after filtering:', searchResults.length)
-
-            if (searchResults.length > 0) {
-              placeResult = searchResults[0]
-              console.log('[Import Debug] Found via coordinate search:', placeResult.name, placeResult.address)
-            }
-          }
-        }
-
-        // Strategy 3: Try place_id if available (feature ID format)
-        if (!placeResult) {
-          const placeId = extractPlaceIdFromUrl(place.url)
-          if (placeId && !placeId.startsWith('0x')) {
-            // Only use standard ChIJ... format place IDs, not feature IDs
-            console.log('[Import Debug] Trying place_id:', placeId)
-            placeResult = await getPlaceDetails(placeId)
-            if (placeResult) {
-              console.log('[Import Debug] Found via place_id:', placeResult.name)
-            }
-          }
-        }
-
-        // NO FALLBACK - if we can't find the place reliably, skip it
-        // This prevents importing wrong places from user's current location
-        if (!placeResult) {
-          console.log('[Import Debug] Skipping place - could not find reliably:', place.name)
-          continue
-        }
-
-        // Match location by address
-        const locationId = matchLocationByAddress(placeResult.address, trip.locations)
-
-        // Check for duplicates
-        const isDuplicate = trip.savedPlaces.some(
-          p => p.googlePlaceId === placeResult.placeId ||
-               (p.name.toLowerCase() === placeResult.name.toLowerCase() &&
-                p.address.toLowerCase() === placeResult.address.toLowerCase())
-        )
-        if (isDuplicate) continue
-
-        // Add to database
-        await addSavedPlace(trip.id, {
-          name: placeResult.name,
-          googlePlaceId: placeResult.placeId,
-          address: placeResult.address,
-          coordinates: placeResult.coordinates,
-          category: category || 'other',
-          notes: place.note || undefined,
-          locationId,
-        })
-
-        // Refresh to show new place in list
-        await onRefresh()
-
-      } catch (err) {
-        // Continue with next place on error
-        console.error('Failed to import place:', place.name, err)
-      }
-
-      // Small delay to avoid rate limiting
-      if (i < placesToImport.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200))
-      }
-    }
-
-    setImportProgress(null)
-  }
 
   return (
     <div className="h-full flex flex-col relative">
@@ -1717,14 +1579,6 @@ function PlacesRightPanel({
             {filteredPlaceCount}/{totalPlaceCount} PLACES
           </span>
           <Button
-            variant="secondary"
-            size="small"
-            leftIcon={<Upload />}
-            onClick={() => setIsImportDialogOpen(true)}
-          >
-            Import
-          </Button>
-          <Button
             variant="primary"
             size="small"
             leftIcon={<Plus />}
@@ -1734,34 +1588,6 @@ function PlacesRightPanel({
           </Button>
         </div>
       </div>
-
-      {/* Import Places Dialog */}
-      <ImportPlacesDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-        onStartImport={handleStartImport}
-      />
-
-      {/* Import Progress Banner */}
-      {importProgress && (
-        <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-md border border-neutral-200 p-4 z-10 w-[320px]">
-          <span className="text-h3 text-text-primary">Importing places...</span>
-          <div className="w-full bg-neutral-100 rounded-full h-1 mt-2">
-            <div
-              className="bg-neutral-800 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-body text-text-secondary truncate flex-1 min-w-0 mr-2">
-              {importProgress.currentName}
-            </span>
-            <span className="text-mono-regular text-text-secondary flex-shrink-0">
-              {importProgress.current}/{importProgress.total}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Content */}
       {showMapView ? (

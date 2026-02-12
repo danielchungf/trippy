@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react"
 import {
   MapPin,
-  Phone,
-  Globe,
   SquarePen,
   Trash2,
   X,
@@ -23,7 +21,6 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { PlacePhoto } from "@/components/PlacePhoto"
 import { Accommodation, Location, parseLocalDate } from "@/types"
-import { getPlaceDetailsExtended, PlaceDetailsExtended } from "@/lib/maps"
 import { deleteAccommodation, updateAccommodation } from "@/lib/db"
 
 interface StayDrawerProps {
@@ -68,9 +65,6 @@ export function StayDrawer({
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Google details state
-  const [googleDetails, setGoogleDetails] = useState<PlaceDetailsExtended | null>(null)
-
   // Editable fields state
   const [notes, setNotes] = useState(accommodation?.notes || "")
 
@@ -83,21 +77,6 @@ export function StayDrawer({
   const location = accommodation?.locationId
     ? locations.find(l => l.id === accommodation.locationId)
     : undefined
-
-  // Fetch extended Google details when drawer opens
-  useEffect(() => {
-    if (open && accommodation?.googlePlaceId) {
-      getPlaceDetailsExtended(accommodation.googlePlaceId)
-        .then(details => {
-          setGoogleDetails(details)
-        })
-        .catch(() => {
-          // Silently fail - just don't show extended details
-        })
-    } else {
-      setGoogleDetails(null)
-    }
-  }, [open, accommodation?.googlePlaceId])
 
   const handleDelete = async () => {
     if (!accommodation) return
@@ -205,30 +184,6 @@ export function StayDrawer({
                         <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5">
                           <MapPin className="w-4 h-4" />
                           Google Maps
-                        </a>
-                      </Button>
-                    )}
-                    {googleDetails?.website && (
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        asChild
-                      >
-                        <a href={googleDetails.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5">
-                          <Globe className="w-4 h-4" />
-                          Website
-                        </a>
-                      </Button>
-                    )}
-                    {googleDetails?.phoneNumber && (
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        asChild
-                      >
-                        <a href={`tel:${googleDetails.phoneNumber}`} className="inline-flex items-center gap-1.5">
-                          <Phone className="w-4 h-4" />
-                          Call
                         </a>
                       </Button>
                     )}
