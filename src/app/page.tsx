@@ -499,10 +499,13 @@ function HomeSidebar({
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
+  const queryClient = useQueryClient()
+
   const handleSignOut = async () => {
     setIsLoggingOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
+    queryClient.clear()
     router.push("/login")
     router.refresh()
   }
