@@ -5,7 +5,6 @@ import { Activity, SavedPlace } from "@/types"
 import { loadGoogleMaps, getDirections, formatDistance, formatDuration } from "@/lib/maps"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getPlaceDetails } from "@/lib/maps"
 import { MapPin, Footprints, Car, Plus } from "lucide-react"
 
 interface DayMapProps {
@@ -34,7 +33,6 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
   const [selectedSavedPlace, setSelectedSavedPlace] = useState<SavedPlace | null>(null)
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null)
-  const [popoverPhoto, setPopoverPhoto] = useState<string | null>(null)
 
   // Filter activities with valid coordinates - memoize to prevent unnecessary re-renders
   const validActivities = useMemo(() =>
@@ -62,24 +60,7 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
   const handleMapClick = useCallback(() => {
     setSelectedSavedPlace(null)
     setPopoverPosition(null)
-    setPopoverPhoto(null)
   }, [])
-
-  // Fetch photo when saved place is selected
-  useEffect(() => {
-    if (!selectedSavedPlace?.googlePlaceId) {
-      setPopoverPhoto(null)
-      return
-    }
-
-    getPlaceDetails(selectedSavedPlace.googlePlaceId).then(details => {
-      if (details?.photos?.[0]) {
-        setPopoverPhoto(details.photos[0])
-      }
-    }).catch(() => {
-      setPopoverPhoto(null)
-    })
-  }, [selectedSavedPlace])
 
   // Initialize map
   useEffect(() => {
@@ -520,21 +501,6 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
           style={{ left: popoverPosition.x, top: popoverPosition.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Photo - 16:9 aspect ratio */}
-          <div className="w-full aspect-video bg-neutral-100">
-            {popoverPhoto ? (
-              <img
-                src={popoverPhoto}
-                alt={selectedSavedPlace.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <MapPin className="h-6 w-6 text-neutral-300" />
-              </div>
-            )}
-          </div>
-
           {/* Info */}
           <div className="p-3 flex flex-col gap-2">
             <div className="text-h3 text-text-primary line-clamp-1">{selectedSavedPlace.name}</div>
@@ -547,7 +513,6 @@ export function DayMap({ activities, hoveredIndex, focusedIndex, savedPlaces, on
                 onAddPlaceAsActivity?.(selectedSavedPlace.id)
                 setSelectedSavedPlace(null)
                 setPopoverPosition(null)
-                setPopoverPhoto(null)
               }}
             >
               Add as activity

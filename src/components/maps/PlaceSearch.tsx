@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Search, MapPin, Star, Loader2, Navigation } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { TextField } from "@/components/ui/text-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { searchPlaces, geocodeAddress, getPlaceDetails, PlaceSearchResult } from "@/lib/maps"
+import { placeKeys } from "@/lib/hooks/use-places"
 import { Coordinates } from "@/types"
 
 interface PlaceSearchProps {
@@ -18,6 +20,7 @@ export function PlaceSearch({
   placeholder = "Search for a place...",
   centerLocation
 }: PlaceSearchProps) {
+  const queryClient = useQueryClient()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<PlaceSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -52,7 +55,11 @@ export function PlaceSearch({
     setError(null)
 
     try {
-      const places = await searchPlaces(searchQuery, centerLocation)
+      const places = await queryClient.fetchQuery({
+        queryKey: placeKeys.search(searchQuery, centerLocation?.lat, centerLocation?.lng),
+        queryFn: () => searchPlaces(searchQuery, centerLocation),
+        staleTime: 5 * 60 * 1000,
+      })
       setResults(places)
       // Always open dropdown if there's a query (to show "Use this address" option)
       setIsOpen(true)
@@ -108,7 +115,11 @@ export function PlaceSearch({
     if (place.placeId) {
       setIsFetchingDetails(true)
       try {
-        const details = await getPlaceDetails(place.placeId)
+        const details = await queryClient.fetchQuery({
+          queryKey: placeKeys.detail(place.placeId),
+          queryFn: () => getPlaceDetails(place.placeId),
+          staleTime: 20 * 60 * 1000,
+        })
         if (details) {
           onSelect(details)
         } else {
