@@ -60,7 +60,7 @@ DROP POLICY IF EXISTS "Users can view members of accessible trips" ON trip_membe
 CREATE POLICY "Users can view members of accessible trips" ON trip_members
   FOR SELECT USING (
     trip_id IN (SELECT get_accessible_trip_ids())
-    OR (invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) AND status = 'pending')
+    OR (invited_email = (auth.jwt() ->> 'email') AND status = 'pending')
   );
 
 DROP POLICY IF EXISTS "Trip owners can insert members" ON trip_members;
@@ -72,7 +72,7 @@ CREATE POLICY "Trip owners can insert members" ON trip_members
 DROP POLICY IF EXISTS "Users can update their own invites or manage as owner" ON trip_members;
 CREATE POLICY "Users can update their own invites or manage as owner" ON trip_members
   FOR UPDATE USING (
-    (invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) AND status = 'pending')
+    (invited_email = (auth.jwt() ->> 'email') AND status = 'pending')
     OR trip_id IN (SELECT id FROM trips WHERE owner_id = auth.uid())
   );
 

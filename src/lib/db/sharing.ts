@@ -37,15 +37,16 @@ export async function getTripMembers(tripId: string): Promise<TripMember[]> {
     .order('created_at', { ascending: true })
 
   if (error || !members) {
-    console.error('Error fetching trip members:', error)
+    console.error('Error fetching trip members:', JSON.stringify(error), 'data:', members)
     return []
   }
 
   return members.map(row => rowToTripMember(row))
 }
 
-// Invite a user by email
-export async function inviteMember(tripId: string, email: string): Promise<TripMember | null> {
+// Invite a user by email. If userId is provided (from search results),
+// the invite is immediately accepted so the user sees the trip right away.
+export async function inviteMember(tripId: string, email: string, userId?: string): Promise<TripMember | null> {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -57,30 +58,50 @@ export async function inviteMember(tripId: string, email: string): Promise<TripM
   // Check if this email is already a member or has a pending invite
   const { data: existingMember } = await supabase
     .from('trip_members')
-    .select('id')
+    .select('*')
     .eq('trip_id', tripId)
     .eq('invited_email', normalizedEmail)
     .single()
 
   if (existingMember) {
-    console.error('User already invited')
-    return null
+    // If already accepted, they're already an editor
+    if (existingMember.status === 'accepted') {
+      console.log('User is already an accepted editor')
+      return null
+    }
+
+    // If pending, re-activate: set user_id if we know it and mark accepted
+    if (existingMember.status === 'pending' && userId) {
+      const { data: updated, error: updateError } = await supabase
+        .from('trip_members')
+        .update({ user_id: userId, status: 'accepted' })
+        .eq('id', existingMember.id)
+        .select()
+        .single()
+
+      if (updateError || !updated) {
+        console.error('Error re-activating pending invite:', updateError)
+        return null
+      }
+
+      return rowToTripMember(updated)
+    }
+
+    // Pending but no userId - return existing record so UI can show it
+    return rowToTripMember(existingMember)
   }
 
-  // Check if a user with this email exists in auth.users
-  // We need to search for existing user by checking trip_members with matching user
-  // Since we can't directly query auth.users, we'll create a pending invite
-  // and it will be converted when the user logs in
-
+  // Create new invite
+  const isKnownUser = !!userId
   const { data: member, error } = await supabase
     .from('trip_members')
     .insert({
       trip_id: tripId,
-      user_id: null,
+      user_id: isKnownUser ? userId : null,
       role: 'editor',
       invited_by: user.id,
       invited_email: normalizedEmail,
-      status: 'pending',
+      status: isKnownUser ? 'accepted' : 'pending',
     })
     .select()
     .single()
