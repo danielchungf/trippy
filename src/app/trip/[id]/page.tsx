@@ -166,6 +166,8 @@ import { PlacePhoto } from "@/components/PlacePhoto"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { PlacesMap } from "@/components/maps/PlacesMap"
 import { ExpenseList } from "@/components/trip/ExpenseList"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { UserMenu } from "@/components/auth/UserMenu"
 import logo from "@/app/logo.png"
 
 // Tab types
@@ -251,6 +253,8 @@ export default function TripPage() {
     }
     return 500
   })
+
+  const isDesktop = useMediaQuery("(min-width: 1024px)")
 
   // Stays hover state (for map highlighting)
   const [hoveredStayIndex, setHoveredStayIndex] = useState<number | null>(null)
@@ -722,9 +726,18 @@ export default function TripPage() {
   )
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar onNavigateHome={() => router.push('/')} activeTab={activeTab} onTabChange={setActiveTab} />
+    <div className="h-screen bg-background flex flex-col lg:flex-row overflow-hidden">
+      {/* Desktop: Sidebar */}
+      <div className="hidden lg:flex">
+        <Sidebar onNavigateHome={() => router.push('/')} activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
+
+      {/* Mobile: Top navbar */}
+      <MobileTopNav
+        onNavigateHome={() => router.push('/')}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       {/* Main content */}
       {mainContent}
@@ -994,12 +1007,6 @@ function Sidebar({ onNavigateHome, activeTab, onTabChange }: {
           onClick={() => onTabChange('places')}
           className={activeTab !== 'places' ? 'text-text-tertiary hover:text-text-primary' : undefined}
         />
-        <NakedIconButton
-          icon={<PiggyBank />}
-          selected={activeTab === 'expenses'}
-          onClick={() => onTabChange('expenses')}
-          className={activeTab !== 'expenses' ? 'text-text-tertiary hover:text-text-primary' : undefined}
-        />
       </div>
 
       {/* Bottom: User Menu */}
@@ -1015,6 +1022,60 @@ function Sidebar({ onNavigateHome, activeTab, onTabChange }: {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+// Mobile Top Navigation Bar
+function MobileTopNav({ onNavigateHome, activeTab, onTabChange }: {
+  onNavigateHome: () => void
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
+}) {
+  return (
+    <div className="flex lg:hidden items-center h-[49px] border-b border-neutral-200 px-3 bg-background flex-shrink-0">
+      {/* Left: Logo/Home */}
+      <button
+        onClick={onNavigateHome}
+        className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-[8px] transition-colors hover:bg-neutral-100 flex-shrink-0"
+      >
+        <span className="w-[20px] h-[20px] flex items-center justify-center">
+          <Image src={logo} alt="Logo" width={20} height={20} />
+        </span>
+      </button>
+
+      {/* Center: Tab icons */}
+      <div className="flex-1 flex items-center justify-center gap-3">
+        <NakedIconButton
+          icon={<TicketsPlane />}
+          selected={activeTab === 'overview'}
+          onClick={() => onTabChange('overview')}
+          className={activeTab !== 'overview' ? 'text-text-tertiary' : undefined}
+        />
+        <NakedIconButton
+          icon={<BedDouble />}
+          selected={activeTab === 'stays'}
+          onClick={() => onTabChange('stays')}
+          className={activeTab !== 'stays' ? 'text-text-tertiary' : undefined}
+        />
+        <NakedIconButton
+          icon={<CalendarClock />}
+          selected={activeTab === 'itinerary'}
+          onClick={() => onTabChange('itinerary')}
+          className={activeTab !== 'itinerary' ? 'text-text-tertiary' : undefined}
+        />
+        <NakedIconButton
+          icon={<MapPinned />}
+          selected={activeTab === 'places'}
+          onClick={() => onTabChange('places')}
+          className={activeTab !== 'places' ? 'text-text-tertiary' : undefined}
+        />
+      </div>
+
+      {/* Right: User menu */}
+      <div className="flex-shrink-0">
+        <UserMenu />
       </div>
     </div>
   )
