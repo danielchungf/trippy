@@ -307,7 +307,7 @@ CREATE POLICY "Users can view members of accessible trips" ON trip_members
       SELECT trip_id FROM trip_members WHERE user_id = auth.uid() AND status = 'accepted'
     )
     -- Also allow users to see their own pending invites (for acceptPendingInvites)
-    OR (invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) AND status = 'pending')
+    OR (invited_email = (auth.jwt() ->> 'email') AND status = 'pending')
   );
 
 -- Only trip owners can invite members
@@ -325,7 +325,7 @@ DROP POLICY IF EXISTS "Users can update their own invites or manage as owner" ON
 CREATE POLICY "Users can update their own invites or manage as owner" ON trip_members
   FOR UPDATE USING (
     -- User accepting their own invite
-    (invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) AND status = 'pending')
+    (invited_email = (auth.jwt() ->> 'email') AND status = 'pending')
     -- Or trip owner managing members
     OR trip_id IN (
       SELECT id FROM trips WHERE owner_id = auth.uid()

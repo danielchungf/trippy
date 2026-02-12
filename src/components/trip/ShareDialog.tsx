@@ -147,16 +147,28 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
 
     setLoading(true)
 
-    const member = await inviteMember(tripId, emailToInvite)
+    const member = await inviteMember(tripId, emailToInvite, selectedUser?.id)
 
     if (member) {
-      setMembers([...members, member])
+      // Update or add the member in the list
+      const existingIndex = members.findIndex(m => m.id === member.id)
+      if (existingIndex >= 0) {
+        const updated = [...members]
+        updated[existingIndex] = member
+        setMembers(updated)
+      } else {
+        setMembers([...members, member])
+      }
       setSearchQuery("")
       setSelectedUser(null)
       const displayName = selectedUser?.name || emailToInvite
-      toast.success(`Invitation sent to ${displayName}`)
+      if (member.status === 'accepted') {
+        toast.success(`${displayName} added as editor`)
+      } else {
+        toast.success(`Invitation sent to ${displayName}`)
+      }
     } else {
-      toast.error("Failed to send invite. User may already be a member.")
+      toast.error("Failed to send invite. User may already be an editor.")
     }
 
     setLoading(false)
