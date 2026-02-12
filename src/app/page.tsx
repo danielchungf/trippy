@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Plus, MapPin, Plane, User as UserIcon, LogOut, CircleAlert, Calendar as CalendarIcon } from "lucide-react"
+import { Plus, MapPin, User as UserIcon, LogOut, CircleAlert } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
@@ -26,10 +26,6 @@ import { useTrips, useCreateTrip, tripKeys } from "@/lib/hooks/use-trips"
 import { useRealtimeInvites } from "@/lib/hooks/use-realtime-invites"
 import { useQueryClient } from "@tanstack/react-query"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { TripTabs, TripTabValue } from "@/components/home/TripTabs"
-import { MobileNavBar, MobileNavItem } from "@/components/home/MobileNavBar"
-import { NextTripCard as NextTripCardMobile } from "@/components/home/NextTripCard"
-import { SimpleTripCard } from "@/components/home/SimpleTripCard"
 import { UserMenu } from "@/components/auth/UserMenu"
 import { CalendarView } from "@/components/home/CalendarView"
 import { createClient } from "@/lib/supabase/client"
@@ -39,8 +35,6 @@ import type { User } from "@supabase/supabase-js"
 import logo from "@/app/logo.png"
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<TripTabValue>('upcoming')
-  const [mobileNavItem, setMobileNavItem] = useState<MobileNavItem>('home')
   const [desktopView, setDesktopView] = useState<'trips' | 'calendar'>('trips')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
@@ -195,23 +189,6 @@ export default function HomePage() {
   // Other upcoming trips (excluding the next one)
   const otherUpcomingTrips = upcomingTrips.slice(1)
 
-  // Filter trips based on active tab (for mobile trips view)
-  const filteredTrips = trips.filter(trip => {
-    const status = getTripStatus(trip)
-    if (activeTab === 'upcoming') {
-      return status === 'upcoming' || status === 'ongoing'
-    }
-    return status === 'past'
-  })
-
-  // Sort filtered trips
-  const sortedFilteredTrips = [...filteredTrips].sort((a, b) => {
-    if (activeTab === 'upcoming') {
-      return parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
-    }
-    return parseLocalDate(b.endDate).getTime() - parseLocalDate(a.endDate).getTime()
-  })
-
   return (
     <div className="min-h-screen bg-white">
       {isDesktop ? (
@@ -227,15 +204,10 @@ export default function HomePage() {
           onViewChange={setDesktopView}
         />
       ) : (
-        <MobileLayout
+        <MobileHomeLayout
           nextTrip={nextTrip}
           upcomingTrips={otherUpcomingTrips}
-          filteredTrips={sortedFilteredTrips}
-          allTrips={trips}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          mobileNavItem={mobileNavItem}
-          onNavItemChange={setMobileNavItem}
+          pastTrips={pastTrips}
           onCreateTrip={() => setIsCreateOpen(true)}
           user={user}
           isLoading={isLoading}
@@ -292,142 +264,37 @@ export default function HomePage() {
   )
 }
 
-function MobileLayout({
+function MobileHomeLayout({
   nextTrip,
   upcomingTrips,
-  filteredTrips,
-  allTrips,
-  activeTab,
-  onTabChange,
-  mobileNavItem,
-  onNavItemChange,
+  pastTrips,
   onCreateTrip,
   user,
   isLoading
 }: {
   nextTrip: TripWithOwnership | undefined
   upcomingTrips: TripWithOwnership[]
-  filteredTrips: TripWithOwnership[]
-  allTrips: TripWithOwnership[]
-  activeTab: TripTabValue
-  onTabChange: (tab: TripTabValue) => void
-  mobileNavItem: MobileNavItem
-  onNavItemChange: (item: MobileNavItem) => void
+  pastTrips: TripWithOwnership[]
   onCreateTrip: () => void
   user: User | null
   isLoading: boolean
 }) {
   return (
-    <div className="flex flex-col min-h-screen pb-[52px]">
-      {mobileNavItem === 'home' ? (
-        // Home tab - "Plan your trips" view
-        <MobileHomeView
-          nextTrip={nextTrip}
-          upcomingTrips={upcomingTrips}
-          onCreateTrip={onCreateTrip}
-          user={user}
-          isLoading={isLoading}
-        />
-      ) : mobileNavItem === 'trips' ? (
-        // Trips tab - Past/Upcoming view
-        <MobileTripsView
-          trips={filteredTrips}
-          activeTab={activeTab}
-          onTabChange={onTabChange}
-          onCreateTrip={onCreateTrip}
-          user={user}
-          isLoading={isLoading}
-        />
-      ) : (
-        // Calendar tab
-        <div className="flex-1 flex flex-col">
-          <CalendarView trips={allTrips} />
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Top bar */}
+      <header className="flex items-center justify-between p-3 border-b border-border-muted">
+        <div className="flex items-center">
+          <Image src={logo} alt="Logo" width={20} height={20} />
         </div>
-      )}
-
-      {/* Bottom navigation */}
-      <MobileNavBar activeItem={mobileNavItem} onItemChange={onNavItemChange} />
-    </div>
-  )
-}
-
-function MobileHomeView({
-  nextTrip,
-  upcomingTrips,
-  onCreateTrip,
-  user,
-  isLoading
-}: {
-  nextTrip: TripWithOwnership | undefined
-  upcomingTrips: TripWithOwnership[]
-  onCreateTrip: () => void
-  user: User | null
-  isLoading: boolean
-}) {
-  return (
-    <div className="flex-1 bg-white px-[15px] pt-[15px] pb-[40px] overflow-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-[20px]">
-        <h1 className="text-h1">
-          Plan your trips
-        </h1>
-        {user && (
-          <UserMenu
-            email={user.email}
-            name={user.user_metadata?.name}
-          />
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="space-y-[20px]">
-        {isLoading ? (
-          <LoadingSkeleton />
-        ) : nextTrip ? (
-          <>
-            {/* Featured next trip */}
-            <NextTripCardMobile trip={nextTrip} variant="mobile" />
-
-            {/* Other upcoming trips */}
-            {upcomingTrips.map(trip => (
-              <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
-            ))}
-          </>
-        ) : (
-          <EmptyState onCreateTrip={onCreateTrip} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function MobileTripsView({
-  trips,
-  activeTab,
-  onTabChange,
-  onCreateTrip,
-  user,
-  isLoading
-}: {
-  trips: TripWithOwnership[]
-  activeTab: TripTabValue
-  onTabChange: (tab: TripTabValue) => void
-  onCreateTrip: () => void
-  user: User | null
-  isLoading: boolean
-}) {
-  return (
-    <>
-      {/* Header area with tabs and add button */}
-      <div className="flex items-center justify-between px-[15px] pt-[15px] pb-[20px]">
-        <TripTabs activeTab={activeTab} onTabChange={onTabChange} />
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={onCreateTrip}
-            className="w-[36px] h-[36px] bg-black rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors"
+            variant="primary"
+            size="small"
+            leftIcon={<Plus />}
           >
-            <Plus className="h-5 w-5 text-white" />
-          </button>
+            New trip
+          </Button>
           {user && (
             <UserMenu
               email={user.email}
@@ -435,21 +302,50 @@ function MobileTripsView({
             />
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Trip cards list */}
-      <div className="flex-1 px-[15px] pb-[40px] space-y-[20px] overflow-auto">
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
         {isLoading ? (
           <LoadingSkeleton />
-        ) : trips.length > 0 ? (
-          trips.map(trip => (
-            <SimpleTripCard key={trip.id} trip={trip} isShared={!trip.isOwner} />
-          ))
         ) : (
-          <EmptyState onCreateTrip={onCreateTrip} />
+          <div className="flex flex-col">
+            {/* Next trip */}
+            {nextTrip && (
+              <section className="flex flex-col border-b border-border-muted">
+                <SectionHeader>Your next trip</SectionHeader>
+                <MobileNextTripCard trip={nextTrip} />
+              </section>
+            )}
+
+            {/* Upcoming trips */}
+            {upcomingTrips.length > 0 && (
+              <section className="flex flex-col border-b border-border-muted">
+                <SectionHeader>Upcoming trips</SectionHeader>
+                {upcomingTrips.map(trip => (
+                  <TripCard key={trip.id} trip={trip} />
+                ))}
+              </section>
+            )}
+
+            {/* Past trips */}
+            {pastTrips.length > 0 && (
+              <section className="flex flex-col">
+                <SectionHeader>Past trips</SectionHeader>
+                {pastTrips.map(trip => (
+                  <TripCard key={trip.id} trip={trip} />
+                ))}
+              </section>
+            )}
+
+            {/* Empty state */}
+            {!nextTrip && upcomingTrips.length === 0 && pastTrips.length === 0 && (
+              <EmptyState onCreateTrip={onCreateTrip} />
+            )}
+          </div>
         )}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -818,22 +714,100 @@ function TripCard({ trip }: { trip: TripWithOwnership }) {
   )
 }
 
+// Mobile version of NextTripCard — full-width with image, stats, and missing stays warning
+function MobileNextTripCard({ trip }: { trip: TripWithOwnership }) {
+  const router = useRouter()
+  const duration = getTripDuration(trip)
+  const dateRangeText = `${formatDateRange(trip.startDate, trip.endDate)} (${duration} day${duration === 1 ? '' : 's'})`
+
+  const daysPlanned = trip.days?.filter(day => day.activities && day.activities.length > 0).length || 0
+  const activitiesCount = trip.days?.reduce((acc, day) => acc + (day.activities?.length || 0), 0) || 0
+  const placesSaved = trip.savedPlaces?.length || 0
+  const staysLogged = trip.accommodations?.length || 0
+
+  const tripNights = duration - 1
+  let coveredNights = 0
+  trip.accommodations?.forEach(acc => {
+    const checkIn = parseLocalDate(acc.checkIn)
+    const checkOut = parseLocalDate(acc.checkOut)
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
+    coveredNights += nights
+  })
+  const missingStays = Math.max(0, tripNights - coveredNights)
+  const formatStat = (num: number) => num.toString().padStart(2, '0')
+
+  return (
+    <Link href={`/trip/${trip.id}`} className="flex flex-col cursor-pointer">
+      <div className="relative w-full h-[200px]">
+        {trip.coverImage ? (
+          <img
+            src={trip.coverImage}
+            alt={trip.name}
+            className="w-full h-full object-cover"
+            style={{ objectPosition: `${(trip.coverImageFocusX ?? 0.5) * 100}% ${(trip.coverImageFocusY ?? 0.5) * 100}%` }}
+          />
+        ) : (
+          <div className="w-full h-full bg-neutral-300" />
+        )}
+        <CountdownBadge trip={trip} />
+      </div>
+
+      <div className="p-[16px] text-center">
+        <h3 className="text-h2 text-text-primary">{trip.name}</h3>
+        <p className="text-h2 text-text-secondary">{dateRangeText}</p>
+      </div>
+
+      <div className="grid grid-cols-2 grid-rows-2 border-t border-border-muted">
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-r border-b border-border-muted"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
+        >
+          <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
+        </div>
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-b border-border-muted"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
+        >
+          <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Activities</span>
+        </div>
+        <div
+          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-r border-border-muted"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=places`) }}
+        >
+          <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-[8px] py-[16px]">
+          <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
+          <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
+        </div>
+      </div>
+
+      {missingStays > 0 && (
+        <div className="py-[16px] flex items-center justify-center gap-[8px] border-t border-border-muted">
+          <span className="w-4 h-4 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-orange-400">
+            <CircleAlert />
+          </span>
+          <span className="text-h3 text-orange-400 uppercase">
+            {missingStays} night{missingStays === 1 ? '' : 's'} missing stay
+          </span>
+        </div>
+      )}
+    </Link>
+  )
+}
+
 function LoadingSkeleton() {
   return (
-    <div className="space-y-[20px]">
+    <div className="flex flex-col">
       {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="bg-white border-[0.5px] border-neutral-200 rounded-[15px] overflow-hidden"
-        >
-          {/* Image skeleton */}
-          <div className="p-[5px]">
-            <div className="h-[120px] rounded-[10px] bg-neutral-100 animate-pulse" />
-          </div>
-          {/* Content skeleton */}
-          <div className="px-[15px] pt-[10px] pb-[15px]">
-            <div className="h-[22px] w-3/4 bg-neutral-100 rounded animate-pulse" />
-            <div className="h-[17px] w-1/2 bg-neutral-100 rounded animate-pulse mt-[8px]" />
+        <div key={i} className="border-b border-border-muted">
+          <div className="h-[119px] bg-neutral-100 animate-pulse" />
+          <div className="p-[16px]">
+            <div className="h-[18px] w-3/4 bg-neutral-100 rounded animate-pulse" />
+            <div className="h-[16px] w-1/2 bg-neutral-100 rounded animate-pulse mt-[8px]" />
           </div>
         </div>
       ))}
