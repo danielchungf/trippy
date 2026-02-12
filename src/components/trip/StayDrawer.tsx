@@ -16,16 +16,7 @@ import {
   SheetClose,
   SheetTitle,
 } from "@/components/ui/sheet"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -294,26 +285,17 @@ export function StayDrawer({
       </Sheet>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Stay</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove &quot;{accommodation.name}&quot; from your trip?
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Removing..." : "Remove"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteAlert}
+        onOpenChange={setShowDeleteAlert}
+        title="Remove Stay"
+        description={`Are you sure you want to remove "${accommodation.name}" from your trip? This action cannot be undone.`}
+        confirmLabel="Remove"
+        onConfirm={handleDelete}
+        loading={isDeleting}
+        loadingLabel="Removing..."
+        destructive
+      />
     </>
   )
 }

@@ -2451,7 +2451,7 @@ function RightPanel({
                 </TooltipProvider>
               )}
               <Button
-                variant="primary"
+                variant={day.activities.length === 0 ? "secondary" : "primary"}
                 size="small"
                 leftIcon={<Plus />}
                 onClick={() => handleOpenActivityDialog()}
@@ -2529,12 +2529,15 @@ function RightPanel({
                 </SortableContext>
               </DndContext>
             ) : !(departingAccommodation || stayingAccommodation) ? (
-              <div className="h-full flex items-center justify-center">
+              <div className="h-full flex flex-col items-center justify-center gap-0">
+                <h2 className="text-h2 text-text-primary">What&apos;s the plan for today?</h2>
+                <p className="text-body text-text-secondary">Build a day-by-day schedule with activities</p>
                 <Button
                   variant="primary"
                   size="small"
                   leftIcon={<Plus />}
                   onClick={() => handleOpenActivityDialog()}
+                  className="mt-[20px]"
                 >
                   New activity
                 </Button>

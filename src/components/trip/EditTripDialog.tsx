@@ -6,16 +6,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { Settings } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormDialog } from "@/components/ui/form-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { TextField } from "@/components/ui/text-field"
@@ -259,49 +250,30 @@ export function EditTripDialog({
       </FormDialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Trip</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{tripName}&quot;? This will permanently
-              delete all locations, accommodations, saved places, and activities.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {loading ? "Deleting..." : "Delete Trip"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteAlert}
+        onOpenChange={setShowDeleteAlert}
+        title="Delete Trip"
+        description={`Are you sure you want to delete "${tripName}"? This will permanently delete all locations, accommodations, saved places, and activities. This action cannot be undone.`}
+        confirmLabel="Delete Trip"
+        onConfirm={handleDelete}
+        loading={loading}
+        loadingLabel="Deleting..."
+        destructive
+      />
 
       {/* Date Shortening Warning Dialog */}
-      <AlertDialog open={showDateShortenAlert} onOpenChange={setShowDateShortenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Shorten Trip Dates?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are shortening the trip dates. Activities on removed days will be
-              permanently deleted. Are you sure you want to continue?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={performSave}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {loading ? "Saving..." : "Continue"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDateShortenAlert}
+        onOpenChange={setShowDateShortenAlert}
+        title="Shorten Trip Dates?"
+        description="You are shortening the trip dates. Activities on removed days will be permanently deleted. Are you sure you want to continue?"
+        confirmLabel="Continue"
+        onConfirm={performSave}
+        loading={loading}
+        loadingLabel="Saving..."
+        destructive
+      />
     </>
   )
 }
