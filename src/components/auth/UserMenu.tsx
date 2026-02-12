@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { LogOut, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -20,11 +21,13 @@ interface UserMenuProps {
 export function UserMenu({ email, name }: UserMenuProps) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   const handleSignOut = async () => {
     setLoading(true)
     const supabase = createClient()
     await supabase.auth.signOut()
+    queryClient.clear()
     router.push("/login")
     router.refresh()
   }
