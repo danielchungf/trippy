@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { IconButton } from "@/components/ui/icon-button"
+import { NakedIconButton } from "@/components/ui/naked-icon-button"
 
 interface UserMenuProps {
   email?: string
@@ -34,7 +34,7 @@ export function UserMenu({ email, name }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton icon={<User />} />
+        <NakedIconButton icon={<User />} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem disabled className="text-[#a1a1a1]">
