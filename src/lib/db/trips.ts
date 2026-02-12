@@ -471,12 +471,30 @@ export async function createTrip(data: {
 export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | null> {
   const supabase = createClient()
 
-  // Get current trip to check if dates actually changed
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Verify user has access to this trip (owner or accepted member)
   const { data: currentTrip } = await supabase
     .from('trips')
-    .select('start_date, end_date')
+    .select('start_date, end_date, owner_id')
     .eq('id', id)
     .single()
+
+  if (!currentTrip) return null
+
+  const isOwner = currentTrip.owner_id === user.id
+  if (!isOwner) {
+    const { data: membership } = await supabase
+      .from('trip_members')
+      .select('id')
+      .eq('trip_id', id)
+      .eq('user_id', user.id)
+      .eq('status', 'accepted')
+      .single()
+
+    if (!membership) return null
+  }
 
   const updateData: Record<string, unknown> = {}
   if (data.name !== undefined) updateData.name = data.name
@@ -533,6 +551,18 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
 // Delete a trip
 export async function deleteTrip(id: string): Promise<boolean> {
   const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+
+  // Only the trip owner can delete a trip
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('owner_id')
+    .eq('id', id)
+    .single()
+
+  if (!trip || trip.owner_id !== user.id) return false
 
   // Days, activities, and other related data will be deleted via cascade
   const { error } = await supabase
