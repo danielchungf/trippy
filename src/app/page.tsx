@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Plus, MapPin, User as UserIcon, LogOut, CircleAlert } from "lucide-react"
+import { Plus, User as UserIcon, LogOut, CircleAlert } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { NakedIconButton } from "@/components/ui/naked-icon-button"
@@ -287,14 +287,16 @@ function MobileHomeLayout({
           <Image src={logo} alt="Logo" width={20} height={20} />
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={onCreateTrip}
-            variant="primary"
-            size="small"
-            leftIcon={<Plus />}
-          >
-            New trip
-          </Button>
+          {(nextTrip || upcomingTrips.length > 0 || pastTrips.length > 0) && (
+            <Button
+              onClick={onCreateTrip}
+              variant="primary"
+              size="small"
+              leftIcon={<Plus />}
+            >
+              New trip
+            </Button>
+          )}
           {user && (
             <UserMenu
               email={user.email}
@@ -340,7 +342,9 @@ function MobileHomeLayout({
 
             {/* Empty state */}
             {!nextTrip && upcomingTrips.length === 0 && pastTrips.length === 0 && (
-              <EmptyState onCreateTrip={onCreateTrip} />
+              <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+                <EmptyState onCreateTrip={onCreateTrip} />
+              </div>
             )}
           </div>
         )}
@@ -371,6 +375,7 @@ function DesktopLayout({
   onViewChange: (view: 'trips' | 'calendar') => void
 }) {
   const userName = user?.user_metadata?.name?.split(' ')[0] || 'there'
+  const hasTrips = !!nextTrip || upcomingTrips.length > 0 || pastTrips.length > 0
 
   // Random greeting subtitle - selected once on mount
   const [greeting] = useState(() => {
@@ -399,23 +404,29 @@ function DesktopLayout({
             {/* Header */}
             <header className="flex items-center justify-between p-3 border-b border-border-muted">
               <div className="flex flex-col">
-                <h1 className="text-h1 text-text-primary">Welcome back, {userName}</h1>
-                <p className="text-h2 text-text-secondary">{greeting}</p>
+                <h1 className="text-h1 text-text-primary">{hasTrips ? `Welcome back, ${userName}` : `Welcome, ${userName}`}</h1>
+                <p className="text-h2 text-text-secondary">{hasTrips ? greeting : 'The time has come to plan your trips.'}</p>
               </div>
-              <Button
-                onClick={onCreateTrip}
-                variant="primary"
-                size="small"
-                leftIcon={<Plus />}
-              >
-                New trip
-              </Button>
+              {hasTrips && (
+                <Button
+                  onClick={onCreateTrip}
+                  variant="primary"
+                  size="small"
+                  leftIcon={<Plus />}
+                >
+                  New trip
+                </Button>
+              )}
             </header>
 
-            {/* Content area - 3 columns with no gap */}
+            {/* Content area */}
             <div className="flex-1 overflow-auto">
               {isLoading ? (
                 <LoadingSkeletonDesktop />
+              ) : !hasTrips ? (
+                <div className="flex items-center justify-center h-full">
+                  <EmptyState onCreateTrip={onCreateTrip} />
+                </div>
               ) : (
                 <div className="flex h-full">
                   {/* Your next trip section - 580px fixed */}
@@ -435,8 +446,6 @@ function DesktopLayout({
                           <TripCard key={trip.id} trip={trip} />
                         ))}
                       </div>
-                    ) : !nextTrip ? (
-                      <EmptyState onCreateTrip={onCreateTrip} />
                     ) : null}
                   </section>
 
@@ -465,19 +474,17 @@ function DesktopLayout({
 
 function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
   return (
-    <div className="text-center py-16">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 mb-4">
-        <MapPin className="h-8 w-8 text-text-tertiary" />
-      </div>
-      <h2 className="text-h1 mb-2">No trips yet</h2>
-      <p className="text-text-tertiary mb-6">Create your first trip to get started</p>
-      <button
+    <div className="flex flex-col items-center gap-2">
+      <h2 className="text-h1 text-text-primary">No trips yet</h2>
+      <p className="text-body text-text-tertiary">Create your first trip to get started</p>
+      <Button
         onClick={onCreateTrip}
-        className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition-colors text-h3 font-fustat"
+        variant="primary"
+        size="small"
+        className="mt-2"
       >
-        <Plus className="h-4 w-4" />
-        Create Trip
-      </button>
+        Create trip
+      </Button>
     </div>
   )
 }
