@@ -20,7 +20,6 @@ import { FormDialog } from "@/components/ui/form-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { TextField } from "@/components/ui/text-field"
 import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
-import { ColorPicker } from "@/components/ui/color-picker"
 import { ImageUploadField } from "@/components/ui/image-upload-field"
 import { LOCATION_COLORS, parseLocalDate, formatLocalDate } from "@/types"
 import { updateTrip, deleteTrip } from "@/lib/db"
@@ -241,10 +240,6 @@ export function EditTripDialog({
             value={dateRange}
             onChange={setDateRange}
           />
-        </FormField>
-
-        <FormField label="Color">
-          <ColorPicker value={color} onChange={setColor} />
         </FormField>
 
         <FormField label="Cover image">

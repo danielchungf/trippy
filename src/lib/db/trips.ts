@@ -169,8 +169,9 @@ export interface TripWithOwnership extends Trip {
 export async function getTrips(): Promise<TripWithOwnership[]> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return []
+  const user = session.user
 
   console.log('getTrips: Fetching for user', user.id, user.email)
 
@@ -300,8 +301,9 @@ export async function getTrips(): Promise<TripWithOwnership[]> {
 export async function getTrip(id: string): Promise<TripWithOwnership | undefined> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return undefined
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return undefined
+  const user = session.user
 
   // Fetch the specific trip
   const { data: tripRow, error: tripError } = await supabase
@@ -407,28 +409,34 @@ export async function createTrip(data: {
 }): Promise<Trip | null> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: tripRow, error } = await supabase
-    .from('trips')
-    .insert({
-      owner_id: user.id,
-      name: data.name,
-      start_date: data.startDate,
-      end_date: data.endDate,
-      cover_image: data.coverImage || null,
-      cover_image_focus_x: data.coverImageFocusX ?? 0.5,
-      cover_image_focus_y: data.coverImageFocusY ?? 0.5,
-      color: data.color || null,
-    })
-    .select()
-    .single()
-
-  if (error || !tripRow) {
-    console.error('Error creating trip:', error)
+  // Force a fresh token by calling getUser() which validates server-side
+  // and triggers a token refresh if the access token is expired.
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    console.error('createTrip: auth failed', authError?.message)
     return null
   }
+
+  // Use RPC function (SECURITY DEFINER) to bypass RLS for trip creation.
+  // Passes user.id as fallback in case auth.uid() is NULL in the DB context.
+  const { data: tripJson, error } = await supabase.rpc('create_trip_for_user', {
+    p_name: data.name,
+    p_start_date: data.startDate,
+    p_end_date: data.endDate,
+    p_cover_image: data.coverImage || null,
+    p_cover_image_focus_x: data.coverImageFocusX ?? 0.5,
+    p_cover_image_focus_y: data.coverImageFocusY ?? 0.5,
+    p_color: data.color || null,
+    p_home_currency: 'USD',
+    p_user_id: user.id,
+  })
+
+  if (error || !tripJson) {
+    console.error('Error creating trip:', error?.message, error?.code)
+    return null
+  }
+
+  const tripRow = tripJson as TripRow
 
   const trip: Trip = {
     id: tripRow.id,
@@ -453,7 +461,7 @@ export async function createTrip(data: {
   trip.days = generateDaysFromTrip(trip)
 
   // Insert days into database
-  const dayInserts = trip.days.map((day, index) => ({
+  const dayInserts = trip.days.map((day) => ({
     trip_id: trip.id,
     date: day.date,
     name: day.name || null,
@@ -471,8 +479,9 @@ export async function createTrip(data: {
 export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | null> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return null
+  const user = session.user
 
   // Verify user has access to this trip (owner or accepted member)
   const { data: currentTrip } = await supabase
@@ -552,8 +561,9 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
 export async function deleteTrip(id: string): Promise<boolean> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return false
+  const user = session.user
 
   // Only the trip owner can delete a trip
   const { data: trip } = await supabase

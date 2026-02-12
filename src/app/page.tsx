@@ -18,9 +18,8 @@ import { FormDialog } from "@/components/ui/form-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { TextField } from "@/components/ui/text-field"
 import { DateRangePickerField } from "@/components/ui/date-range-picker-field"
-import { ColorPicker } from "@/components/ui/color-picker"
 import { ImageUploadField } from "@/components/ui/image-upload-field"
-import { getTripStatus, parseLocalDate, formatDateRange, getTripDuration } from "@/types"
+import { getTripStatus, parseLocalDate, formatLocalDate, formatDateRange, getTripDuration } from "@/types"
 import { TripWithOwnership, acceptPendingInvites } from "@/lib/db"
 import { useTrips, useCreateTrip, tripKeys } from "@/lib/hooks/use-trips"
 import { useRealtimeInvites } from "@/lib/hooks/use-realtime-invites"
@@ -35,6 +34,7 @@ import type { User } from "@supabase/supabase-js"
 import logo from "@/app/logo.png"
 
 export default function HomePage() {
+  const router = useRouter()
   const [desktopView, setDesktopView] = useState<'trips' | 'calendar'>('trips')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newTripName, setNewTripName] = useState("")
@@ -125,10 +125,16 @@ export default function HomePage() {
       // Create trip first to get the ID
       const newTrip = await createTripMutation.mutateAsync({
         name: newTripName,
-        startDate: dateRange.from.toISOString().split('T')[0],
-        endDate: dateRange.to.toISOString().split('T')[0],
+        startDate: formatLocalDate(dateRange.from),
+        endDate: formatLocalDate(dateRange.to),
         color: tripColor,
       })
+
+      if (!newTrip) {
+        setUploadError("Failed to create trip. Please try again.")
+        setIsUploading(false)
+        return
+      }
 
       // Upload cover image if one was selected
       if (coverImageFile && newTrip) {
@@ -157,6 +163,7 @@ export default function HomePage() {
       setCoverImageFocusX(0.5)
       setCoverImageFocusY(0.5)
       setIsCreateOpen(false)
+      router.push(`/trip/${newTrip.id}`)
     } catch (err) {
       if (err instanceof ImageUploadError) {
         setUploadError(err.message)
@@ -239,10 +246,6 @@ export default function HomePage() {
             onChange={setDateRange}
             numberOfMonths={isDesktop ? 2 : 1}
           />
-        </FormField>
-
-        <FormField label="Color">
-          <ColorPicker value={tripColor} onChange={setTripColor} />
         </FormField>
 
         <FormField label="Cover image">
@@ -474,14 +477,15 @@ function DesktopLayout({
 
 function EmptyState({ onCreateTrip }: { onCreateTrip: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-2">
-      <h2 className="text-h1 text-text-primary">No trips yet</h2>
-      <p className="text-body text-text-tertiary">Create your first trip to get started</p>
+    <div className="flex flex-col items-center justify-center gap-0">
+      <h2 className="text-h2 text-text-primary">No trips yet</h2>
+      <p className="text-body text-text-secondary">Create your first trip to get started</p>
       <Button
         onClick={onCreateTrip}
         variant="primary"
         size="small"
-        className="mt-2"
+        leftIcon={<Plus />}
+        className="mt-[20px]"
       >
         Create trip
       </Button>

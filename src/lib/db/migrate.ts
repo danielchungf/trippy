@@ -16,12 +16,13 @@ export async function migrateLocalStorageToSupabase(): Promise<boolean> {
   }
 
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user) {
+  if (!session?.user) {
     console.log('No user logged in, skipping migration')
     return false
   }
+  const user = session.user
 
   const localTrips = getLocalTrips()
   if (localTrips.length === 0) {

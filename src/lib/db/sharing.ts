@@ -49,8 +49,9 @@ export async function getTripMembers(tripId: string): Promise<TripMember[]> {
 export async function inviteMember(tripId: string, email: string, userId?: string): Promise<TripMember | null> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return null
+  const user = session.user
 
   // Normalize email
   const normalizedEmail = email.toLowerCase().trim()
@@ -137,13 +138,14 @@ export async function removeMember(tripId: string, memberId: string): Promise<bo
 export async function acceptPendingInvites(): Promise<number> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.email) {
     console.log('acceptPendingInvites: No user email found')
     return 0
   }
+  const user = session.user
 
-  const normalizedEmail = user.email.toLowerCase().trim()
+  const normalizedEmail = user.email!.toLowerCase().trim()
   console.log('acceptPendingInvites: Looking for invites for', normalizedEmail)
 
   // First, check if there are any pending invites for this email
@@ -207,8 +209,9 @@ export async function searchUsers(query: string): Promise<UserSearchResult[]> {
 export async function isOwnerOfTrip(tripId: string): Promise<boolean> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return false
+  const user = session.user
 
   const { data: trip } = await supabase
     .from('trips')
