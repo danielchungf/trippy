@@ -53,6 +53,7 @@ import {
   Replace,
   UserRoundPlus,
   Settings,
+  BrushCleaning,
   // Category icons
   Soup,
   Coffee,
@@ -152,6 +153,7 @@ import { ShareDialog } from "@/components/trip/ShareDialog"
 import { EditTripDialog } from "@/components/trip/EditTripDialog"
 import { PackingList } from "@/components/trip/PackingList"
 import { FormDialog } from "@/components/ui/form-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { TextField } from "@/components/ui/text-field"
 import { DateRange } from "react-day-picker"
@@ -1361,6 +1363,33 @@ function PlacesRightPanel({
   } | null>(null)
 
 
+  // Clean unused places state
+  const [isCleanOpen, setIsCleanOpen] = useState(false)
+  const [isCleanLoading, setIsCleanLoading] = useState(false)
+
+  // Get unassigned place IDs for cleanup
+  const unassignedPlaceIds = useMemo(() => {
+    const assignedIds = new Set<string>()
+    const allDays = generateDaysFromTrip(trip)
+    allDays.forEach(day =>
+      day.activities.forEach(activity => {
+        if (activity.savedPlaceId) assignedIds.add(activity.savedPlaceId)
+      })
+    )
+    return trip.savedPlaces.filter(p => !assignedIds.has(p.id)).map(p => p.id)
+  }, [trip])
+
+  const handleCleanUnused = async () => {
+    setIsCleanLoading(true)
+    try {
+      await Promise.all(unassignedPlaceIds.map(id => deleteSavedPlace(trip.id, id)))
+      setIsCleanOpen(false)
+      await onRefresh()
+    } finally {
+      setIsCleanLoading(false)
+    }
+  }
+
   // Get unique locations from places (including null for places without a location)
   const locationsInPlaces = useMemo(() => {
     const locationIds = new Set<string | null>()
@@ -1636,6 +1665,16 @@ function PlacesRightPanel({
           <span className="text-mono-small text-text-secondary">
             {filteredPlaceCount}/{totalPlaceCount} PLACES
           </span>
+          {unassignedPlaceIds.length > 0 && (
+            <Button
+              variant="secondary"
+              size="small"
+              leftIcon={<BrushCleaning />}
+              onClick={() => setIsCleanOpen(true)}
+            >
+              Clean
+            </Button>
+          )}
           <Button
             variant="primary"
             size="small"
@@ -1646,6 +1685,19 @@ function PlacesRightPanel({
           </Button>
         </div>
       </div>
+
+      {/* Clean unused places confirm dialog */}
+      <ConfirmDialog
+        open={isCleanOpen}
+        onOpenChange={setIsCleanOpen}
+        title="Clean unused places?"
+        description="This will remove all saved places that are not currently assigned to any day in your itinerary."
+        confirmLabel="Clean"
+        onConfirm={handleCleanUnused}
+        loading={isCleanLoading}
+        loadingLabel="Cleaning..."
+        destructive
+      />
 
       {/* Content */}
       {showMapView ? (
