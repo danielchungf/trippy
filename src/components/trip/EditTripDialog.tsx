@@ -28,6 +28,7 @@ interface EditTripDialogProps {
   tripEndDate: string
   isOwner: boolean
   onUpdate: () => Promise<void>
+  trigger?: React.ReactNode
 }
 
 export function EditTripDialog({
@@ -41,6 +42,7 @@ export function EditTripDialog({
   tripEndDate,
   isOwner,
   onUpdate,
+  trigger,
 }: EditTripDialogProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -204,7 +206,11 @@ export function EditTripDialog({
 
   return (
     <>
-      <NakedIconButton icon={<Settings />} onClick={() => setOpen(true)} />
+      {trigger ? (
+        <span onClick={() => setOpen(true)}>{trigger}</span>
+      ) : (
+        <NakedIconButton icon={<Settings />} onClick={() => setOpen(true)} />
+      )}
 
       <FormDialog
         open={open}

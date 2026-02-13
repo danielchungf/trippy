@@ -71,3 +71,4 @@ After making corrections, update this file or add to `/memory/corrections/`.
 ## Rules & Corrections
 
 - **Google Places photo URLs expire** - Never store/use photo URLs from the database. Always fetch fresh photos using `googlePlaceId` via `PlacePhoto` component. URLs return 403 after ~24 hours. (See `src/components/PlacePhoto.tsx`)
+- **ALWAYS flag Google Maps API cost impact** - Before implementing any feature that adds or modifies Google Maps API calls (`getPlaceDetails`, `searchPlaces`, `getPlaceDetailsExtended`, `getDirections`, `geocodeAddress`), flag it to the user with the estimated cost tier. Never add raw API calls — always use React Query caching (`use-places.ts` hooks or `queryClient.fetchQuery`). Never call API functions inside loops or uncached useEffects. Prefer using data already in the database over fetching from API. See `src/lib/hooks/use-places.ts` for the caching pattern.

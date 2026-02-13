@@ -35,6 +35,7 @@ const buttonVariants = cva(
         sm: "h-8 rounded-md px-3 text-xs font-medium",
         lg: "h-10 rounded-md px-8 text-sm font-medium",
         icon: "h-9 w-9 rounded-md",
+        "icon-mobile": "h-[28px] w-[28px] rounded-[8px]",
       },
     },
     defaultVariants: {
@@ -45,6 +46,7 @@ const buttonVariants = cva(
 )
 
 const iconClasses = "w-[16px] h-[16px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2]"
+const iconClassesMobile = "w-[20px] h-[20px] flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8]"
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -71,6 +73,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       )
     }
 
+    const icoClasses = size === "icon-mobile" ? iconClassesMobile : iconClasses
+
     return (
       <button
         className={cn(buttonVariants({ variant, size, className }))}
@@ -78,13 +82,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {leftIcon && (
-          <span className={iconClasses}>
+          <span className={icoClasses}>
             {leftIcon}
           </span>
         )}
         {children && <span className="px-[2px] translate-y-[1px]">{children}</span>}
         {rightIcon && (
-          <span className={iconClasses}>
+          <span className={icoClasses}>
             {rightIcon}
           </span>
         )}

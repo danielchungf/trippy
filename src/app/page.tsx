@@ -285,21 +285,18 @@ function MobileHomeLayout({
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Top bar */}
-      <header className="flex items-center justify-between p-3 border-b border-border-muted">
+      <header className="relative flex items-center justify-between p-3 border-b border-border-muted">
         <div className="flex items-center">
-          <Image src={logo} alt="Logo" width={20} height={20} />
+          <div className="w-[28px] h-[28px] inline-flex items-center justify-center">
+            <Image src={logo} alt="Logo" width={20} height={20} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {(nextTrip || upcomingTrips.length > 0 || pastTrips.length > 0) && (
-            <Button
-              onClick={onCreateTrip}
-              variant="primary"
-              size="small"
-              leftIcon={<Plus />}
-            >
-              New trip
-            </Button>
-          )}
+        {(nextTrip || upcomingTrips.length > 0 || pastTrips.length > 0) && (
+          <div className="absolute left-1/2 -translate-x-1/2">
+            <NakedIconButton icon={<Plus />} onClick={onCreateTrip} />
+          </div>
+        )}
+        <div className="flex items-center">
           {user && (
             <UserMenu
               email={user.email}
@@ -773,27 +770,27 @@ function MobileNextTripCard({ trip }: { trip: TripWithOwnership }) {
 
       <div className="grid grid-cols-2 grid-rows-2 border-t border-border-muted">
         <div
-          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-r border-b border-border-muted"
+          className="flex flex-col items-center justify-center gap-[8px] py-[10px] border-r border-b border-border-muted"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
         >
           <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
           <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
         </div>
         <div
-          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-b border-border-muted"
+          className="flex flex-col items-center justify-center gap-[8px] py-[10px] border-b border-border-muted"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=itinerary`) }}
         >
           <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
           <span className="text-h3 text-text-secondary uppercase">Activities</span>
         </div>
         <div
-          className="flex flex-col items-center justify-center gap-[8px] py-[16px] border-r border-border-muted"
+          className="flex flex-col items-center justify-center gap-[8px] py-[10px] border-r border-border-muted"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/trip/${trip.id}?tab=places`) }}
         >
           <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
           <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
         </div>
-        <div className="flex flex-col items-center justify-center gap-[8px] py-[16px]">
+        <div className="flex flex-col items-center justify-center gap-[8px] py-[10px]">
           <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
           <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
         </div>
