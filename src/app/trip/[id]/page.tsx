@@ -51,6 +51,8 @@ import {
   CalendarClock,
   CalendarRange,
   Replace,
+  UserRoundPlus,
+  Settings,
   // Category icons
   Soup,
   Coffee,
@@ -662,27 +664,37 @@ export default function TripPage() {
       </ResizablePanel>
     </ResizablePanelGroup>
   ) : activeTab === 'stays' ? (
-    // Stays tab: Two-panel layout with stays list + map
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel
-        defaultSize="500px"
-        minSize="420px"
-        maxSize="580px"
-        className="border-r border-neutral-200 flex flex-col overflow-hidden"
-      >
-        <StaysPanel
-          trip={trip}
-          onOpenAccommodationDialog={handleOpenAccommodationDialog}
-          onOpenStayDrawer={handleOpenStayDrawer}
-          onRefresh={refreshTrip}
-          onHoverStay={setHoveredStayIndex}
-        />
-      </ResizablePanel>
-      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
-      <ResizablePanel className="flex flex-col overflow-hidden">
-        <DestinationsMap locations={staysAsLocations} hoveredIndex={hoveredStayIndex} />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    // Stays tab — mobile: plain list (map is sticky in mainContent), desktop: two-panel
+    isDesktop ? (
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel
+          defaultSize="500px"
+          minSize="420px"
+          maxSize="580px"
+          className="border-r border-neutral-200 flex flex-col overflow-hidden"
+        >
+          <StaysPanel
+            trip={trip}
+            onOpenAccommodationDialog={handleOpenAccommodationDialog}
+            onOpenStayDrawer={handleOpenStayDrawer}
+            onRefresh={refreshTrip}
+            onHoverStay={setHoveredStayIndex}
+          />
+        </ResizablePanel>
+        <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+        <ResizablePanel className="flex flex-col overflow-hidden">
+          <DestinationsMap locations={staysAsLocations} hoveredIndex={hoveredStayIndex} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    ) : (
+      <StaysPanel
+        trip={trip}
+        onOpenAccommodationDialog={handleOpenAccommodationDialog}
+        onOpenStayDrawer={handleOpenStayDrawer}
+        onRefresh={refreshTrip}
+        onHoverStay={setHoveredStayIndex}
+      />
+    )
   ) : activeTab === 'expenses' ? (
     // Expenses tab
     <div className="flex-1 overflow-auto">
@@ -707,15 +719,35 @@ export default function TripPage() {
   )
 
   const mainContent = (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Trip Header */}
-      <TripHeader
-        trip={trip}
-        tripId={tripId}
-        duration={duration}
-        onRefresh={refreshTrip}
-        activeTab={activeTab}
-      />
+    <div className="flex-1 flex flex-col overflow-auto lg:overflow-hidden">
+      {/* Mobile: sticky map on top for overview and stays tabs */}
+      {!isDesktop && activeTab === 'overview' && (
+        <div className="lg:hidden aspect-video w-full sticky top-0 z-20 flex-shrink-0">
+          <DestinationsMap
+            locations={trip.locations}
+            hoveredIndex={null}
+          />
+        </div>
+      )}
+      {!isDesktop && activeTab === 'stays' && (
+        <div className="lg:hidden aspect-video w-full sticky top-0 z-20 flex-shrink-0">
+          <DestinationsMap
+            locations={staysAsLocations}
+            hoveredIndex={hoveredStayIndex}
+          />
+        </div>
+      )}
+
+      {/* Trip Header — always on desktop, only overview on mobile */}
+      {(isDesktop || activeTab === 'overview') && (
+        <TripHeader
+          trip={trip}
+          tripId={tripId}
+          duration={duration}
+          onRefresh={refreshTrip}
+          activeTab={activeTab}
+        />
+      )}
 
       {/* Tab Content Area */}
       {tabContent}
@@ -1031,7 +1063,7 @@ function MobileTopNav({ onNavigateHome, activeTab, onTabChange }: {
   onTabChange: (tab: TabId) => void
 }) {
   return (
-    <div className="flex lg:hidden items-center h-[49px] border-b border-neutral-200 px-3 bg-background flex-shrink-0">
+    <div className="flex lg:hidden items-center border-b border-neutral-200 p-3 bg-background flex-shrink-0">
       {/* Left: Logo/Home */}
       <button
         onClick={onNavigateHome}
@@ -1043,7 +1075,7 @@ function MobileTopNav({ onNavigateHome, activeTab, onTabChange }: {
       </button>
 
       {/* Center: Tab icons */}
-      <div className="flex-1 flex items-center justify-center gap-3">
+      <div className="flex-1 flex items-center justify-center gap-2">
         <NakedIconButton
           icon={<TicketsPlane />}
           selected={activeTab === 'overview'}
@@ -1103,8 +1135,34 @@ function TripHeader({
   activeTab: TabId
 }) {
   return (
-    <header className="flex border-t border-b border-border-muted">
-      <div className="flex-1 p-3 flex items-center justify-between">
+    <header className="flex flex-col border-t border-b border-border-muted">
+      {/* Mobile: centered trip name + buttons below — sticky */}
+      <div className="lg:hidden flex flex-col items-center gap-2 p-3">
+        <h1 className="text-h1 text-text-primary">{trip.name}</h1>
+        <div className="flex items-center gap-2">
+          <ShareDialog
+            tripId={tripId}
+            tripName={trip.name}
+            isOwner={trip.isOwner}
+            trigger={<Button variant="secondary" size="small" leftIcon={<UserRoundPlus />}>Add members</Button>}
+          />
+          <EditTripDialog
+            tripId={tripId}
+            tripName={trip.name}
+            tripColor={trip.color}
+            tripCoverImage={trip.coverImage}
+            tripCoverImageFocusX={trip.coverImageFocusX}
+            tripCoverImageFocusY={trip.coverImageFocusY}
+            tripStartDate={trip.startDate}
+            tripEndDate={trip.endDate}
+            isOwner={trip.isOwner}
+            onUpdate={onRefresh}
+            trigger={<Button variant="secondary" size="small" leftIcon={<Settings />}>Settings</Button>}
+          />
+        </div>
+      </div>
+      {/* Desktop: horizontal name / tab + buttons right */}
+      <div className="hidden lg:flex flex-1 p-3 items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-h2 text-text-secondary">{trip.name}</span>
           <span className="text-h2 text-text-secondary">/</span>
@@ -3163,121 +3221,128 @@ function OverviewPanel({
     [trip.locations]
   )
 
-  return (
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
-      {/* Left Panel */}
-      <ResizablePanel
-        defaultSize="500px"
-        minSize="420px"
-        maxSize="580px"
-        className="border-r border-neutral-200 flex flex-col overflow-hidden"
+  const daysAwayBanner = (
+    <div className="py-3 px-4 bg-white border-b border-border-muted flex items-center justify-center gap-2 flex-shrink-0">
+      <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-[#FF591E]">
+        <CalendarClock />
+      </span>
+      <span className="text-[14px] leading-[18px] tracking-[-0.02em] font-semibold text-[#FF591E] uppercase">{daysAwayInfo.text}</span>
+    </div>
+  )
+
+  const statsGrid = (
+    <div className="h-[200px] grid grid-cols-2 grid-rows-2 border-b border-border-muted flex-shrink-0">
+      <div
+        className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+        onClick={() => onTabChange('itinerary')}
       >
-        {/* Days Away Banner */}
-        <div className="py-3 px-4 bg-white border-b border-border-muted flex items-center justify-center gap-2 flex-shrink-0">
-          <span className="w-4 h-4 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[2.25] text-[#FF591E]">
-            <CalendarClock />
-          </span>
-          <span className="text-[14px] leading-[18px] tracking-[-0.02em] font-semibold text-[#FF591E] uppercase">{daysAwayInfo.text}</span>
+        <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
+        <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
+      </div>
+      <div
+        className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+        onClick={() => onTabChange('itinerary')}
+      >
+        <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
+        <span className="text-h3 text-text-secondary uppercase">Activities</span>
+      </div>
+      <div
+        className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
+        onClick={() => onTabChange('places')}
+      >
+        <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
+        <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
+      </div>
+      <div
+        className="flex flex-col items-center justify-center gap-[8px] hover:bg-neutral-50 transition-colors cursor-pointer"
+        onClick={() => onTabChange('stays')}
+      >
+        <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
+        <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
+      </div>
+    </div>
+  )
+
+  const destinationsContent = (
+    <>
+      {sortedLocations.length > 0 && (
+        <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <SegmentedControl
+            value={destinationsViewMode}
+            onChange={setDestinationsViewMode}
+            options={[
+              { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
+              { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
+            ]}
+          />
+          <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
+            New destination
+          </Button>
         </div>
-
-        {/* Stats Grid - 2x2 */}
-        <div className="h-[200px] grid grid-cols-2 grid-rows-2 border-b border-border-muted flex-shrink-0">
-          {/* Days Planned */}
-          <div
-            className="flex flex-col items-center justify-center gap-[8px] border-r border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
-            onClick={() => onTabChange('itinerary')}
-          >
-            <span className="text-mono-large text-text-primary">{formatStat(daysPlanned)}/{formatStat(duration)}</span>
-            <span className="text-h3 text-text-secondary uppercase">Days Planned</span>
-          </div>
-
-          {/* Activities */}
-          <div
-            className="flex flex-col items-center justify-center gap-[8px] border-b border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
-            onClick={() => onTabChange('itinerary')}
-          >
-            <span className="text-mono-large text-text-primary">{formatStat(activitiesCount)}</span>
-            <span className="text-h3 text-text-secondary uppercase">Activities</span>
-          </div>
-
-          {/* Places Saved */}
-          <div
-            className="flex flex-col items-center justify-center gap-[8px] border-r border-border-muted hover:bg-neutral-50 transition-colors cursor-pointer"
-            onClick={() => onTabChange('places')}
-          >
-            <span className="text-mono-large text-text-primary">{formatStat(placesSaved)}</span>
-            <span className="text-h3 text-text-secondary uppercase">Places Saved</span>
-          </div>
-
-          {/* Stays Logged */}
-          <div
-            className="flex flex-col items-center justify-center gap-[8px] hover:bg-neutral-50 transition-colors cursor-pointer"
-            onClick={() => onTabChange('stays')}
-          >
-            <span className="text-mono-large text-text-primary">{formatStat(staysLogged)}</span>
-            <span className="text-h3 text-text-secondary uppercase">Stays Logged</span>
-          </div>
+      )}
+      {sortedLocations.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-0 py-12">
+          <h2 className="text-h2 text-text-primary">Where are you going?</h2>
+          <p className="text-body text-text-secondary">Add the cities or countries you're planning to visit.</p>
+          <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()} className="mt-[20px]">
+            Add destination
+          </Button>
         </div>
-
-        {/* Scrollable content area */}
-        <div className="flex-1 overflow-auto flex flex-col">
-          {/* Destinations Header - hidden when empty */}
-          {sortedLocations.length > 0 && (
-            <div className="p-3 border-b border-neutral-200 flex items-center justify-between sticky top-0 bg-white z-10">
-              <SegmentedControl
-                value={destinationsViewMode}
-                onChange={setDestinationsViewMode}
-                options={[
-                  { value: 'list', icon: <ListOrdered className="h-4 w-4" /> },
-                  { value: 'calendar', icon: <CalendarRange className="h-4 w-4" /> },
-                ]}
-              />
-              <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()}>
-                New destination
-              </Button>
-            </div>
-          )}
-
-          {/* Destinations List / Calendar */}
-          {sortedLocations.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-0">
-              <h2 className="text-h2 text-text-primary">Where are you going?</h2>
-              <p className="text-body text-text-secondary">Add the cities or countries you're planning to visit.</p>
-              <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenLocationDialog()} className="mt-[20px]">
-                Add destination
-              </Button>
-            </div>
-          ) : destinationsViewMode === 'calendar' ? (
-            <DestinationCalendar trip={trip} onEditLocation={onOpenLocationDialog} />
-          ) : (
-            <div>
-              {sortedLocations.map((location, index) => (
-                <DestinationCard
-                  key={location.id}
-                  tripId={trip.id}
-                  location={location}
-                  index={index}
-                  onEdit={() => onOpenLocationDialog(location)}
-                  onHover={() => setHoveredLocationIndex(index)}
-                  onLeave={() => setHoveredLocationIndex(null)}
-                  onRefresh={onRefresh}
-                />
-              ))}
-            </div>
-          )}
+      ) : destinationsViewMode === 'calendar' ? (
+        <DestinationCalendar trip={trip} onEditLocation={onOpenLocationDialog} />
+      ) : (
+        <div>
+          {sortedLocations.map((location, index) => (
+            <DestinationCard
+              key={location.id}
+              tripId={trip.id}
+              location={location}
+              index={index}
+              onEdit={() => onOpenLocationDialog(location)}
+              onHover={() => setHoveredLocationIndex(index)}
+              onLeave={() => setHoveredLocationIndex(null)}
+              onRefresh={onRefresh}
+            />
+          ))}
         </div>
-      </ResizablePanel>
+      )}
+    </>
+  )
 
-      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+  return (
+    <>
+      {/* Mobile: single scrollable column */}
+      <div className="lg:hidden flex flex-col">
+        {daysAwayBanner}
+        {statsGrid}
+        {destinationsContent}
+      </div>
 
-      {/* Right Panel - Full-height Map */}
-      <ResizablePanel className="flex flex-col overflow-hidden">
-        <DestinationsMap
-          locations={trip.locations}
-          hoveredIndex={hoveredLocationIndex}
-        />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      {/* Desktop: resizable two-panel layout */}
+      <ResizablePanelGroup direction="horizontal" className="hidden lg:flex flex-1">
+        <ResizablePanel
+          defaultSize="500px"
+          minSize="420px"
+          maxSize="580px"
+          className="border-r border-neutral-200 flex flex-col overflow-hidden"
+        >
+          {daysAwayBanner}
+          {statsGrid}
+          <div className="flex-1 overflow-auto flex flex-col">
+            {destinationsContent}
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+
+        <ResizablePanel className="flex flex-col overflow-hidden">
+          <DestinationsMap
+            locations={trip.locations}
+            hoveredIndex={hoveredLocationIndex}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </>
   )
 }
 
@@ -3302,7 +3367,7 @@ function DestinationCard({
   const contentRef = useRef<HTMLDivElement>(null)
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null)
 
-  // Measure content height and calculate photo dimensions (4:3 ratio)
+  // Measure content height and calculate photo dimensions (4:3 ratio) — desktop only
   useEffect(() => {
     if (contentRef.current) {
       const height = contentRef.current.offsetHeight
@@ -3333,7 +3398,7 @@ function DestinationCard({
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
     >
-      {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
+      {/* Photo - dimensions matched to content height with 4:3 ratio */}
       <PlacePhoto
         googlePlaceId={location.googlePlaceId}
         selectedPhotoIndex={location.selectedPhotoIndex}
@@ -3348,22 +3413,22 @@ function DestinationCard({
         }}
       />
 
-      {/* Content - 16px padding, 12px gap */}
+      {/* Content */}
       <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-3">
-        {/* Badge row */}
+        {/* Mobile: dates on top, then badge, then nights — all vstack */}
+        <span className="lg:hidden text-mono-regular text-text-secondary">{dateRange}</span>
         <div className="flex items-center">
           <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
             {location.name}
           </Badge>
         </div>
-        {/* Nights text */}
         <span className="text-body text-text-secondary">
           {nights} {nights === 1 ? 'night' : 'nights'}
         </span>
       </div>
 
-      {/* Date Range */}
-      <div className="flex items-center pr-4 flex-shrink-0">
+      {/* Date Range - desktop only */}
+      <div className="hidden lg:flex items-center pr-4 flex-shrink-0">
         <span className="text-mono-regular text-text-secondary">{dateRange}</span>
       </div>
     </div>
@@ -3473,16 +3538,18 @@ function StayCard({
         }}
       />
 
-      {/* Content - 16px padding, 12px gap */}
+      {/* Content */}
       <div ref={contentRef} className="flex-1 min-w-0 flex flex-col justify-center p-4 gap-2">
-        {/* Badge + Date range row */}
+        {/* Mobile: dates on top */}
+        <span className="lg:hidden text-mono-regular text-text-secondary">{dateRange}</span>
+        {/* Badge + Date range row (desktop) */}
         <div className="flex items-center justify-between">
           {location && (
             <Badge dotColor={location.color || LOCATION_COLORS[0].value}>
               {location.name}
             </Badge>
           )}
-          <span className="text-mono-regular text-text-secondary">{dateRange}</span>
+          <span className="hidden lg:inline text-mono-regular text-text-secondary">{dateRange}</span>
         </div>
         {/* Name */}
         <h3 className="text-h3 text-text-primary truncate">{accommodation.name}</h3>

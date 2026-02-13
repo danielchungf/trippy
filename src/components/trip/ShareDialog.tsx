@@ -15,6 +15,7 @@ interface ShareDialogProps {
   tripId: string
   tripName: string
   isOwner: boolean
+  trigger?: React.ReactNode
 }
 
 // Format relative time (e.g., "2 hours ago", "3 days ago")
@@ -45,7 +46,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
+export function ShareDialog({ tripId, tripName, isOwner, trigger }: ShareDialogProps) {
   const [open, setOpen] = useState(false)
   const [members, setMembers] = useState<TripMember[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -189,7 +190,11 @@ export function ShareDialog({ tripId, tripName, isOwner }: ShareDialogProps) {
 
   return (
     <>
-      <NakedIconButton icon={<UserRoundPlus />} onClick={() => setOpen(true)} />
+      {trigger ? (
+        <span onClick={() => setOpen(true)}>{trigger}</span>
+      ) : (
+        <NakedIconButton icon={<UserRoundPlus />} onClick={() => setOpen(true)} />
+      )}
 
       <FormDialog
         open={open}
