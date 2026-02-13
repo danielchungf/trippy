@@ -132,6 +132,7 @@ export function StayDrawer({
             <div className="relative w-full shrink-0 bg-neutral-100" style={{ height: 293 }}>
               <PlacePhoto
                 googlePlaceId={accommodation.googlePlaceId}
+                photos={accommodation.photos}
                 selectedPhotoIndex={accommodation.selectedPhotoIndex}
                 alt={accommodation.name}
                 width={520}

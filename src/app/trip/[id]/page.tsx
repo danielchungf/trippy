@@ -267,6 +267,7 @@ export default function TripPage() {
   const [locationColor, setLocationColor] = useState<string>(LOCATION_COLORS[0].value)
   const [locationCoordinates, setLocationCoordinates] = useState<Coordinates | undefined>()
   const [locationGooglePlaceId, setLocationGooglePlaceId] = useState<string | undefined>()
+  const [locationPhotos, setLocationPhotos] = useState<string[] | undefined>()
   const [locationStartDate, setLocationStartDate] = useState<Date | undefined>()
   const [locationEndDate, setLocationEndDate] = useState<Date | undefined>()
   const [isSavingLocation, setIsSavingLocation] = useState(false)
@@ -280,6 +281,7 @@ export default function TripPage() {
   const [accommodationAddress, setAccommodationAddress] = useState("")
   const [accommodationCoordinates, setAccommodationCoordinates] = useState<Coordinates | undefined>()
   const [accommodationGooglePlaceId, setAccommodationGooglePlaceId] = useState<string | undefined>()
+  const [accommodationPhotos, setAccommodationPhotos] = useState<string[] | undefined>()
   const [accommodationCheckIn, setAccommodationCheckIn] = useState<Date | undefined>()
   const [accommodationCheckOut, setAccommodationCheckOut] = useState<Date | undefined>()
   const [accommodationLocationId, setAccommodationLocationId] = useState("")
@@ -344,12 +346,14 @@ export default function TripPage() {
     setLocationName(place.name)
     setLocationCoordinates(place.coordinates)
     setLocationGooglePlaceId(place.placeId)
+    setLocationPhotos(place.photos)
   }
 
   const handleClearLocation = () => {
     setLocationName("")
     setLocationCoordinates(undefined)
     setLocationGooglePlaceId(undefined)
+    setLocationPhotos(undefined)
   }
 
   const handleSaveLocation = async () => {
@@ -376,7 +380,8 @@ export default function TripPage() {
           coordinates: locationCoordinates,
           googlePlaceId: locationGooglePlaceId,
           startDate: startDateStr,
-          endDate: endDateStr
+          endDate: endDateStr,
+          photos: locationPhotos,
         })
       }
 
@@ -436,6 +441,7 @@ export default function TripPage() {
     setAccommodationAddress(place.address)
     setAccommodationCoordinates(place.coordinates)
     setAccommodationGooglePlaceId(place.placeId)
+    setAccommodationPhotos(place.photos)
   }
 
   const handleAccommodationNameChange = (value: string) => {
@@ -449,6 +455,7 @@ export default function TripPage() {
     setAccommodationAddress("")
     setAccommodationCoordinates(undefined)
     setAccommodationGooglePlaceId(undefined)
+    setAccommodationPhotos(undefined)
   }
 
   const getAccommodationSearchCenter = (): Coordinates | undefined => {
@@ -475,7 +482,8 @@ export default function TripPage() {
         googlePlaceId: accommodationGooglePlaceId,
         checkIn: formatLocalDate(accommodationCheckIn),
         checkOut: formatLocalDate(accommodationCheckOut),
-        locationId: accommodationLocationId || undefined
+        locationId: accommodationLocationId || undefined,
+        photos: accommodationPhotos,
       }
 
       if (editingAccommodation) {
@@ -1249,6 +1257,7 @@ function PlaceCardGrid({
       {/* Photo */}
       <PlacePhoto
         googlePlaceId={place.googlePlaceId}
+        photos={place.photos}
         selectedPhotoIndex={place.selectedPhotoIndex}
         alt={place.name}
         className="w-full aspect-video"
@@ -1904,6 +1913,7 @@ function PlaceCardMapView({
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
       <PlacePhoto
         googlePlaceId={place.googlePlaceId}
+        photos={place.photos}
         selectedPhotoIndex={place.selectedPhotoIndex}
         alt={place.name}
         width={photoDimensions?.width ?? 0}
@@ -3453,6 +3463,7 @@ function DestinationCard({
       {/* Photo - dimensions matched to content height with 4:3 ratio */}
       <PlacePhoto
         googlePlaceId={location.googlePlaceId}
+        photos={location.photos}
         selectedPhotoIndex={location.selectedPhotoIndex}
         alt={location.name}
         width={photoDimensions?.width ?? 0}
@@ -3578,6 +3589,7 @@ function StayCard({
       {/* Photo - dimensions explicitly set to match content height with 4:3 ratio */}
       <PlacePhoto
         googlePlaceId={accommodation.googlePlaceId}
+        photos={accommodation.photos}
         selectedPhotoIndex={accommodation.selectedPhotoIndex}
         alt={accommodation.name}
         width={photoDimensions?.width ?? 0}

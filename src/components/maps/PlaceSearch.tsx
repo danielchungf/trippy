@@ -76,7 +76,11 @@ export function PlaceSearch({
 
     setIsGeocoding(true)
     try {
-      const result = await geocodeAddress(query)
+      const result = await queryClient.fetchQuery({
+        queryKey: ['geocode', query],
+        queryFn: () => geocodeAddress(query),
+        staleTime: 30 * 60 * 1000,
+      })
       if (result) {
         onSelect({
           placeId: '',
