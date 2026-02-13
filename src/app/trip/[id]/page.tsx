@@ -302,15 +302,22 @@ export default function TripPage() {
   const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null)
   const [isSavingPlace, setIsSavingPlace] = useState(false)
 
-  // Select first day by default when trip loads
+  // Select first day by default when trip loads (desktop only — mobile starts with no selection)
   useEffect(() => {
-    if (trip && !selectedDayDate) {
+    if (trip && !selectedDayDate && isDesktop) {
       const days = generateDaysFromTrip(trip)
       if (days.length > 0) {
         setSelectedDayDate(days[0].date)
       }
     }
-  }, [trip, selectedDayDate])
+  }, [trip, selectedDayDate, isDesktop])
+
+  // On mobile, reset day selection when entering itinerary tab so the list is always the entry point
+  useEffect(() => {
+    if (!isDesktop && activeTab === 'itinerary') {
+      setSelectedDayDate(null)
+    }
+  }, [activeTab, isDesktop])
 
   // Redirect if trip not found (after loading completes)
   if (!isLoading && !trip) {
@@ -632,47 +639,62 @@ export default function TripPage() {
       />
     </div>
   ) : activeTab === 'itinerary' ? (
-    // Itinerary tab: Two-panel layout
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
-      {/* Left Panel - Itinerary list */}
-      <ResizablePanel
-        defaultSize="500px"
-        minSize="420px"
-        maxSize="580px"
-        className="border-r border-neutral-200 flex flex-col overflow-hidden"
-      >
-        <div className="flex-1 overflow-auto">
-          <ItineraryPanel
-            trip={trip}
-            onRefresh={refreshTrip}
-            onSelectDay={setSelectedDayDate}
-            selectedDayDate={selectedDayDate}
-            viewMode={itineraryViewMode}
-            setViewMode={setItineraryViewMode}
-          />
-        </div>
-      </ResizablePanel>
-
-      <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
-
-      {/* Right Panel - Map + day activities */}
-      <ResizablePanel className="flex flex-col overflow-hidden">
-        {selectedDayDate ? (
-          <RightPanel
-            trip={trip}
-            selectedDayDate={selectedDayDate}
-            onRefresh={refreshTrip}
-            onOpenAccommodationDialog={handleOpenAccommodationDialog}
-            mapHeight={mapHeight}
-            setMapHeight={setMapHeight}
-          />
-        ) : (
-          <div className="h-full flex items-center justify-center text-text-secondary">
-            Select a day to view the map
+    // Itinerary tab — mobile: sliding list-to-detail, desktop: two-panel
+    isDesktop ? (
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        {/* Left Panel - Itinerary list */}
+        <ResizablePanel
+          defaultSize="500px"
+          minSize="420px"
+          maxSize="580px"
+          className="border-r border-neutral-200 flex flex-col overflow-hidden"
+        >
+          <div className="flex-1 overflow-auto">
+            <ItineraryPanel
+              trip={trip}
+              onRefresh={refreshTrip}
+              onSelectDay={setSelectedDayDate}
+              selectedDayDate={selectedDayDate}
+              viewMode={itineraryViewMode}
+              setViewMode={setItineraryViewMode}
+            />
           </div>
-        )}
-      </ResizablePanel>
-    </ResizablePanelGroup>
+        </ResizablePanel>
+
+        <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+
+        {/* Right Panel - Map + day activities */}
+        <ResizablePanel className="flex flex-col overflow-hidden">
+          {selectedDayDate ? (
+            <RightPanel
+              trip={trip}
+              selectedDayDate={selectedDayDate}
+              onRefresh={refreshTrip}
+              onOpenAccommodationDialog={handleOpenAccommodationDialog}
+              mapHeight={mapHeight}
+              setMapHeight={setMapHeight}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center text-text-secondary">
+              Select a day to view the map
+            </div>
+          )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    ) : (
+      <MobileItineraryView
+        trip={trip}
+        selectedDayDate={selectedDayDate}
+        onSelectDay={setSelectedDayDate}
+        onClearDay={() => setSelectedDayDate(null)}
+        onRefresh={refreshTrip}
+        onOpenAccommodationDialog={handleOpenAccommodationDialog}
+        mapHeight={mapHeight}
+        setMapHeight={setMapHeight}
+        itineraryViewMode={itineraryViewMode}
+        setItineraryViewMode={setItineraryViewMode}
+      />
+    )
   ) : activeTab === 'stays' ? (
     // Stays tab — mobile: plain list (map is sticky in mainContent), desktop: two-panel
     isDesktop ? (
@@ -765,7 +787,7 @@ export default function TripPage() {
   )
 
   return (
-    <div className="h-screen bg-background flex flex-col lg:flex-row overflow-hidden">
+    <div className="h-dvh bg-background flex flex-col lg:flex-row overflow-hidden">
       {/* Desktop: Sidebar */}
       <div className="hidden lg:flex">
         <Sidebar onNavigateHome={() => router.push('/')} activeTab={activeTab} onTabChange={setActiveTab} />
@@ -1073,7 +1095,7 @@ function MobileTopNav({ onNavigateHome, activeTab, onTabChange }: {
   onTabChange: (tab: TabId) => void
 }) {
   return (
-    <div className="flex lg:hidden items-center border-b border-neutral-200 p-3 bg-background flex-shrink-0">
+    <div className="flex lg:hidden items-center border-b border-neutral-200 p-3 bg-background flex-shrink-0 sticky top-0 z-30">
       {/* Left: Logo/Home */}
       <button
         onClick={onNavigateHome}
@@ -1528,172 +1550,202 @@ function PlacesRightPanel({
   }
 
 
+  const isDesktop = useMediaQuery("(min-width: 1024px)")
+
+  // Shared filter controls
+  const destinationFilter = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
+          <span className="px-[2px]">Destination</span>
+          <span className="w-[16px] h-[16px] flex-shrink-0">
+            <ChevronDown className="w-full h-full stroke-[2]" />
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-2">
+        {/* Location checkboxes */}
+        <div className="flex flex-col gap-1">
+          {locationsInPlaces.map(location => (
+            <label
+              key={location.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+            >
+              <Checkbox
+                checked={isLocationSelected(location.id)}
+                onCheckedChange={() => toggleLocation(location.id)}
+              />
+              <span className="text-sm text-text-primary">{location.name}</span>
+            </label>
+          ))}
+          {hasUnassignedPlaces && (
+            <label
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+            >
+              <Checkbox
+                checked={isLocationSelected(null)}
+                onCheckedChange={() => toggleLocation(null)}
+              />
+              <span className="text-sm text-text-secondary italic">No location</span>
+            </label>
+          )}
+        </div>
+        {/* Divider */}
+        <div className="my-2 h-px bg-neutral-200" />
+        {/* Assignment radio options */}
+        <div className="flex flex-col gap-1">
+          <label
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+            onClick={() => setAssignmentFilter('all')}
+          >
+            <span className={cn(
+              "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+              assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
+            )}>
+              {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+            </span>
+            <span className="text-sm text-text-primary">All</span>
+          </label>
+          <label
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+            onClick={() => setAssignmentFilter('assigned')}
+          >
+            <span className={cn(
+              "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+              assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
+            )}>
+              {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+            </span>
+            <span className="text-sm text-text-primary">Assigned</span>
+          </label>
+          <label
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
+            onClick={() => setAssignmentFilter('not_assigned')}
+          >
+            <span className={cn(
+              "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+              assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
+            )}>
+              {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
+            </span>
+            <span className="text-sm text-text-primary">Not assigned</span>
+          </label>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+
+  const categoryFilter = (
+    <Select
+      value={selectedCategory ?? "_all"}
+      onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
+    >
+      <SelectTrigger
+        className={cn(
+          "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
+          selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
+        )}
+        style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
+      >
+        <span>
+          {selectedCategory !== null
+            ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
+            : "Category"}
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="_all">All Categories</SelectItem>
+        {categoriesInPlaces.map(category => {
+          const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
+          return (
+            <SelectItem key={category} value={category}>
+              {config.label}
+            </SelectItem>
+          )
+        })}
+      </SelectContent>
+    </Select>
+  )
+
+  const viewToggle = (
+    <div className="flex items-center gap-0.5 p-px h-[32px] rounded-[8px] border border-neutral-200 bg-neutral-100">
+      <button
+        onClick={() => setShowMapView(false)}
+        className={cn(
+          "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+          !showMapView
+            ? "bg-white text-text-primary shadow-sm"
+            : "bg-transparent text-text-secondary"
+        )}
+      >
+        <LayoutGrid className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => setShowMapView(true)}
+        className={cn(
+          "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
+          showMapView
+            ? "bg-white text-text-primary shadow-sm"
+            : "bg-transparent text-text-secondary"
+        )}
+      >
+        <Map className="h-4 w-4" />
+      </button>
+    </div>
+  )
+
   return (
     <div className="h-full flex flex-col relative">
-      {/* Header */}
-      <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          {/* Destination Filter Dropdown */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="inline-flex items-center h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors">
-                <span className="px-[2px]">Destination</span>
-                <span className="w-[16px] h-[16px] flex-shrink-0">
-                  <ChevronDown className="w-full h-full stroke-[2]" />
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-2">
-              {/* Location checkboxes */}
-              <div className="flex flex-col gap-1">
-                {locationsInPlaces.map(location => (
-                  <label
-                    key={location.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={isLocationSelected(location.id)}
-                      onCheckedChange={() => toggleLocation(location.id)}
-                    />
-                    <span className="text-sm text-text-primary">{location.name}</span>
-                  </label>
-                ))}
-                {hasUnassignedPlaces && (
-                  <label
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={isLocationSelected(null)}
-                      onCheckedChange={() => toggleLocation(null)}
-                    />
-                    <span className="text-sm text-text-secondary italic">No location</span>
-                  </label>
-                )}
-              </div>
-              {/* Divider */}
-              <div className="my-2 h-px bg-neutral-200" />
-              {/* Assignment radio options */}
-              <div className="flex flex-col gap-1">
-                <label
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                  onClick={() => setAssignmentFilter('all')}
-                >
-                  <span className={cn(
-                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                    assignmentFilter === 'all' ? "border-neutral-800" : "border-neutral-300"
-                  )}>
-                    {assignmentFilter === 'all' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                  </span>
-                  <span className="text-sm text-text-primary">All</span>
-                </label>
-                <label
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                  onClick={() => setAssignmentFilter('assigned')}
-                >
-                  <span className={cn(
-                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                    assignmentFilter === 'assigned' ? "border-neutral-800" : "border-neutral-300"
-                  )}>
-                    {assignmentFilter === 'assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                  </span>
-                  <span className="text-sm text-text-primary">Assigned</span>
-                </label>
-                <label
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 cursor-pointer"
-                  onClick={() => setAssignmentFilter('not_assigned')}
-                >
-                  <span className={cn(
-                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-                    assignmentFilter === 'not_assigned' ? "border-neutral-800" : "border-neutral-300"
-                  )}>
-                    {assignmentFilter === 'not_assigned' && <span className="w-2 h-2 rounded-full bg-neutral-800" />}
-                  </span>
-                  <span className="text-sm text-text-primary">Not assigned</span>
-                </label>
-              </div>
-            </PopoverContent>
-          </Popover>
-          {/* Category Filter Dropdown */}
-          <Select
-            value={selectedCategory ?? "_all"}
-            onValueChange={(value) => setSelectedCategory(value === "_all" ? null : value)}
-          >
-            <SelectTrigger
-              className={cn(
-                "w-auto h-[32px] px-[8px] py-[6px] gap-[6px] rounded-[10px] bg-white font-fustat font-bold text-[14px] leading-[10px] tracking-[-0.02em] transition-colors shadow-none focus:ring-0 [&>span]:line-clamp-none border",
-                selectedCategory === null && "border-neutral-200 text-neutral-800 hover:bg-neutral-50"
-              )}
-              style={selectedCategory !== null ? { borderColor: '#FF591E', color: '#FF591E' } : undefined}
-            >
-              <span>
-                {selectedCategory !== null
-                  ? (CATEGORY_CONFIG[selectedCategory]?.label || selectedCategory)
-                  : "Category"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all">All Categories</SelectItem>
-              {categoriesInPlaces.map(category => {
-                const config = CATEGORY_CONFIG[category] || { label: category, icon: Flower }
-                return (
-                  <SelectItem key={category} value={category}>
-                    {config.label}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-          {/* Map/List Toggle */}
-          <div className="flex items-center gap-0.5 p-px h-[32px] rounded-[8px] border border-neutral-200 bg-neutral-100">
-            <button
-              onClick={() => setShowMapView(false)}
-              className={cn(
-                "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
-                !showMapView
-                  ? "bg-white text-text-primary shadow-sm"
-                  : "bg-transparent text-text-secondary"
-              )}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowMapView(true)}
-              className={cn(
-                "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors [&>svg]:stroke-[2.25]",
-                showMapView
-                  ? "bg-white text-text-primary shadow-sm"
-                  : "bg-transparent text-text-secondary"
-              )}
-            >
-              <Map className="h-4 w-4" />
-            </button>
+      {/* Header — Desktop: single row, Mobile: two rows */}
+      {isDesktop ? (
+        <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {destinationFilter}
+            {categoryFilter}
+            {viewToggle}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-mono-small text-text-secondary">
+              {filteredPlaceCount}/{totalPlaceCount} PLACES
+            </span>
+            {unassignedPlaceIds.length > 0 && (
+              <Button variant="secondary" size="small" leftIcon={<BrushCleaning />} onClick={() => setIsCleanOpen(true)}>
+                Clean
+              </Button>
+            )}
+            <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+              New place
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Places count */}
-          <span className="text-mono-small text-text-secondary">
-            {filteredPlaceCount}/{totalPlaceCount} PLACES
-          </span>
-          {unassignedPlaceIds.length > 0 && (
-            <Button
-              variant="secondary"
-              size="small"
-              leftIcon={<BrushCleaning />}
-              onClick={() => setIsCleanOpen(true)}
-            >
-              Clean
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="small"
-            leftIcon={<Plus />}
-            onClick={() => onOpenPlaceDialog()}
-          >
-            New place
-          </Button>
+      ) : (
+        <div className="flex flex-col flex-shrink-0">
+          {/* Row 1: Count + actions */}
+          <div className="p-3 flex items-center justify-between border-b border-neutral-200">
+            <span className="text-mono-small text-text-secondary">
+              {filteredPlaceCount}/{totalPlaceCount} PLACES
+            </span>
+            <div className="flex items-center gap-2">
+              {unassignedPlaceIds.length > 0 && (
+                <Button variant="secondary" size="small" leftIcon={<BrushCleaning />} onClick={() => setIsCleanOpen(true)}>
+                  Clean
+                </Button>
+              )}
+              <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()}>
+                New place
+              </Button>
+            </div>
+          </div>
+          {/* Row 2: Filters + view toggle */}
+          <div className="p-3 flex items-center justify-between border-b border-neutral-200">
+            <div className="flex items-center gap-2">
+              {destinationFilter}
+              {categoryFilter}
+            </div>
+            {viewToggle}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Clean unused places confirm dialog */}
       <ConfirmDialog
@@ -1710,71 +1762,116 @@ function PlacesRightPanel({
 
       {/* Content */}
       {showMapView ? (
-        /* Map View with horizontal ResizablePanelGroup */
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
-          {/* Left Panel - Filters + Places List */}
-          <ResizablePanel
-            defaultSize="500px"
-            minSize="420px"
-            maxSize="580px"
-            className="border-r border-neutral-200 flex flex-col overflow-hidden"
-          >
-            {/* Scrollable Places List or Empty State */}
-            <div className="flex-1 overflow-auto flex flex-col">
+        isDesktop ? (
+          /* Desktop: Map View with horizontal ResizablePanelGroup */
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            {/* Left Panel - Places List */}
+            <ResizablePanel
+              defaultSize="500px"
+              minSize="420px"
+              maxSize="580px"
+              className="border-r border-neutral-200 flex flex-col overflow-hidden"
+            >
+              <div className="flex-1 overflow-auto flex flex-col">
+                {totalPlaceCount === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-0">
+                    <h2 className="text-h2 text-text-primary">Got any must-visits?</h2>
+                    <p className="text-body text-text-secondary text-center">Save restaurants, landmarks, or anything<br />you don't want to miss.</p>
+                    <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()} className="mt-[20px]">
+                      New place
+                    </Button>
+                  </div>
+                ) : (
+                  filteredPlaces.map(place => {
+                    const location = place.locationId
+                      ? trip.locations.find(l => l.id === place.locationId) ?? null
+                      : null
+                    return (
+                      <PlaceCardMapView
+                        key={place.id}
+                        place={place}
+                        location={location}
+                        tripId={trip.id}
+                        onEdit={() => onOpenPlaceDialog(place)}
+                        onDelete={() => onDeletePlace(place.id)}
+                        onAssign={() => handleOpenAssignDialog(place)}
+                        onHover={setHoveredPlaceId}
+                        onClick={() => setFocusedPlaceId(place.id)}
+                        onRefresh={onRefresh}
+                        isAssigned={isPlaceAssigned(place.id)}
+                      />
+                    )
+                  })
+                )}
+              </div>
+            </ResizablePanel>
+
+            <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+
+            {/* Right Panel - Map */}
+            <ResizablePanel className="flex flex-col overflow-hidden">
               {totalPlaceCount === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-0">
-                  <h2 className="text-h2 text-text-primary">Got any must-visits?</h2>
-                  <p className="text-body text-text-secondary text-center">Save restaurants, landmarks, or anything<br />you don't want to miss.</p>
-                  <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()} className="mt-[20px]">
-                    New place
-                  </Button>
+                <div className="h-full bg-neutral-100 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-h2 text-text-primary">Nothing to show yet</span>
+                    <span className="text-body text-text-secondary">Add places to reveal the map</span>
+                  </div>
                 </div>
               ) : (
-                filteredPlaces.map(place => {
-                  const location = place.locationId
-                    ? trip.locations.find(l => l.id === place.locationId) ?? null
-                    : null
-
-                  return (
-                    <PlaceCardMapView
-                      key={place.id}
-                      place={place}
-                      location={location}
-                      tripId={trip.id}
-                      onEdit={() => onOpenPlaceDialog(place)}
-                      onDelete={() => onDeletePlace(place.id)}
-                      onAssign={() => handleOpenAssignDialog(place)}
-                      onHover={setHoveredPlaceId}
-                      onClick={() => setFocusedPlaceId(place.id)}
-                      onRefresh={onRefresh}
-                      isAssigned={isPlaceAssigned(place.id)}
-                    />
-                  )
-                })
+                <PlacesMap
+                  places={filteredPlaces}
+                  hoveredPlaceId={hoveredPlaceId}
+                  focusedPlaceId={focusedPlaceId}
+                />
               )}
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
-
-          {/* Right Panel - Map or Empty State */}
-          <ResizablePanel className="flex flex-col overflow-hidden">
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          /* Mobile: Sticky map on top + single-column list below */
+          <div className="flex-1 overflow-auto">
             {totalPlaceCount === 0 ? (
-              <div className="h-full bg-neutral-100 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-h2 text-text-primary">Nothing to show yet</span>
-                  <span className="text-body text-text-secondary">Add places to reveal the map</span>
-                </div>
+              <div className="flex-1 flex flex-col items-center justify-center gap-0 py-12">
+                <h2 className="text-h2 text-text-primary">Got any must-visits?</h2>
+                <p className="text-body text-text-secondary text-center">Save restaurants, landmarks, or anything you don't want to miss.</p>
+                <Button variant="primary" size="small" leftIcon={<Plus />} onClick={() => onOpenPlaceDialog()} className="mt-[20px]">
+                  New place
+                </Button>
               </div>
             ) : (
-              <PlacesMap
-                places={filteredPlaces}
-                hoveredPlaceId={hoveredPlaceId}
-                focusedPlaceId={focusedPlaceId}
-              />
+              <>
+                <div className="sticky top-0 z-20 aspect-video w-full flex-shrink-0">
+                  <PlacesMap
+                    places={filteredPlaces}
+                    hoveredPlaceId={hoveredPlaceId}
+                    focusedPlaceId={focusedPlaceId}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  {filteredPlaces.map(place => {
+                    const location = place.locationId
+                      ? trip.locations.find(l => l.id === place.locationId) ?? null
+                      : null
+                    return (
+                      <PlaceCardMapView
+                        key={place.id}
+                        place={place}
+                        location={location}
+                        tripId={trip.id}
+                        onEdit={() => onOpenPlaceDialog(place)}
+                        onDelete={() => onDeletePlace(place.id)}
+                        onAssign={() => handleOpenAssignDialog(place)}
+                        onHover={setHoveredPlaceId}
+                        onClick={() => setFocusedPlaceId(place.id)}
+                        onRefresh={onRefresh}
+                        isAssigned={isPlaceAssigned(place.id)}
+                      />
+                    )
+                  })}
+                </div>
+              </>
             )}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        )
       ) : (
         /* Grid View (original) */
         <div className="flex-1 flex flex-col min-h-0">
@@ -1789,7 +1886,7 @@ function PlacesRightPanel({
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-3 min-[1000px]:grid-cols-4 min-[1250px]:grid-cols-5">
+              <div className="grid grid-cols-2 lg:grid-cols-3 min-[1000px]:grid-cols-4 min-[1250px]:grid-cols-5">
                 {filteredPlaces.map(place => {
                   const location = place.locationId
                     ? trip.locations.find(l => l.id === place.locationId) ?? null
@@ -2005,7 +2102,9 @@ function RightPanel({
   onRefresh,
   onOpenAccommodationDialog,
   mapHeight,
-  setMapHeight
+  setMapHeight,
+  hideMap = false,
+  onBack,
 }: {
   trip: TripWithOwnership
   selectedDayDate: string
@@ -2013,6 +2112,8 @@ function RightPanel({
   onOpenAccommodationDialog: (accommodation?: Accommodation) => void
   mapHeight: number
   setMapHeight: (height: number | ((h: number) => number)) => void
+  hideMap?: boolean
+  onBack?: () => void
 }) {
   const days = generateDaysFromTrip(trip)
   const dayIndex = days.findIndex(d => d.date === selectedDayDate)
@@ -2331,38 +2432,77 @@ function RightPanel({
     await onRefresh()
   }
 
+  const mobileToolbar = hideMap && onBack ? (
+    <div className="p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 bg-background">
+      <Button variant="secondary" size="small" leftIcon={<ChevronLeft />} onClick={onBack}>
+        Back
+      </Button>
+      <div className="flex items-center gap-2">
+        {canOptimize && (
+          <Button
+            variant="secondary"
+            size="small"
+            leftIcon={<Route />}
+            onClick={handleOptimizeRoute}
+            disabled={isOptimizing}
+          >
+            {isOptimizing ? 'Optimizing...' : 'Optimize'}
+          </Button>
+        )}
+        <Button
+          variant={day.activities.length === 0 ? "secondary" : "primary"}
+          size="small"
+          leftIcon={<Plus />}
+          onClick={() => handleOpenActivityDialog()}
+        >
+          New activity
+        </Button>
+      </div>
+    </div>
+  ) : null
+
   return (
     <>
-      <div ref={containerRef} className="flex flex-col h-full">
-        {/* Map Panel - Resizable height */}
-        <div
-          className="flex-shrink-0"
-          style={{ height: mapHeight }}
-        >
-          <DayMap
-              activities={day.activities}
-              hoveredIndex={hoveredActivityIndex}
-              focusedIndex={focusedActivityIndex}
-              savedPlaces={unscheduledSavedPlaces}
-              onAddPlaceAsActivity={handleAddSavedPlaceFromMap}
-              locationCenter={location?.coordinates}
-            />
-        </div>
+      <div ref={containerRef} className={cn("flex flex-col", !hideMap && "h-full")}>
+        {/* Map Panel - Resizable height (hidden when mobile wrapper provides its own map) */}
+        {!hideMap && (
+          <div
+            className="flex-shrink-0"
+            style={{ height: mapHeight }}
+          >
+            <DayMap
+                activities={day.activities}
+                hoveredIndex={hoveredActivityIndex}
+                focusedIndex={focusedActivityIndex}
+                savedPlaces={unscheduledSavedPlaces}
+                onAddPlaceAsActivity={handleAddSavedPlaceFromMap}
+                locationCenter={location?.coordinates}
+              />
+          </div>
+        )}
 
         {/* Activities Panel - Takes remaining space */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className={cn("flex-1 flex flex-col", !hideMap && "min-h-0")}>
+          {/* Mobile: Back + action buttons row (sticky below map) */}
+          {mobileToolbar && (
+            <div className="sticky top-[56.25vw] z-20">
+              {mobileToolbar}
+            </div>
+          )}
           {/* Activities Header with Resize Handle */}
           <div className="relative p-3 flex items-center justify-between border-b border-neutral-200 flex-shrink-0 group">
-            {/* Resize Handle - pill at top of header */}
-            <div
-              className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
-              onMouseDown={handleMouseDown}
-            >
-              <div className={cn(
-                "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
-                isResizing && "opacity-100"
-              )} />
-            </div>
+            {/* Resize Handle - pill at top of header (only with map) */}
+            {!hideMap && (
+              <div
+                className="absolute top-0 left-0 right-0 h-3 cursor-row-resize flex items-center justify-center"
+                onMouseDown={handleMouseDown}
+              >
+                <div className={cn(
+                  "w-8 h-1 rounded-full bg-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity",
+                  isResizing && "opacity-100"
+                )} />
+              </div>
+            )}
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-h2 text-text-primary">{displayName}</span>
@@ -2375,36 +2515,38 @@ function RightPanel({
               </div>
               <span className="text-h3 text-text-secondary">{dayInfo}</span>
             </div>
-            <div className="flex items-center gap-2">
-              {canOptimize && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        leftIcon={<Route />}
-                        onClick={handleOptimizeRoute}
-                        disabled={isOptimizing}
-                      >
-                        {isOptimizing ? 'Optimizing...' : 'Optimize'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Optimize activities to minimize travel distance</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              <Button
-                variant={day.activities.length === 0 ? "secondary" : "primary"}
-                size="small"
-                leftIcon={<Plus />}
-                onClick={() => handleOpenActivityDialog()}
-              >
-                New activity
-              </Button>
-            </div>
+            {!hideMap && (
+              <div className="flex items-center gap-2">
+                {canOptimize && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          leftIcon={<Route />}
+                          onClick={handleOptimizeRoute}
+                          disabled={isOptimizing}
+                        >
+                          {isOptimizing ? 'Optimizing...' : 'Optimize'}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Optimize activities to minimize travel distance</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                <Button
+                  variant={day.activities.length === 0 ? "secondary" : "primary"}
+                  size="small"
+                  leftIcon={<Plus />}
+                  onClick={() => handleOpenActivityDialog()}
+                >
+                  New activity
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Activities List */}
@@ -2919,6 +3061,105 @@ function ActivityCard({
   )
 }
 
+// Mobile Itinerary View — sliding list-to-detail navigation
+function MobileItineraryView({
+  trip,
+  selectedDayDate,
+  onSelectDay,
+  onClearDay,
+  onRefresh,
+  onOpenAccommodationDialog,
+  mapHeight,
+  setMapHeight,
+  itineraryViewMode,
+  setItineraryViewMode,
+}: {
+  trip: TripWithOwnership
+  selectedDayDate: string | null
+  onSelectDay: (date: string) => void
+  onClearDay: () => void
+  onRefresh: () => Promise<void>
+  onOpenAccommodationDialog: (accommodation?: Accommodation) => void
+  mapHeight: number
+  setMapHeight: (height: number | ((h: number) => number)) => void
+  itineraryViewMode: 'list' | 'timeline'
+  setItineraryViewMode: (mode: 'list' | 'timeline') => void
+}) {
+  // Keep track of last selected day so content persists during slide-out animation
+  const [animatingDayDate, setAnimatingDayDate] = useState<string | null>(null)
+  const detailDayDate = selectedDayDate || animatingDayDate
+
+  useEffect(() => {
+    if (selectedDayDate) {
+      setAnimatingDayDate(selectedDayDate)
+    } else {
+      const timer = setTimeout(() => setAnimatingDayDate(null), 300)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedDayDate])
+
+  // Get selected day data for the sticky map
+  const days = useMemo(() => generateDaysFromTrip(trip), [trip])
+  const detailDay = detailDayDate ? days.find(d => d.date === detailDayDate) : null
+  const detailLocation = detailDay?.locationId
+    ? trip.locations.find(l => l.id === detailDay.locationId)
+    : null
+
+  return (
+    <div className="flex-1 overflow-clip">
+      <div className={cn(
+        "flex h-full transition-transform duration-300 ease-in-out",
+        selectedDayDate ? "-translate-x-full" : "translate-x-0"
+      )}>
+        {/* List View */}
+        <div className="w-full h-full flex-shrink-0 overflow-auto">
+          <ItineraryPanel
+            trip={trip}
+            onRefresh={onRefresh}
+            onSelectDay={onSelectDay}
+            selectedDayDate={selectedDayDate}
+            viewMode={itineraryViewMode}
+            setViewMode={setItineraryViewMode}
+          />
+        </div>
+
+        {/* Detail View */}
+        <div className="w-full h-full flex-shrink-0 overflow-auto">
+          {detailDayDate && detailDay && (
+            <>
+              {/* Sticky map */}
+              <div className="sticky top-0 z-20 flex-shrink-0">
+                <div className="aspect-video w-full">
+                  <DayMap
+                    activities={detailDay.activities}
+                    hoveredIndex={null}
+                    focusedIndex={null}
+                    savedPlaces={[]}
+                    onAddPlaceAsActivity={() => {}}
+                    locationCenter={detailLocation?.coordinates}
+                  />
+                </div>
+              </div>
+
+              {/* Day activities (RightPanel without its own map, with back button row) */}
+              <RightPanel
+                trip={trip}
+                selectedDayDate={detailDayDate}
+                onRefresh={onRefresh}
+                onOpenAccommodationDialog={onOpenAccommodationDialog}
+                mapHeight={mapHeight}
+                setMapHeight={setMapHeight}
+                hideMap
+                onBack={onClearDay}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Itinerary Panel Component
 function ItineraryPanel({
   trip,
@@ -3380,30 +3621,32 @@ function OverviewPanel({
         {destinationsContent}
       </div>
 
-      {/* Desktop: resizable two-panel layout */}
-      <ResizablePanelGroup direction="horizontal" className="hidden lg:flex flex-1">
-        <ResizablePanel
-          defaultSize="500px"
-          minSize="420px"
-          maxSize="580px"
-          className="border-r border-neutral-200 flex flex-col overflow-hidden"
-        >
-          {daysAwayBanner}
-          {statsGrid}
-          <div className="flex-1 overflow-auto flex flex-col">
-            {destinationsContent}
-          </div>
-        </ResizablePanel>
+      {/* Desktop: resizable two-panel layout (wrapper div needed because ResizablePanelGroup applies inline display:flex which overrides hidden) */}
+      <div className="hidden lg:flex flex-1">
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          <ResizablePanel
+            defaultSize="500px"
+            minSize="420px"
+            maxSize="580px"
+            className="border-r border-neutral-200 flex flex-col overflow-hidden"
+          >
+            {daysAwayBanner}
+            {statsGrid}
+            <div className="flex-1 overflow-auto flex flex-col">
+              {destinationsContent}
+            </div>
+          </ResizablePanel>
 
-        <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
+          <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
-        <ResizablePanel className="flex flex-col overflow-hidden">
-          <DestinationsMap
-            locations={trip.locations}
-            hoveredIndex={hoveredLocationIndex}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          <ResizablePanel className="flex flex-col overflow-hidden">
+            <DestinationsMap
+              locations={trip.locations}
+              hoveredIndex={hoveredLocationIndex}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
     </>
   )
 }
