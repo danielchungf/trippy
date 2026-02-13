@@ -10,6 +10,7 @@ export async function addLocation(tripId: string, data: {
   endDate: string
   coordinates?: { lat: number; lng: number }
   googlePlaceId?: string
+  photos?: string[]
 }): Promise<Location | null> {
   const supabase = createClient()
 
@@ -25,6 +26,7 @@ export async function addLocation(tripId: string, data: {
       lng: data.coordinates?.lng || null,
       google_place_id: data.googlePlaceId || null,
       selected_photo_index: null,
+      photos: data.photos || null,
     })
     .select()
     .single()
@@ -68,6 +70,7 @@ export async function addLocation(tripId: string, data: {
       : undefined,
     googlePlaceId: locationRow.google_place_id || undefined,
     selectedPhotoIndex: locationRow.selected_photo_index ?? undefined,
+    photos: locationRow.photos || undefined,
   }
 }
 
@@ -86,6 +89,7 @@ export async function updateLocation(tripId: string, locationId: string, data: P
   }
   if (data.googlePlaceId !== undefined) updateData.google_place_id = data.googlePlaceId || null
   if (data.selectedPhotoIndex !== undefined) updateData.selected_photo_index = data.selectedPhotoIndex ?? null
+  if (data.photos !== undefined) updateData.photos = data.photos || null
 
   const { data: locationRow, error } = await supabase
     .from('locations')
@@ -126,6 +130,7 @@ export async function updateLocation(tripId: string, locationId: string, data: P
       : undefined,
     googlePlaceId: locationRow.google_place_id || undefined,
     selectedPhotoIndex: locationRow.selected_photo_index ?? undefined,
+    photos: locationRow.photos || undefined,
   }
 }
 

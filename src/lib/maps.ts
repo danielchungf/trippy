@@ -48,23 +48,6 @@ export interface PlaceSearchResult {
   photos?: string[]
 }
 
-export interface PlaceReview {
-  authorName: string
-  rating: number
-  text: string
-  relativeTimeDescription: string
-}
-
-export interface PlaceDetailsExtended extends PlaceSearchResult {
-  website?: string
-  phoneNumber?: string
-  openingHours?: string[]
-  isOpenNow?: boolean
-  priceLevel?: number
-  reviewCount?: number
-  reviews?: PlaceReview[]
-}
-
 export interface GeocodeResult {
   address: string
   coordinates: Coordinates
@@ -135,18 +118,10 @@ export async function searchPlaces(
         // This is necessary because Google's textSearch treats location/radius as a
         // "bias" not a strict filter, and can return places from anywhere in the world.
         if (preciseMatch && location) {
-          console.log('[searchPlaces Debug] Before filter:', mapped.length, 'results')
-          mapped.forEach(p => {
-            const dist = calculateDistance(location, p.coordinates)
-            console.log('[searchPlaces Debug]', p.name, 'at', p.coordinates, 'distance:', Math.round(dist), 'm')
-          })
-
-          mapped = mapped.filter(place => {
+              mapped = mapped.filter(place => {
             const distance = calculateDistance(location, place.coordinates)
             return distance <= 500 // 500m max distance for precise matching
           })
-
-          console.log('[searchPlaces Debug] After filter:', mapped.length, 'results')
 
           // Sort by distance, closest first
           mapped.sort((a, b) => {
@@ -189,105 +164,6 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
             rating: place.rating,
             types: place.types,
             photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
-          })
-        } else {
-          resolve(null)
-        }
-      }
-    )
-  })
-}
-
-/**
- * Find a specific place using Find Place API
- * This is more reliable than textSearch for finding a known place by name
- */
-export async function findPlaceByQuery(query: string): Promise<PlaceSearchResult | null> {
-  await loadGoogleMaps()
-  const places = await loadPlacesLibrary()
-
-  return new Promise((resolve) => {
-    const service = new places.PlacesService(document.createElement('div'))
-
-    service.findPlaceFromQuery(
-      {
-        query,
-        fields: ['place_id', 'name', 'formatted_address', 'geometry', 'rating', 'photos', 'types']
-      },
-      (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-          const place = results[0]
-          resolve({
-            placeId: place.place_id || '',
-            name: place.name || '',
-            address: place.formatted_address || '',
-            coordinates: {
-              lat: place.geometry?.location?.lat() || 0,
-              lng: place.geometry?.location?.lng() || 0
-            },
-            rating: place.rating,
-            types: place.types,
-            photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
-          })
-        } else {
-          resolve(null)
-        }
-      }
-    )
-  })
-}
-
-export async function getPlaceDetailsExtended(placeId: string): Promise<PlaceDetailsExtended | null> {
-  await loadGoogleMaps()
-  const places = await loadPlacesLibrary()
-
-  return new Promise((resolve) => {
-    const service = new places.PlacesService(document.createElement('div'))
-
-    service.getDetails(
-      {
-        placeId,
-        fields: [
-          'place_id',
-          'name',
-          'formatted_address',
-          'geometry',
-          'rating',
-          'photos',
-          'types',
-          'website',
-          'formatted_phone_number',
-          'opening_hours',
-          'price_level',
-          'reviews',
-          'user_ratings_total'
-        ]
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          resolve({
-            placeId: place.place_id || '',
-            name: place.name || '',
-            address: place.formatted_address || '',
-            coordinates: {
-              lat: place.geometry?.location?.lat() || 0,
-              lng: place.geometry?.location?.lng() || 0
-            },
-            rating: place.rating,
-            types: place.types,
-            photos: place.photos?.slice(0, 5).map(p => p.getUrl({ maxWidth: 800 })),
-            website: place.website,
-            phoneNumber: place.formatted_phone_number,
-            openingHours: place.opening_hours?.weekday_text,
-            isOpenNow: place.opening_hours?.isOpen?.(),
-            priceLevel: place.price_level,
-            reviewCount: place.user_ratings_total,
-            reviews: place.reviews?.slice(0, 3).map(review => ({
-              authorName: review.author_name || 'Anonymous',
-              rating: review.rating || 0,
-              text: review.text || '',
-              relativeTimeDescription: review.relative_time_description || ''
-            }))
           })
         } else {
           resolve(null)

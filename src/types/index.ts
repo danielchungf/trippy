@@ -140,6 +140,7 @@ export interface Accommodation {
   bookingUrl?: string
   locationId?: string
   selectedPhotoIndex?: number
+  photos?: string[]
 }
 
 // Location colors - Tailwind 400 level colors
@@ -169,6 +170,7 @@ export interface Location {
   startDate: string // ISO date
   endDate: string // ISO date
   selectedPhotoIndex?: number
+  photos?: string[]
 }
 
 // Trip (top-level container)
