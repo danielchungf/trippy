@@ -283,9 +283,9 @@ function MobileHomeLayout({
   isLoading: boolean
 }) {
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col h-dvh bg-background overflow-hidden">
       {/* Top bar */}
-      <header className="relative flex items-center justify-between p-3 border-b border-border-muted">
+      <header className="relative flex items-center justify-between p-3 border-b border-border-muted flex-shrink-0">
         <div className="flex items-center">
           <div className="w-[28px] h-[28px] inline-flex items-center justify-center">
             <Image src={logo} alt="Logo" width={20} height={20} />
