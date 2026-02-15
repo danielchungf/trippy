@@ -27,7 +27,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+      if (event === "SIGNED_OUT") {
         queryClient.clear()
       }
     })
