@@ -2483,9 +2483,9 @@ function RightPanel({
 
         {/* Activities Panel - Takes remaining space */}
         <div className={cn("flex-1 flex flex-col", !hideMap && "min-h-0")}>
-          {/* Mobile: Back + action buttons row (sticky below map) */}
+          {/* Mobile: Back + action buttons row (sticky at top of scroll area) */}
           {mobileToolbar && (
-            <div className="sticky top-[56.25vw] z-20">
+            <div className="sticky top-0 z-20">
               {mobileToolbar}
             </div>
           )}
@@ -2550,7 +2550,7 @@ function RightPanel({
           </div>
 
           {/* Activities List */}
-          <div className="flex-1 overflow-auto">
+          <div className={cn("flex-1", !hideMap && "overflow-auto")}>
             {/* Departing Accommodation Row (checking out today) */}
             {departingAccommodation && (
               <div className="group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
@@ -3106,7 +3106,7 @@ function MobileItineraryView({
     : null
 
   return (
-    <div className="flex-1 overflow-clip">
+    <div className="flex-1 min-h-0 overflow-clip">
       <div className={cn(
         "flex h-full transition-transform duration-300 ease-in-out",
         selectedDayDate ? "-translate-x-full" : "translate-x-0"
@@ -3124,11 +3124,11 @@ function MobileItineraryView({
         </div>
 
         {/* Detail View */}
-        <div className="w-full h-full flex-shrink-0 overflow-auto">
+        <div className="w-full h-full flex-shrink-0 flex flex-col">
           {detailDayDate && detailDay && (
             <>
-              {/* Sticky map */}
-              <div className="sticky top-0 z-20 flex-shrink-0">
+              {/* Fixed map at top */}
+              <div className="flex-shrink-0 z-20">
                 <div className="aspect-video w-full">
                   <DayMap
                     activities={detailDay.activities}
@@ -3141,17 +3141,19 @@ function MobileItineraryView({
                 </div>
               </div>
 
-              {/* Day activities (RightPanel without its own map, with back button row) */}
-              <RightPanel
-                trip={trip}
-                selectedDayDate={detailDayDate}
-                onRefresh={onRefresh}
-                onOpenAccommodationDialog={onOpenAccommodationDialog}
-                mapHeight={mapHeight}
-                setMapHeight={setMapHeight}
-                hideMap
-                onBack={onClearDay}
-              />
+              {/* Day activities - scrollable below map */}
+              <div className="flex-1 min-h-0 overflow-auto">
+                <RightPanel
+                  trip={trip}
+                  selectedDayDate={detailDayDate}
+                  onRefresh={onRefresh}
+                  onOpenAccommodationDialog={onOpenAccommodationDialog}
+                  mapHeight={mapHeight}
+                  setMapHeight={setMapHeight}
+                  hideMap
+                  onBack={onClearDay}
+                />
+              </div>
             </>
           )}
         </div>
@@ -3457,7 +3459,7 @@ function StaysPanel({
           New stay
         </Button>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 lg:overflow-auto">
         <OverviewStaysList
           trip={trip}
           onOpenStayDrawer={onOpenStayDrawer}
@@ -3615,7 +3617,7 @@ function OverviewPanel({
   return (
     <>
       {/* Mobile: single scrollable column */}
-      <div className="lg:hidden flex flex-col">
+      <div className="lg:hidden flex flex-col flex-1">
         {daysAwayBanner}
         {statsGrid}
         {destinationsContent}
