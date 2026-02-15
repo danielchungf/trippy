@@ -81,96 +81,83 @@ export async function searchPlaces(
   /** When true, strictly filter results to only include places within 500m of the coordinates */
   preciseMatch?: boolean
 ): Promise<PlaceSearchResult[]> {
-  // Load both maps (for LatLng) and places libraries
   await loadGoogleMaps()
-  const places = await loadPlacesLibrary()
+  await loadPlacesLibrary()
 
-  // For precise matching, use a larger search radius to get results,
-  // then filter strictly by distance afterward
-  const request: google.maps.places.TextSearchRequest = {
-    query,
+  const request: google.maps.places.SearchByTextRequest = {
+    fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'types', 'photos'],
+    textQuery: query,
+    maxResultCount: 10,
     ...(location && {
-      location: new google.maps.LatLng(location.lat, location.lng),
-      radius: preciseMatch ? 5000 : 50000 // 5km search radius, will filter later
-    })
+      locationBias: {
+        center: { lat: location.lat, lng: location.lng },
+        radius: preciseMatch ? 5000 : 50000,
+      } as google.maps.CircleLiteral,
+    }),
   }
 
-  return new Promise((resolve) => {
-    const service = new places.PlacesService(document.createElement('div'))
+  try {
+    const { places: results } = await google.maps.places.Place.searchByText(request)
 
-    service.textSearch(request, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        let mapped: PlaceSearchResult[] = results.slice(0, 10).map(place => ({
-          placeId: place.place_id || '',
-          name: place.name || '',
-          address: place.formatted_address || '',
-          coordinates: {
-            lat: place.geometry?.location?.lat() || 0,
-            lng: place.geometry?.location?.lng() || 0
-          },
-          rating: place.rating,
-          types: place.types,
-          photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
-        }))
+    let mapped: PlaceSearchResult[] = (results || []).map(place => ({
+      placeId: place.id || '',
+      name: place.displayName || '',
+      address: place.formattedAddress || '',
+      coordinates: {
+        lat: place.location?.lat() || 0,
+        lng: place.location?.lng() || 0
+      },
+      rating: place.rating ?? undefined,
+      types: place.types ?? undefined,
+      photos: place.photos?.slice(0, 3).map(p => p.getURI({ maxWidth: 400 }))
+    }))
 
-        // When preciseMatch is true and we have coordinates, strictly filter results
-        // to only include places within 500m of the target coordinates.
-        // This is necessary because Google's textSearch treats location/radius as a
-        // "bias" not a strict filter, and can return places from anywhere in the world.
-        if (preciseMatch && location) {
-              mapped = mapped.filter(place => {
-            const distance = calculateDistance(location, place.coordinates)
-            return distance <= 500 // 500m max distance for precise matching
-          })
+    // When preciseMatch is true and we have coordinates, strictly filter results
+    // to only include places within 500m of the target coordinates.
+    if (preciseMatch && location) {
+      mapped = mapped.filter(place => {
+        const distance = calculateDistance(location, place.coordinates)
+        return distance <= 500
+      })
 
-          // Sort by distance, closest first
-          mapped.sort((a, b) => {
-            const distA = calculateDistance(location, a.coordinates)
-            const distB = calculateDistance(location, b.coordinates)
-            return distA - distB
-          })
-        }
+      mapped.sort((a, b) => {
+        const distA = calculateDistance(location, a.coordinates)
+        const distB = calculateDistance(location, b.coordinates)
+        return distA - distB
+      })
+    }
 
-        resolve(mapped)
-      } else {
-        resolve([])
-      }
-    })
-  })
+    return mapped
+  } catch {
+    return []
+  }
 }
 
 export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResult | null> {
   await loadGoogleMaps()
-  const places = await loadPlacesLibrary()
+  await loadPlacesLibrary()
 
-  return new Promise((resolve) => {
-    const service = new places.PlacesService(document.createElement('div'))
+  try {
+    const place = new google.maps.places.Place({ id: placeId })
+    await place.fetchFields({
+      fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'types', 'photos']
+    })
 
-    service.getDetails(
-      {
-        placeId,
-        fields: ['place_id', 'name', 'formatted_address', 'geometry', 'rating', 'photos', 'types']
+    return {
+      placeId: place.id || '',
+      name: place.displayName || '',
+      address: place.formattedAddress || '',
+      coordinates: {
+        lat: place.location?.lat() || 0,
+        lng: place.location?.lng() || 0
       },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          resolve({
-            placeId: place.place_id || '',
-            name: place.name || '',
-            address: place.formatted_address || '',
-            coordinates: {
-              lat: place.geometry?.location?.lat() || 0,
-              lng: place.geometry?.location?.lng() || 0
-            },
-            rating: place.rating,
-            types: place.types,
-            photos: place.photos?.slice(0, 3).map(p => p.getUrl({ maxWidth: 400 }))
-          })
-        } else {
-          resolve(null)
-        }
-      }
-    )
-  })
+      rating: place.rating ?? undefined,
+      types: place.types ?? undefined,
+      photos: place.photos?.slice(0, 3).map(p => p.getURI({ maxWidth: 400 }))
+    }
+  } catch {
+    return null
+  }
 }
 
 export interface DirectionsResult {
