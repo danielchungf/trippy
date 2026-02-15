@@ -632,7 +632,7 @@ export default function TripPage() {
   )
 
   if (!trip) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+    return <div className="min-h-dvh flex items-center justify-center">Loading...</div>
   }
 
   const duration = getTripDuration(trip)
@@ -708,7 +708,7 @@ export default function TripPage() {
       />
     )
   ) : activeTab === 'stays' ? (
-    // Stays tab — mobile: plain list (map is sticky in mainContent), desktop: two-panel
+    // Stays tab — mobile: map + list in own scroll container, desktop: two-panel
     isDesktop ? (
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel
@@ -731,13 +731,18 @@ export default function TripPage() {
         </ResizablePanel>
       </ResizablePanelGroup>
     ) : (
-      <StaysPanel
-        trip={trip}
-        onOpenAccommodationDialog={handleOpenAccommodationDialog}
-        onOpenStayDrawer={handleOpenStayDrawer}
-        onRefresh={refreshTrip}
-        onHoverStay={setHoveredStayIndex}
-      />
+      <div className="flex-1 flex flex-col overflow-auto">
+        <div className="aspect-video w-full sticky top-0 z-20 flex-shrink-0">
+          <DestinationsMap locations={staysAsLocations} hoveredIndex={hoveredStayIndex} />
+        </div>
+        <StaysPanel
+          trip={trip}
+          onOpenAccommodationDialog={handleOpenAccommodationDialog}
+          onOpenStayDrawer={handleOpenStayDrawer}
+          onRefresh={refreshTrip}
+          onHoverStay={setHoveredStayIndex}
+        />
+      </div>
     )
   ) : activeTab === 'expenses' ? (
     // Expenses tab
@@ -750,8 +755,8 @@ export default function TripPage() {
         onRefresh={refreshTrip}
       />
     </div>
-  ) : (
-    // Overview tab: Two-panel layout with destinations + map
+  ) : isDesktop ? (
+    // Overview tab — desktop: OverviewPanel handles its own two-panel layout
     <OverviewPanel
       trip={trip}
       onOpenLocationDialog={handleOpenLocationDialog}
@@ -760,30 +765,37 @@ export default function TripPage() {
       destinationsViewMode={destinationsViewMode}
       setDestinationsViewMode={setDestinationsViewMode}
     />
+  ) : (
+    // Overview tab — mobile: map + header + content in own scroll container
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="aspect-video w-full sticky top-0 z-20 flex-shrink-0">
+        <DestinationsMap
+          locations={trip.locations}
+          hoveredIndex={null}
+        />
+      </div>
+      <TripHeader
+        trip={trip}
+        tripId={tripId}
+        duration={duration}
+        onRefresh={refreshTrip}
+        activeTab={activeTab}
+      />
+      <OverviewPanel
+        trip={trip}
+        onOpenLocationDialog={handleOpenLocationDialog}
+        onRefresh={refreshTrip}
+        onTabChange={setActiveTab}
+        destinationsViewMode={destinationsViewMode}
+        setDestinationsViewMode={setDestinationsViewMode}
+      />
+    </div>
   )
 
   const mainContent = (
-    <div className="flex-1 flex flex-col overflow-auto lg:overflow-hidden">
-      {/* Mobile: sticky map on top for overview and stays tabs */}
-      {!isDesktop && activeTab === 'overview' && (
-        <div className="lg:hidden aspect-video w-full sticky top-0 z-20 flex-shrink-0">
-          <DestinationsMap
-            locations={trip.locations}
-            hoveredIndex={null}
-          />
-        </div>
-      )}
-      {!isDesktop && activeTab === 'stays' && (
-        <div className="lg:hidden aspect-video w-full sticky top-0 z-20 flex-shrink-0">
-          <DestinationsMap
-            locations={staysAsLocations}
-            hoveredIndex={hoveredStayIndex}
-          />
-        </div>
-      )}
-
-      {/* Trip Header — always on desktop, only overview on mobile */}
-      {(isDesktop || activeTab === 'overview') && (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Trip Header — desktop only (mobile overview includes its own) */}
+      {isDesktop && (
         <TripHeader
           trip={trip}
           tripId={tripId}
@@ -793,7 +805,7 @@ export default function TripPage() {
         />
       )}
 
-      {/* Tab Content Area */}
+      {/* Tab Content Area — each tab manages its own scrolling on mobile */}
       {tabContent}
     </div>
   )

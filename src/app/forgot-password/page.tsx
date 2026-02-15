@@ -108,7 +108,7 @@ function ForgotPasswordForm() {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-white px-4">
       <Suspense fallback={<div className="w-full max-w-sm h-64" />}>
         <ForgotPasswordForm />
       </Suspense>

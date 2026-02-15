@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
   // Show loading while checking session
   if (!sessionChecked) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-white px-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <p className="text-[#a1a1a1]">Loading...</p>
         </div>
@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
   // Show error if no valid session
   if (!hasSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-white px-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div>
             <h1 className="text-2xl font-bold text-[#0a0a0a]">Session expired</h1>
@@ -127,7 +127,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#0a0a0a]">Set new password</h1>
