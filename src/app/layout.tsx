@@ -51,7 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${fustat.variable} ${dmMono.variable}`}>
-      <body className="antialiased min-h-screen font-inter">
+      <body className="antialiased min-h-dvh font-inter">
         <QueryProvider>
           {children}
         </QueryProvider>

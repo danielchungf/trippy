@@ -311,7 +311,7 @@ export default function DayPage() {
   }
 
   if (!trip || !day) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+    return <div className="min-h-dvh flex items-center justify-center">Loading...</div>
   }
 
   const unassignedPlaces = trip.savedPlaces.filter(
@@ -333,7 +333,7 @@ export default function DayPage() {
   const hasAccommodationWithCoords = !!currentAccommodation?.coordinates
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       {/* Header */}
       <header className="border-b sticky top-0 bg-background z-10">
         <div className="container mx-auto px-4 py-4">
