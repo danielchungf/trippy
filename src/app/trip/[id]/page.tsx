@@ -205,9 +205,21 @@ export default function TripPage() {
   const refreshTrip = useRefreshTrip(tripId)
 
   const initialTab = searchParams.get('tab') as TabId | null
-  const [activeTab, setActiveTab] = useState<TabId>(
+  const [activeTab, setActiveTabState] = useState<TabId>(
     initialTab && ['overview', 'stays', 'itinerary', 'places', 'expenses', 'packing'].includes(initialTab) ? initialTab : 'overview'
   )
+
+  // Keep URL in sync with active tab so refresh preserves it
+  const setActiveTab = useCallback((tab: TabId) => {
+    setActiveTabState(tab)
+    const url = new URL(window.location.href)
+    if (tab === 'overview') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', tab)
+    }
+    window.history.replaceState(null, '', url.toString())
+  }, [])
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null)
 
   // Persisted view mode states (survive tab switches)
