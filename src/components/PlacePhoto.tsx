@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { updateAccommodation, updateSavedPlace, updateLocation } from "@/lib/db"
-import { usePlaceDetails, useInvalidatePlacePhotos } from "@/lib/hooks/use-places"
+import { usePlacePhotos, useInvalidatePlacePhotos } from "@/lib/hooks/use-places"
 
 type EntityType = 'accommodation' | 'savedPlace' | 'location'
 
@@ -45,13 +45,33 @@ export function PlacePhoto({
   placeholderIcon,
   editable
 }: PlacePhotoProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const [photos, setPhotos] = useState<string[]>(preloadedPhotos || [])
   const [photoIndex, setPhotoIndex] = useState(selectedPhotoIndex)
   const [needsFresh, setNeedsFresh] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
 
-  // Fetch photos via React Query — only when no preloaded photos or URLs expired
-  const shouldFetch = !preloadedPhotos?.length || needsFresh
-  const { data: placeDetails } = usePlaceDetails(shouldFetch ? googlePlaceId : undefined)
+  // Lazy-load: only mark as visible once the component enters the viewport
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Fetch photos via React Query (Essentials tier) — only when visible AND no preloaded photos or URLs expired
+  const shouldFetch = isVisible && (!preloadedPhotos?.length || needsFresh)
+  const { data: photoData } = usePlacePhotos(shouldFetch ? googlePlaceId : undefined)
   const invalidatePhotos = useInvalidatePlacePhotos()
 
   // Sync photoIndex when selectedPhotoIndex prop changes
@@ -68,10 +88,10 @@ export function PlacePhoto({
 
   // Sync photos from React Query result
   useEffect(() => {
-    if (placeDetails?.photos && placeDetails.photos.length > 0) {
-      setPhotos(placeDetails.photos)
+    if (photoData?.photos && photoData.photos.length > 0) {
+      setPhotos(photoData.photos)
     }
-  }, [placeDetails])
+  }, [photoData])
 
   // Handle image load error (expired Google Places URLs return 403)
   const handleImageError = useCallback(() => {
@@ -129,6 +149,7 @@ export function PlacePhoto({
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         "shrink-0 overflow-hidden bg-neutral-100 relative",
         showArrows && "group/photo",

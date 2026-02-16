@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Search, MapPin, Star, Loader2, Navigation } from "lucide-react"
+import { Search, MapPin, Loader2, Navigation } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { TextField } from "@/components/ui/text-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { searchPlaces, geocodeAddress, getPlaceDetails, PlaceSearchResult } from "@/lib/maps"
+import { searchPlaces, geocodeAddress, getPlacePhotos, PlaceSearchResult } from "@/lib/maps"
 import { placeKeys } from "@/lib/hooks/use-places"
 import { Coordinates } from "@/types"
 
@@ -104,28 +104,34 @@ export function PlaceSearch({
   const handleInputChange = (value: string) => {
     setQuery(value)
 
-    // Debounce search
+    // Debounce search — 600ms delay, minimum 3 characters to reduce API calls
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
+    if (value.trim().length < 3) {
+      setResults([])
+      setIsOpen(false)
+      return
+    }
+
     debounceRef.current = setTimeout(() => {
       handleSearch(value)
-    }, 300)
+    }, 600)
   }
 
   const handleSelectPlace = async (place: PlaceSearchResult) => {
-    // Fetch full details to get photos if the place has a placeId
+    // Fetch photos via Essentials-tier call (skips displayName to avoid Pro tier)
     if (place.placeId) {
       setIsFetchingDetails(true)
       try {
-        const details = await queryClient.fetchQuery({
-          queryKey: placeKeys.detail(place.placeId),
-          queryFn: () => getPlaceDetails(place.placeId),
+        const photoData = await queryClient.fetchQuery({
+          queryKey: placeKeys.photos(place.placeId),
+          queryFn: () => getPlacePhotos(place.placeId),
           staleTime: 20 * 60 * 1000,
         })
-        if (details) {
-          onSelect(details)
+        if (photoData?.photos) {
+          onSelect({ ...place, photos: photoData.photos })
         } else {
           onSelect(place)
         }
@@ -183,14 +189,6 @@ export function PlaceSearch({
                         <p className="text-xs text-muted-foreground truncate">
                           {place.address}
                         </p>
-                        {place.rating && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                            <span className="text-xs text-muted-foreground">
-                              {place.rating.toFixed(1)}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </button>
