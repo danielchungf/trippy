@@ -1,14 +1,12 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { getPlaceDetails, searchPlaces, PlaceSearchResult } from "@/lib/maps"
-import { Coordinates } from "@/types"
+import { getPlacePhotos } from "@/lib/maps"
 
 // Query keys for cache management
 export const placeKeys = {
   all: ["places"] as const,
-  details: () => [...placeKeys.all, "detail"] as const,
-  detail: (placeId: string) => [...placeKeys.details(), placeId] as const,
+  photos: (placeId: string) => [...placeKeys.all, "photos", placeId] as const,
   searches: () => [...placeKeys.all, "search"] as const,
   search: (query: string, lat?: number, lng?: number) =>
     [...placeKeys.searches(), query, lat, lng] as const,
@@ -23,11 +21,11 @@ const PLACE_CACHE_CONFIG = {
   retry: 1,
 }
 
-// Hook to fetch place details (used by PlacePhoto, etc.)
-export function usePlaceDetails(placeId: string | undefined) {
+// Hook to fetch place photos via Essentials-tier API call
+export function usePlacePhotos(placeId: string | undefined) {
   return useQuery({
-    queryKey: placeKeys.detail(placeId!),
-    queryFn: () => getPlaceDetails(placeId!),
+    queryKey: placeKeys.photos(placeId!),
+    queryFn: () => getPlacePhotos(placeId!),
     enabled: !!placeId,
     ...PLACE_CACHE_CONFIG,
   })
@@ -39,7 +37,7 @@ export function useInvalidatePlacePhotos() {
 
   return (placeId: string) => {
     queryClient.invalidateQueries({
-      queryKey: placeKeys.detail(placeId),
+      queryKey: placeKeys.photos(placeId),
     })
   }
 }

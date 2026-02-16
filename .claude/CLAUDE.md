@@ -40,12 +40,13 @@ Users open Piper on mobile while traveling:
 
 ## Google Maps API Usage
 Core API functions live in `src/lib/maps.ts`. We use:
-- **Places Text Search** - `searchPlaces()` for place lookups
-- **Place Details** - `getPlaceDetails()` and `getPlaceDetailsExtended()` for place info
+- **Places Text Search** - `searchPlaces()` for place lookups (Pro tier — requests displayName, formattedAddress, location only)
+- **Place Photos** - `getPlacePhotos()` for fetching photos on selection (Essentials tier — photos + id only)
+- **Place Details** - `getPlaceDetails()` for full place info including photos (Pro tier — only used if full details needed)
 - **Directions** - `getDirections()` and `optimizeRoute()` for routing
 - **Geocoding** - `geocodeAddress()` for address-to-coordinates
 
-**Cost note:** We request photos, reviews, opening hours which bills at **Pro tier** rates, not the cheaper Essentials tier. See `/.context/google-maps-api-usage.md` for full analysis.
+**Cost note:** `searchPlaces()` intentionally excludes `rating`, `types`, and `photos` to stay at Pro tier (not Enterprise). Photos are fetched separately via the cheaper `getPlacePhotos()` Essentials-tier call only when a place is selected.
 
 ## Design System
 See `src/lib/design-tokens.ts` for:
@@ -71,4 +72,4 @@ After making corrections, update this file or add to `/memory/corrections/`.
 ## Rules & Corrections
 
 - **Google Places photo URLs expire** - Never store/use photo URLs from the database. Always fetch fresh photos using `googlePlaceId` via `PlacePhoto` component. URLs return 403 after ~24 hours. (See `src/components/PlacePhoto.tsx`)
-- **ALWAYS flag Google Maps API cost impact** - Before implementing any feature that adds or modifies Google Maps API calls (`getPlaceDetails`, `searchPlaces`, `getPlaceDetailsExtended`, `getDirections`, `geocodeAddress`), flag it to the user with the estimated cost tier. Never add raw API calls — always use React Query caching (`use-places.ts` hooks or `queryClient.fetchQuery`). Never call API functions inside loops or uncached useEffects. Prefer using data already in the database over fetching from API. See `src/lib/hooks/use-places.ts` for the caching pattern.
+- **ALWAYS flag Google Maps API cost impact** - Before implementing any feature that adds or modifies Google Maps API calls (`getPlacePhotos`, `getPlaceDetails`, `searchPlaces`, `getDirections`, `geocodeAddress`), flag it to the user with the estimated cost tier. Never add raw API calls — always use React Query caching (`use-places.ts` hooks or `queryClient.fetchQuery`). Never call API functions inside loops or uncached useEffects. Prefer using data already in the database over fetching from API. Prefer `getPlacePhotos()` (Essentials tier) over `getPlaceDetails()` (Pro tier) when you only need photos. See `src/lib/hooks/use-places.ts` for the caching pattern.

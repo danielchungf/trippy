@@ -43,8 +43,6 @@ export interface PlaceSearchResult {
   name: string
   address: string
   coordinates: Coordinates
-  rating?: number
-  types?: string[]
   photos?: string[]
 }
 
@@ -85,7 +83,7 @@ export async function searchPlaces(
   await loadPlacesLibrary()
 
   const request: google.maps.places.SearchByTextRequest = {
-    fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'types', 'photos'],
+    fields: ['id', 'displayName', 'formattedAddress', 'location'],
     textQuery: query,
     maxResultCount: 10,
     ...(location && {
@@ -107,9 +105,6 @@ export async function searchPlaces(
         lat: place.location?.lat() || 0,
         lng: place.location?.lng() || 0
       },
-      rating: place.rating ?? undefined,
-      types: place.types ?? undefined,
-      photos: place.photos?.slice(0, 3).map(p => p.getURI({ maxWidth: 400 }))
     }))
 
     // When preciseMatch is true and we have coordinates, strictly filter results
@@ -140,7 +135,7 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
   try {
     const place = new google.maps.places.Place({ id: placeId })
     await place.fetchFields({
-      fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'types', 'photos']
+      fields: ['id', 'displayName', 'formattedAddress', 'location', 'photos']
     })
 
     return {
@@ -151,10 +146,27 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceSearchResul
         lat: place.location?.lat() || 0,
         lng: place.location?.lng() || 0
       },
-      rating: place.rating ?? undefined,
-      types: place.types ?? undefined,
       photos: place.photos?.slice(0, 3).map(p => p.getURI({ maxWidth: 400 }))
     }
+  } catch {
+    return null
+  }
+}
+
+// Essentials-tier Place Details call — only fetches photos + location data.
+// Avoids requesting displayName (Pro tier) since callers already have the name.
+export async function getPlacePhotos(placeId: string): Promise<{ photos: string[] } | null> {
+  await loadGoogleMaps()
+  await loadPlacesLibrary()
+
+  try {
+    const place = new google.maps.places.Place({ id: placeId })
+    await place.fetchFields({
+      fields: ['id', 'photos']
+    })
+
+    const photos = place.photos?.slice(0, 3).map(p => p.getURI({ maxWidth: 400 })) || []
+    return { photos }
   } catch {
     return null
   }
