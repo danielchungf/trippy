@@ -13,10 +13,10 @@ export const placeKeys = {
 }
 
 // Cache config for place data
-// staleTime 20min, gcTime 1hr — well under 24hr photo URL expiry
+// staleTime 12hr, gcTime 18hr — photo URLs expire after ~24hr so 12hr gives a 2x buffer
 const PLACE_CACHE_CONFIG = {
-  staleTime: 20 * 60 * 1000,
-  gcTime: 60 * 60 * 1000,
+  staleTime: 12 * 60 * 60 * 1000,
+  gcTime: 18 * 60 * 60 * 1000,
   refetchOnWindowFocus: false as const,
   retry: 1,
 }

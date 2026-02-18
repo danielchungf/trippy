@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { ChevronLeft, ChevronRight, MapPin } from "lucide-react"
+import { ChevronLeft, ChevronRight, ImageOff, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { updateAccommodation, updateSavedPlace, updateLocation } from "@/lib/db"
 import { usePlacePhotos, useInvalidatePlacePhotos } from "@/lib/hooks/use-places"
@@ -11,7 +11,7 @@ type EntityType = 'accommodation' | 'savedPlace' | 'location'
 interface PlacePhotoProps {
   /** Google Place ID to fetch photos from */
   googlePlaceId?: string
-  /** Pre-loaded photos array (optional - if provided, skips API fetch) */
+  /** Pre-loaded photos array (only used as fallback when no googlePlaceId) */
   photos?: string[]
   /** Currently selected photo index (from database) */
   selectedPhotoIndex?: number
@@ -46,9 +46,10 @@ export function PlacePhoto({
   editable
 }: PlacePhotoProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [photos, setPhotos] = useState<string[]>(preloadedPhotos || [])
+  const [photos, setPhotos] = useState<string[]>(googlePlaceId ? [] : (preloadedPhotos || []))
   const [photoIndex, setPhotoIndex] = useState(selectedPhotoIndex)
   const [needsFresh, setNeedsFresh] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
 
   // Lazy-load: only mark as visible once the component enters the viewport
@@ -69,8 +70,9 @@ export function PlacePhoto({
     return () => observer.disconnect()
   }, [])
 
-  // Fetch photos via React Query (Essentials tier) — only when visible AND no preloaded photos or URLs expired
-  const shouldFetch = isVisible && (!preloadedPhotos?.length || needsFresh)
+  // Fetch photos via React Query (Essentials tier) — always fetch fresh when visible
+  // Google Places photo URLs expire (~24h), so never rely on stored URLs from the database
+  const shouldFetch = isVisible && !!googlePlaceId
   const { data: photoData } = usePlacePhotos(shouldFetch ? googlePlaceId : undefined)
   const invalidatePhotos = useInvalidatePlacePhotos()
 
@@ -79,22 +81,24 @@ export function PlacePhoto({
     setPhotoIndex(selectedPhotoIndex)
   }, [selectedPhotoIndex])
 
-  // Use preloaded photos if provided (and not marked as needing fresh)
+  // Use preloaded photos only when no googlePlaceId (e.g. manually added places)
   useEffect(() => {
-    if (preloadedPhotos && preloadedPhotos.length > 0 && !needsFresh) {
+    if (!googlePlaceId && preloadedPhotos && preloadedPhotos.length > 0) {
       setPhotos(preloadedPhotos)
     }
-  }, [preloadedPhotos, needsFresh])
+  }, [googlePlaceId, preloadedPhotos])
 
   // Sync photos from React Query result
   useEffect(() => {
     if (photoData?.photos && photoData.photos.length > 0) {
       setPhotos(photoData.photos)
+      setImgError(false)
     }
   }, [photoData])
 
   // Handle image load error (expired Google Places URLs return 403)
   const handleImageError = useCallback(() => {
+    setImgError(true)
     if (!needsFresh && googlePlaceId) {
       invalidatePhotos(googlePlaceId)
       setPhotos([])
@@ -160,7 +164,7 @@ export function PlacePhoto({
         height: height ?? 'auto'
       }}
     >
-      {currentPhoto ? (
+      {currentPhoto && !imgError ? (
         <>
           <img
             src={currentPhoto}
@@ -187,8 +191,8 @@ export function PlacePhoto({
           )}
         </>
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          {placeholderIcon || <MapPin className="h-5 w-5 text-neutral-300" />}
+        <div className="w-full h-full flex items-center justify-center bg-neutral-100">
+          <ImageOff className="h-5 w-5 text-neutral-300" strokeWidth={1.5} />
         </div>
       )}
     </div>
