@@ -209,6 +209,9 @@ export default function TripPage() {
     initialTab && ['overview', 'stays', 'itinerary', 'places', 'expenses', 'packing'].includes(initialTab) ? initialTab : 'overview'
   )
 
+  // Shared panel layout state so resizing persists across tab switches
+  const [panelLayout, setPanelLayout] = useState<Record<string | number, number> | undefined>()
+
   // Keep URL in sync with active tab so refresh preserves it
   const setActiveTab = useCallback((tab: TabId) => {
     setActiveTabState(tab)
@@ -647,18 +650,20 @@ export default function TripPage() {
         onDeletePlace={handleDeletePlaceById}
         onRefresh={refreshTrip}
         showMapView={placesViewMode === 'map'}
+        panelLayout={panelLayout}
+        setPanelLayout={setPanelLayout}
         setShowMapView={(show) => setPlacesViewMode(show ? 'map' : 'grid')}
       />
     </div>
   ) : activeTab === 'itinerary' ? (
     // Itinerary tab — mobile: sliding list-to-detail, desktop: two-panel
     isDesktop ? (
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1" defaultLayout={panelLayout} onLayoutChanged={setPanelLayout}>
         {/* Left Panel - Itinerary list */}
         <ResizablePanel
+          id="left"
           defaultSize="500px"
           minSize="420px"
-          maxSize="580px"
           className="border-r border-neutral-200 flex flex-col overflow-hidden"
         >
           <div className="flex-1 overflow-auto">
@@ -676,7 +681,7 @@ export default function TripPage() {
         <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
         {/* Right Panel - Map + day activities */}
-        <ResizablePanel className="flex flex-col overflow-hidden">
+        <ResizablePanel id="right" minSize="500px" className="flex flex-col overflow-hidden">
           {selectedDayDate ? (
             <RightPanel
               trip={trip}
@@ -710,11 +715,11 @@ export default function TripPage() {
   ) : activeTab === 'stays' ? (
     // Stays tab — mobile: map + list in own scroll container, desktop: two-panel
     isDesktop ? (
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1" defaultLayout={panelLayout} onLayoutChanged={setPanelLayout}>
         <ResizablePanel
+          id="left"
           defaultSize="500px"
           minSize="420px"
-          maxSize="580px"
           className="border-r border-neutral-200 flex flex-col overflow-hidden"
         >
           <StaysPanel
@@ -726,7 +731,7 @@ export default function TripPage() {
           />
         </ResizablePanel>
         <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
-        <ResizablePanel className="flex flex-col overflow-hidden">
+        <ResizablePanel id="right" minSize="500px" className="flex flex-col overflow-hidden">
           <DestinationsMap locations={staysAsLocations} hoveredIndex={hoveredStayIndex} />
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -764,6 +769,8 @@ export default function TripPage() {
       onTabChange={setActiveTab}
       destinationsViewMode={destinationsViewMode}
       setDestinationsViewMode={setDestinationsViewMode}
+      panelLayout={panelLayout}
+      setPanelLayout={setPanelLayout}
     />
   ) : (
     // Overview tab — mobile: map + header + content in own scroll container
@@ -788,6 +795,8 @@ export default function TripPage() {
         onTabChange={setActiveTab}
         destinationsViewMode={destinationsViewMode}
         setDestinationsViewMode={setDestinationsViewMode}
+        panelLayout={panelLayout}
+        setPanelLayout={setPanelLayout}
       />
     </div>
   )
@@ -1386,7 +1395,9 @@ function PlacesRightPanel({
   onDeletePlace,
   onRefresh,
   showMapView,
-  setShowMapView
+  setShowMapView,
+  panelLayout,
+  setPanelLayout
 }: {
   trip: TripWithOwnership
   onOpenPlaceDialog: (place?: SavedPlace) => void
@@ -1394,6 +1405,8 @@ function PlacesRightPanel({
   onRefresh: () => Promise<void>
   showMapView: boolean
   setShowMapView: (show: boolean) => void
+  panelLayout: Record<string | number, number> | undefined
+  setPanelLayout: (layout: Record<string | number, number>) => void
 }) {
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
@@ -1788,12 +1801,12 @@ function PlacesRightPanel({
       {showMapView ? (
         isDesktop ? (
           /* Desktop: Map View with horizontal ResizablePanelGroup */
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
+          <ResizablePanelGroup direction="horizontal" className="flex-1" defaultLayout={panelLayout} onLayoutChanged={setPanelLayout}>
             {/* Left Panel - Places List */}
             <ResizablePanel
+              id="left"
               defaultSize="500px"
               minSize="420px"
-              maxSize="580px"
               className="border-r border-neutral-200 flex flex-col overflow-hidden"
             >
               <div className="flex-1 overflow-auto flex flex-col">
@@ -1833,7 +1846,7 @@ function PlacesRightPanel({
             <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
             {/* Right Panel - Map */}
-            <ResizablePanel className="flex flex-col overflow-hidden">
+            <ResizablePanel id="right" minSize="500px" className="flex flex-col overflow-hidden">
               {totalPlaceCount === 0 ? (
                 <div className="h-full bg-neutral-100 flex items-center justify-center">
                   <div className="flex flex-col items-center gap-1">
@@ -2658,7 +2671,7 @@ function RightPanel({
 
             {/* Staying Accommodation Row (checking in or staying tonight) */}
             {stayingAccommodation && (
-              <div className={cn("group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors", day.activities.length > 0 && "border-t")}>
+              <div className="group py-3 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50 hover:bg-neutral-100 transition-colors">
                 {/* Left: Bed icon + Name */}
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-5 flex-shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.8] text-text-secondary">
@@ -3374,7 +3387,7 @@ function DayCard({
       >
         {/* Row 1: Badge (location) + Date */}
         <div className="flex items-center justify-between">
-          <Badge dotColor={location?.color || LOCATION_COLORS[0].value} truncate>
+          <Badge dotColor={location?.color || 'bg-neutral-300'} truncate>
             {location?.name || 'No destination'}
           </Badge>
           <span className="text-mono-regular text-text-secondary">{dateLabel}</span>
@@ -3502,7 +3515,9 @@ function OverviewPanel({
   onRefresh,
   onTabChange,
   destinationsViewMode,
-  setDestinationsViewMode
+  setDestinationsViewMode,
+  panelLayout,
+  setPanelLayout
 }: {
   trip: TripWithOwnership
   onOpenLocationDialog: (location?: Location) => void
@@ -3510,6 +3525,8 @@ function OverviewPanel({
   onTabChange: (tab: TabId) => void
   destinationsViewMode: 'list' | 'calendar'
   setDestinationsViewMode: (mode: 'list' | 'calendar') => void
+  panelLayout: Record<string | number, number> | undefined
+  setPanelLayout: (layout: Record<string | number, number>) => void
 }) {
   const [hoveredLocationIndex, setHoveredLocationIndex] = useState<number | null>(null)
 
@@ -3649,11 +3666,11 @@ function OverviewPanel({
 
       {/* Desktop: resizable two-panel layout (wrapper div needed because ResizablePanelGroup applies inline display:flex which overrides hidden) */}
       <div className="hidden lg:flex flex-1">
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanelGroup direction="horizontal" className="flex-1" defaultLayout={panelLayout} onLayoutChanged={setPanelLayout}>
           <ResizablePanel
+            id="left"
             defaultSize="500px"
             minSize="420px"
-            maxSize="580px"
             className="border-r border-neutral-200 flex flex-col overflow-hidden"
           >
             {daysAwayBanner}
@@ -3665,7 +3682,7 @@ function OverviewPanel({
 
           <ResizableHandle direction="horizontal" className="w-px bg-transparent focus:outline-none focus-visible:ring-0" />
 
-          <ResizablePanel className="flex flex-col overflow-hidden">
+          <ResizablePanel id="right" minSize="500px" className="flex flex-col overflow-hidden">
             <DestinationsMap
               locations={trip.locations}
               hoveredIndex={hoveredLocationIndex}
